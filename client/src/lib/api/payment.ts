@@ -1,0 +1,97 @@
+// src/lib/api/payment.ts
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+export interface PaymentSummary {
+  itemCount: number;
+  totalAmount: number;
+  items: Array<{
+    id: string;
+    designId: string;
+    packageType: 'classic' | 'premium' | 'vip';
+    hostName: string;
+    eventDate: string;
+    eventLocation: string;
+    inviteCount: number;
+    price: number;
+  }>;
+}
+
+export interface PaymentApiResponse<T = any> {
+  success: boolean;
+  message?: string;
+  summary?: PaymentSummary;
+  eventsCreated?: number;
+  events?: T[];
+  paymentId?: string;
+  totalAmount?: number;
+  errorReason?: string;
+  error?: { message: string };
+}
+
+class PaymentAPI {
+  private getAuthHeaders() {
+    const token = localStorage.getItem('access_token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+  }
+
+  async getPaymentSummary(): Promise<PaymentApiResponse<PaymentSummary>> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/summary`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في جلب ملخص الدفع');
+    }
+
+    return result;
+  }
+
+  async processPayment(paymentDetails: {
+    paymentId: string;
+    amount: number;
+    paymentMethod: string;
+    transactionId?: string;
+  }): Promise<PaymentApiResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/process`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(paymentDetails),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في معالجة الدفع');
+    }
+
+    return result;
+  }
+
+  async processFailedPayment(failureDetails: {
+    paymentId: string;
+    amount: number;
+    errorReason: string;
+  }): Promise<PaymentApiResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/failed`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(failureDetails),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في معالجة فشل الدفع');
+    }
+
+    return result;
+  }
+}
+
+export const paymentAPI = new PaymentAPI();

@@ -1,0 +1,42 @@
+export const formUtils = {
+    // Debounced validation function
+    createDebouncedValidator: (validationFn: Function, delay: number = 300) => {
+      let timeoutId: NodeJS.Timeout;
+      
+      return (...args: any[]) => {
+        clearTimeout(timeoutId);
+        return new Promise((resolve) => {
+          timeoutId = setTimeout(() => {
+            resolve(validationFn(...args));
+          }, delay);
+        });
+      };
+    },
+  
+    // Check if form has any data entered
+    hasFormData: (form: any): boolean => {
+      return Object.values(form).some(value => {
+        if (typeof value === 'string') {
+          return value.trim() !== '';
+        }
+        if (typeof value === 'number') {
+          return value !== 100 && value !== 0; // Default values
+        }
+        if (typeof value === 'boolean') {
+          return value !== true; // Default QR code value
+        }
+        return false;
+      });
+    },
+  
+    // Generate form field key for React keys
+    generateFieldKey: (fieldName: string, index?: number): string => {
+      return index !== undefined ? `${fieldName}-${index}` : fieldName;
+    },
+  
+    // Sanitize form input
+    sanitizeInput: (input: string): string => {
+      return input.trim().replace(/\s+/g, ' ');
+    }
+  };
+  
