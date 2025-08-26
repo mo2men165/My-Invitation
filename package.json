@@ -1,0 +1,21 @@
+{
+  "name": "my-invitation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\"",
+    "install:all": "npm install && cd client && npm install && cd server && npm install && cd shared && npm install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "cross-env": "^10.0.0"
+  },
+  "dependencies": {
+    "tailwind-merge": "^3.3.1"
+  }
+}
