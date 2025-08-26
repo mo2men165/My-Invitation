@@ -1,14 +1,14 @@
 // components/Home/AboutSection.tsx
 'use client';
 import Link from 'next/link';
-import { motion, useInView } from 'framer-motion';
+import { motion, useInView, Variants, easeOut } from "framer-motion";
 import { useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, CheckCircle, Star, Users, Calendar } from 'lucide-react';
 
 export function AboutSection() {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, threshold: 0.1 });
+  const isInView = useInView(ref, { once: true });
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -21,29 +21,23 @@ export function AboutSection() {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 30 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: {
-        duration: 0.6,
-        ease: "easeOut"
-      }
-    }
+      transition: { duration: 0.6, ease: easeOut },
+    },
   };
 
-  const imageVariants = {
+  const imageVariants: Variants = {
     hidden: { opacity: 0, x: 50 },
     visible: {
       opacity: 1,
       x: 0,
-      transition: {
-        duration: 0.8,
-        ease: "easeOut"
-      }
-    }
-  };
+      transition: { duration: 0.8, ease: easeOut },
+    },
+  };  
 
   const features = [
     "تنظيم ضيوفك دون تكرار أو تزوير",

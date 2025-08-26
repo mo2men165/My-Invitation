@@ -1,14 +1,14 @@
 // components/Home/CTA.tsx
 'use client';
 import Link from 'next/link';
-import { motion, useInView } from 'framer-motion';
+import { motion, useInView, easeOut } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, Sparkles, Check, Star, Zap, Gift } from 'lucide-react';
 
 export function CTA() {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, threshold: 0.1 });
+  const isInView = useInView(ref, { once: true, amount: 0.1 });
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
 
   const features = [
@@ -47,7 +47,7 @@ export function CTA() {
       y: 0,
       transition: {
         duration: 0.6,
-        ease: "easeOut"
+        ease: easeOut
       }
     }
   };

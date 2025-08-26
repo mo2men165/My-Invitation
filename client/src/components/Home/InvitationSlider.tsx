@@ -84,8 +84,18 @@ export function InvitationSlider() {
     setIsAutoPlaying(false);
   };
 
+  type Invitation = {
+    id: number;
+    title: string;
+    category: string;
+    image: string;
+    likes: number;
+    views: number;
+    position?: number;
+  };
+
   const getVisibleSlides = () => {
-    const slides = [];
+    const slides: Invitation[] = [];
     for (let i = 0; i < 3; i++) {
       const index = (currentSlide + i) % invitations.length;
       slides.push({ ...invitations[index], position: i });

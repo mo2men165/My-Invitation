@@ -52,7 +52,13 @@ export const useCartFormValidation = () => {
     const rule = validationRules[field as keyof typeof validationRules];
     if (!rule) return null;
     
-    return rule(value, form);
+    // Check if the rule needs the form parameter (like endTime validation)
+    if (field === 'endTime' && form) {
+      return (rule as (value: string, form: CartForm) => string | null)(value, form);
+    }
+    
+    // For other rules that only need the value
+    return (rule as (value: string) => string | null)(value);
   }, [validationRules]);
 
   const validateFieldWithTouch = useCallback((field: string, value: any, form?: CartForm) => {

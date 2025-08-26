@@ -1,5 +1,5 @@
 'use client';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { useWishlistData } from '@/hooks/useWishlistData';
 import { useCompareData } from '@/hooks/useCompareData';
@@ -40,6 +40,7 @@ const WishlistPage: React.FC = () => {
   } = useModal();
   const { toast } = useToast();
   const dispatch = useAppDispatch();
+  const [selectedPackageType, setSelectedPackageType] = useState<"classic" | "premium" | "vip">("classic");
 
   const handleRemoveFromWishlist = useCallback(async (designId: string) => {
     try {
@@ -68,15 +69,19 @@ const WishlistPage: React.FC = () => {
 
   const handleAddAllToCompare = useCallback(async () => {
     if (items.length === 0) return;
-
+  
     try {
       // Take only first 3 items for comparison
-      const designIds = items.slice(0, 3).map(item => item.designId);
-      await dispatch(replaceCompareList(designIds)).unwrap();
+      const compareItems = items.slice(0, 3).map(item => ({
+        designId: item.designId,
+        packageType: selectedPackageType,
+      }));
+  
+      await dispatch(replaceCompareList(compareItems)).unwrap();
       
       toast({
         title: "تم إضافة للمقارنة",
-        description: `تم إضافة ${designIds.length} تصميم للمقارنة`,
+        description: `تم إضافة ${compareItems.length} تصميم للمقارنة`,
         variant: "compare",
         duration: 3000
       });
@@ -88,7 +93,8 @@ const WishlistPage: React.FC = () => {
         duration: 3000
       });
     }
-  }, [items, dispatch, toast]);
+  }, [items, dispatch, toast, selectedPackageType]);
+  
 
   const handleClearWishlist = useCallback(async () => {
     if (items.length === 0) return;
@@ -165,6 +171,8 @@ const WishlistPage: React.FC = () => {
               onAddAllToCompare={handleAddAllToCompare}
               onClearWishlist={handleClearWishlist}
               isLoading={isLoading}
+              selectedPackageType={selectedPackageType}
+              onPackageTypeChange={setSelectedPackageType}
             />
           </>
         )}

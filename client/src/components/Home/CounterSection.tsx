@@ -2,7 +2,7 @@
 'use client';
 import { motion, useInView } from 'framer-motion';
 import { useRef, useEffect, useState } from 'react';
-import { Users, Calendar, Star, ThumbsUp, BarChart3 } from 'lucide-react';
+import { Users, Star, ThumbsUp, BarChart3 } from 'lucide-react';
 
 interface CounterItemProps {
   icon: React.ComponentType<any>;
@@ -14,7 +14,7 @@ interface CounterItemProps {
 function CounterItem({ icon: Icon, number, label, delay }: CounterItemProps) {
   const [count, setCount] = useState(0);
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, threshold: 0.5 });
+  const isInView = useInView(ref, { once: true, amount: 0.5 });
 
   useEffect(() => {
     if (isInView) {
@@ -106,7 +106,7 @@ function CounterItem({ icon: Icon, number, label, delay }: CounterItemProps) {
 
 export function CounterSection() {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, threshold: 0.1 });
+  const isInView = useInView(ref, { once: true, amount: 0.5 });
 
   const counters = [
     {

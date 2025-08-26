@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check": "tsc --noEmit && next lint"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.4.0",
