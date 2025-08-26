@@ -1,9 +1,12 @@
 export const formUtils = {
     // Debounced validation function
-    createDebouncedValidator: (validationFn: Function, delay: number = 300) => {
+    createDebouncedValidator: <T extends (...args: any[]) => any>(
+      validationFn: T,
+      delay: number = 300
+    ) => {
       let timeoutId: NodeJS.Timeout;
-      
-      return (...args: any[]) => {
+    
+      return (...args: Parameters<T>): Promise<ReturnType<T>> => {
         clearTimeout(timeoutId);
         return new Promise((resolve) => {
           timeoutId = setTimeout(() => {
@@ -11,7 +14,7 @@ export const formUtils = {
           }, delay);
         });
       };
-    },
+    },    
   
     // Check if form has any data entered
     hasFormData: (form: any): boolean => {
