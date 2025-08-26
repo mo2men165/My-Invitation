@@ -1,7 +1,7 @@
 // src/app/events/[id]/page.tsx
 'use client';
 import React, { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { eventsAPI, EventItem, GuestStats } from '@/lib/api/events';
 import { useToast } from '@/hooks/useToast';
 import { 
@@ -28,8 +28,10 @@ interface Guest {
   whatsappMessageSent: boolean;
 }
 
-const EventDetailPage: React.FC<{ params: { id: string } }> = ({ params }) => {
+const EventDetailPage: React.FC = () => {
   const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const eventId = params?.id;
   const { toast } = useToast();
   
   const [event, setEvent] = useState<EventItem | null>(null);
@@ -48,7 +50,7 @@ const EventDetailPage: React.FC<{ params: { id: string } }> = ({ params }) => {
   const loadEventDetails = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await eventsAPI.getEventDetails(params.id);
+      const response = await eventsAPI.getEventDetails(eventId);
       
       if (response.success) {
         setEvent(response.event!);
@@ -64,7 +66,7 @@ const EventDetailPage: React.FC<{ params: { id: string } }> = ({ params }) => {
     } finally {
       setLoading(false);
     }
-  }, [params.id, toast, router]);
+  }, [eventId, toast, router]);
 
   useEffect(() => {
     loadEventDetails();
@@ -103,7 +105,7 @@ const EventDetailPage: React.FC<{ params: { id: string } }> = ({ params }) => {
 
     try {
       setAddingGuest(true);
-      const response = await eventsAPI.addGuest(params.id, {
+      const response = await eventsAPI.addGuest(eventId, {
         name: newGuest.name.trim(),
         phone: newGuest.phone.replace(/^\+966/, ''),
         numberOfAccompanyingGuests: newGuest.numberOfAccompanyingGuests
@@ -155,7 +157,7 @@ ${event.details.invitationText}
     
     try {
       // Mark as sent in backend
-      await eventsAPI.markWhatsappSent(params.id, guest._id!);
+      await eventsAPI.markWhatsappSent(eventId, guest._id!);
       
       // Open WhatsApp
       window.open(whatsappUrl, '_blank');
@@ -179,7 +181,7 @@ ${event.details.invitationText}
 
   const handleRemoveGuest = async (guestId: string) => {
     try {
-      await eventsAPI.removeGuest(params.id, guestId);
+      await eventsAPI.removeGuest(eventId, guestId);
       await loadEventDetails();
       
       toast({
