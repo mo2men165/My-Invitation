@@ -1,0 +1,90 @@
+/* Optimized scroll styles for cart components */
+
+/* Smooth scrolling for all cart containers */
+.cart-scroll-container {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #C09B52 rgba(255, 255, 255, 0.1);
+}
+
+/* Custom scrollbar for webkit browsers */
+.cart-scroll-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cart-scroll-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.cart-scroll-container::-webkit-scrollbar-thumb {
+  background: #C09B52;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.cart-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #B8935A;
+}
+
+/* Performance optimizations */
+.cart-item {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Smooth transitions for cart items */
+.cart-item-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.cart-item-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+
+.cart-item-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cart-item-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 300ms ease-in, transform 300ms ease-in;
+}
+
+/* Modal scroll optimizations */
+.modal-scroll-container {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  contain: layout style paint;
+}
+
+/* Prevent scroll chaining */
+.modal-scroll-container:focus {
+  outline: none;
+}
+
+/* Smooth momentum scrolling for mobile */
+@media (max-width: 768px) {
+  .cart-scroll-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: auto; /* Better performance on mobile */
+  }
+}
+
+/* High DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .cart-item {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion, useInView, Variants, easeOut } from "framer-motion";
 import { useRef } from 'react';
+import { aboutFeatures } from '@/constants';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, CheckCircle, Star, Users, Calendar } from 'lucide-react';
 
@@ -39,11 +40,6 @@ export function AboutSection() {
     },
   };  
 
-  const features = [
-    "تنظيم ضيوفك دون تكرار أو تزوير",
-    "تصاميم قابلة للتخصيص تناسب هوية مناسبتك",
-    "إدارة كاملة عبر جوالك - من الإرسال إلى تتبع الحضور"
-  ];
 
   return (
     <section ref={ref} className="py-20 bg-white overflow-hidden">
@@ -79,7 +75,7 @@ export function AboutSection() {
                 className="text-xl text-gray-600 leading-relaxed"
                 variants={itemVariants}
               >
-                أول منصة سعودية متخصصة في دعوات المناسبات الإلكترونية باركود دخول فريدا
+                اول شركة سعودية متخصصة فى الدعوات الالكترونية منذ عام ٢٠١٧ 
               </motion.p>
 
               <motion.div 
@@ -94,7 +90,7 @@ export function AboutSection() {
             </div>
 
             <motion.div className="space-y-4" variants={itemVariants}>
-              {features.map((feature, index) => (
+              {aboutFeatures.map((feature, index) => (
                 <motion.div 
                   key={index}
                   className="flex items-start space-x-3 "

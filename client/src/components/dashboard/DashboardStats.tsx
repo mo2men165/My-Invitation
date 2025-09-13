@@ -11,11 +11,23 @@ export function DashboardStats() {
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const { stats, isLoadingStats, statsError } = useAppSelector((state) => state.dashboard);
+  const { stats, isLoadingStats, statsError, lastFetched } = useAppSelector((state) => state.dashboard);
   const [isVisible, setIsVisible] = useState(false);
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+  const [isPageVisible, setIsPageVisible] = useState(true);
 
   useEffect(() => {
     setIsVisible(true);
+  }, []);
+
+  // Track page visibility for auto-refresh optimization
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   // Fetch stats on mount if authenticated
@@ -24,6 +36,22 @@ export function DashboardStats() {
       dispatch(fetchDashboardStats());
     }
   }, [dispatch, isAuthenticated]);
+
+  // Auto-refresh stats every 30 seconds for real-time updates (only when page is visible)
+  useEffect(() => {
+    if (!isAuthenticated || !isPageVisible) return;
+
+    const interval = setInterval(() => {
+      if (isPageVisible) {
+        setIsBackgroundRefreshing(true);
+        dispatch(fetchDashboardStats()).finally(() => {
+          setIsBackgroundRefreshing(false);
+        });
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [dispatch, isAuthenticated, isPageVisible]);
 
   // Handle errors with toast
   useEffect(() => {
@@ -39,6 +67,10 @@ export function DashboardStats() {
   }, [statsError, toast, dispatch]);
 
   const handleRetry = () => {
+    dispatch(fetchDashboardStats());
+  };
+
+  const handleRefresh = () => {
     dispatch(fetchDashboardStats());
   };
 
@@ -119,7 +151,42 @@ export function DashboardStats() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-6">
+      {/* Header with refresh button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">إحصائيات لوحة التحكم</h2>
+          {lastFetched && (
+            <p className="text-sm text-gray-400 mt-1 flex items-center gap-2">
+              آخر تحديث: {new Date(lastFetched).toLocaleString('ar-SA', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                calendar: 'gregory'
+              })}
+              {isBackgroundRefreshing && (
+                <span className="flex items-center gap-1 text-[#C09B52]">
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  جاري التحديث...
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={isLoadingStats}
+          className="flex items-center gap-2 px-4 py-2 bg-[#C09B52]/20 text-[#C09B52] rounded-lg hover:bg-[#C09B52]/30 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoadingStats ? 'animate-spin' : ''}`} />
+          تحديث
+        </button>
+      </div>
+      
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {statsConfig.map((stat, index) => {
         const Icon = stat.icon;
         return (
@@ -171,6 +238,7 @@ export function DashboardStats() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

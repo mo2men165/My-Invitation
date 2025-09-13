@@ -2,6 +2,7 @@
 'use client';
 import { motion, useInView } from 'framer-motion';
 import { useRef, useEffect, useState } from 'react';
+import { counters } from '@/constants';
 import { Users, Star, ThumbsUp, BarChart3 } from 'lucide-react';
 
 interface CounterItemProps {
@@ -108,32 +109,6 @@ export function CounterSection() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, amount: 0.5 });
 
-  const counters = [
-    {
-      icon: BarChart3,
-      number: 7000,
-      label: "استخدام الباركود الذكي",
-      delay: 0
-    },
-    {
-      icon: Users,
-      number: 150000,
-      label: "عميل مسجل",
-      delay: 200
-    },
-    {
-      icon: Star,
-      number: 150000,
-      label: "مناسبة",
-      delay: 400
-    },
-    {
-      icon: ThumbsUp,
-      number: 550000,
-      label: "دعوة منفذة",
-      delay: 600
-    }
-  ];
 
   return (
     <section ref={ref} className="py-20 bg-black relative overflow-hidden">

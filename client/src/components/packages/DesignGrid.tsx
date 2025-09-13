@@ -7,8 +7,8 @@ interface DesignGridProps {
   designs: InvitationDesign[];
   packageType: keyof PackageData;
   onAddToCart: (packageType: keyof PackageData, design: InvitationDesign) => void;
-  onToggleWishlist: (designId: string) => void;
-  onToggleCompare: (designId: string) => void;
+  onToggleWishlist: (designId: string, packageType?: keyof PackageData) => void;
+  onToggleCompare: (designId: string, packageType?: keyof PackageData) => void;
   onViewImage: (design: InvitationDesign) => void;
   isInWishlist: (designId: string) => boolean;
   isInCompare: (designId: string) => boolean;

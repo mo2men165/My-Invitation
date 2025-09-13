@@ -4,6 +4,7 @@ import { Save, User, Mail, Phone, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { saudiCities } from '@/constants';
 
 interface ProfileFormProps {
   user: {
@@ -119,7 +120,6 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user, onSubmit, isLoading }) 
     setFormData({ ...formData, phone: value });
   };
 
-  const cities = ['جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'];
 
   return (
     <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">

@@ -47,7 +47,6 @@ const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, design }) => {
                 display: 'block'
               }}
               onError={() => {
-                console.log(`Failed to load image: ${design.image}`);
               }}
             />
           </div>

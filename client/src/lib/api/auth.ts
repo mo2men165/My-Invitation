@@ -99,7 +99,6 @@ class AuthAPI {
       });
     } catch (error) {
       // Don't throw on logout errors
-      console.warn('Logout API call failed:', error);
     } finally {
       // Always clear local storage
       localStorage.removeItem('access_token');
@@ -176,30 +175,42 @@ class AuthAPI {
       throw new Error('No refresh token available');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      // Refresh failed, clear tokens
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      throw new Error('Session expired. Please login again.');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        // Only clear tokens if it's a real session expiry
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          throw new Error('انتهت صلاحية الجلسة');
+        }
+        // For other errors, don't clear tokens
+        throw new Error(result.error?.message || 'فشل في تحديث الجلسة');
+      }
+
+      // Update access token
+      localStorage.setItem('access_token', result.access_token);
+      
+      return {
+        access_token: result.access_token,
+        refresh_token: refreshToken,
+        expires_in: result.expires_in,
+        token_type: result.token_type || 'Bearer'
+      };
+    } catch (error: any) {
+      // If it's a network error, don't clear tokens
+      if (error.name === 'TypeError' || error.message.includes('fetch')) {
+        throw new Error('خطأ في الشبكة. يرجى المحاولة مرة أخرى');
+      }
+      throw error;
     }
-
-    // Update access token
-    localStorage.setItem('access_token', result.access_token);
-    
-    return {
-      access_token: result.access_token,
-      refresh_token: refreshToken,
-      expires_in: result.expires_in,
-      token_type: result.token_type || 'Bearer'
-    };
   }
 
   // Utility method to check if user is authenticated

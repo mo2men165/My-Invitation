@@ -15,7 +15,8 @@ export const useCartForm = () => {
     eventLocation: '',
     additionalCards: 0,
     gateSupervisors: '',
-    fastDelivery: false
+    fastDelivery: false,
+    expeditedDelivery: false
   });
 
   const [locationData, setLocationData] = useState<LocationData>({
@@ -56,7 +57,8 @@ export const useCartForm = () => {
       eventLocation: '',
       additionalCards: 0,
       gateSupervisors: '',
-      fastDelivery: false
+      fastDelivery: false,
+      expeditedDelivery: false
     });
     setLocationData({
       address: '',

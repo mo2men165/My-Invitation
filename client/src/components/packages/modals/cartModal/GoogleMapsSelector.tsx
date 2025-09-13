@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
 import { MapPin, Search, AlertCircle, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/hooks/useToast';
+import { SAUDI_CITIES, CITY_BOUNDARIES, DEFAULT_COORDINATES, MAP_CONFIG, MAP_STYLES } from '@/constants';
 
 // Declare google as any to avoid type conflicts
 declare const google: any;
@@ -25,16 +26,7 @@ interface GoogleMapsSelectorProps {
   onSearchQueryChange: (query: string) => void;
 }
 
-const SAUDI_CITIES = ['جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'];
 
-// City boundaries for validation
-const CITY_BOUNDARIES = {
-  'جدة': { lat: 21.4858, lng: 39.1925, radius: 50 },
-  'الرياض': { lat: 24.7136, lng: 46.6753, radius: 60 },
-  'الدمام': { lat: 26.4207, lng: 50.0888, radius: 40 },
-  'مكة المكرمة': { lat: 21.3891, lng: 39.8579, radius: 30 },
-  'الطائف': { lat: 21.2703, lng: 40.4034, radius: 35 }
-};
 
 // Global state to track Google Maps loading
 let isGoogleMapsLoading = false;
@@ -58,14 +50,12 @@ const loadGoogleMapsGlobally = (callback: () => void) => {
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
-    console.error('Google Maps API key not found');
     return;
   }
 
   // Check if script already exists
   const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
   if (existingScript) {
-    console.warn('Google Maps script already exists, removing...');
     existingScript.remove();
   }
 
@@ -84,7 +74,6 @@ const loadGoogleMapsGlobally = (callback: () => void) => {
 
   script.onerror = () => {
     isGoogleMapsLoading = false;
-    console.error('Failed to load Google Maps');
   };
 
   document.head.appendChild(script);
@@ -170,7 +159,6 @@ const GoogleMapsSelector: React.FC<GoogleMapsSelectorProps> = memo(({
       onLocationSelect(lat, lng, `موقع في ${validCity}`, validCity);
       
     } catch (error) {
-      console.error('Geocoding error:', error);
       onLocationSelect(lat, lng, `موقع في ${validCity}`, validCity);
     }
   }, [validateCityBoundary, onLocationSelect, toast]);
@@ -201,27 +189,9 @@ const GoogleMapsSelector: React.FC<GoogleMapsSelectorProps> = memo(({
     try {
       // Create map
       const map = new google.maps.Map(mapRef.current, {
-        center: { lat: 24.7136, lng: 46.6753 },
-        zoom: 11,
-        styles: [
-          {
-            "elementType": "geometry",
-            "stylers": [{ "color": "#1d2c4d" }]
-          },
-          {
-            "elementType": "labels.text.fill",
-            "stylers": [{ "color": "#8ec3b9" }]
-          },
-          {
-            "elementType": "labels.text.stroke",
-            "stylers": [{ "color": "#1a3646" }]
-          },
-          {
-            "featureType": "water",
-            "elementType": "geometry",
-            "stylers": [{ "color": "#0e1626" }]
-          }
-        ]
+        center: DEFAULT_COORDINATES,
+        zoom: MAP_CONFIG.defaultZoom,
+        // Remove custom styles to use default Google Maps theme
       });
 
       mapInstanceRef.current = map;
@@ -257,7 +227,6 @@ const GoogleMapsSelector: React.FC<GoogleMapsSelectorProps> = memo(({
       setIsMapInitialized(true);
 
     } catch (error) {
-      console.error('Error initializing map:', error);
       setLoadError('خطأ في تهيئة الخريطة');
     }
   }, [isLoading, loadError, isMapInitialized, handleLocationSelect]);
@@ -281,8 +250,8 @@ const GoogleMapsSelector: React.FC<GoogleMapsSelectorProps> = memo(({
 
     try {
       const autocomplete = new google.maps.places.Autocomplete(searchInputRef.current, {
-        componentRestrictions: { country: 'SA' },
-        fields: ['place_id', 'geometry', 'name', 'formatted_address']
+        componentRestrictions: MAP_CONFIG.componentRestrictions,
+        fields: MAP_CONFIG.fields
       });
 
       autocompleteRef.current = autocomplete;
@@ -303,7 +272,6 @@ const GoogleMapsSelector: React.FC<GoogleMapsSelectorProps> = memo(({
       });
 
     } catch (error) {
-      console.error('Error initializing autocomplete:', error);
     }
   }, [isMapInitialized, handleLocationSelect]);
 

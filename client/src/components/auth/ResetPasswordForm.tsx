@@ -35,7 +35,6 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     const verifyToken = async () => {
       try {
         const response = await authAPI.verifyResetToken(token);
-        console.log('API response:', response);
         if (response.valid) {
           setIsTokenValid(true);
           setUserEmail(response.email || '');
@@ -43,7 +42,6 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
           setIsTokenValid(false);
         }
       } catch (error) {
-        console.log(error);
         setIsTokenValid(false);
       }
     };
@@ -55,8 +53,6 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     }
   }, [token]);
 
-  console.log('Token from URL:', token);
-  console.log('State - isTokenValid:', isTokenValid, 'userEmail:', userEmail);
 
 
     const {
@@ -80,7 +76,6 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         await dispatch(resetPassword({ token: data.token, password: data.password })).unwrap();
         setIsSuccess(true);
       } catch (error) {
-        console.log(error);
         
         // Error is handled by Redux
       }

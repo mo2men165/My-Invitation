@@ -28,7 +28,7 @@ const WishlistActions: React.FC<WishlistActionsProps> = ({
         <h3 className="text-xl font-bold text-white mb-4 text-center">إجراءات سريعة</h3>
         
         {/* Package Selection */}
-        <div className="mb-4">
+        {/* <div className="mb-4">
           <label className="block text-sm font-medium text-white mb-2">نوع الباقة:</label>
           <select 
             value={selectedPackageType} 
@@ -39,7 +39,7 @@ const WishlistActions: React.FC<WishlistActionsProps> = ({
             <option value="premium">بريميوم</option>
             <option value="vip">VIP</option>
           </select>
-        </div>
+        </div> */}
         
         <div className="space-y-3">
           <Button

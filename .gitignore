@@ -132,3 +132,9 @@ next-env.d.ts
 
 # Sentry
 .env.sentry-build-plugin
+
+# Test scripts
+scripts/
+
+# Claude
+.claude

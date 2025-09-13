@@ -109,7 +109,6 @@ export const initializeAuth = createAsyncThunk(
       return { isAuthenticated: true, user: response.user };
     } catch (error: any) {
       // Token might be expired, try to refresh
-      console.log(error);
       
       try {
         await dispatch(refreshToken()).unwrap();
@@ -118,7 +117,6 @@ export const initializeAuth = createAsyncThunk(
       } catch (refreshError) {
         // Refresh failed, clear tokens
         authAPI.logout();
-        console.log(refreshError);
         
         return { isAuthenticated: false };
       }
@@ -224,13 +222,25 @@ const authSlice = createSlice({
       })
 
       // Refresh Token
-      .addCase(refreshToken.fulfilled, (state, action) => {
-        state.tokens = action.payload;
+      .addCase(refreshToken.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
       })
-      .addCase(refreshToken.rejected, (state) => {
-        state.user = null;
-        state.tokens = null;
-        state.isAuthenticated = false;
+      .addCase(refreshToken.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.tokens = action.payload;
+        state.error = null;
+      })
+      .addCase(refreshToken.rejected, (state, action) => {
+        state.isLoading = false;
+        // Only clear auth if it's a real session expiry, not a network error
+        const errorMessage = action.payload as string;
+        if (errorMessage.includes('Session expired') || errorMessage.includes('انتهت صلاحية الجلسة')) {
+          state.user = null;
+          state.tokens = null;
+          state.isAuthenticated = false;
+        }
+        state.error = errorMessage;
       })
 
       // Initialize Auth

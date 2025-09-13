@@ -8,9 +8,71 @@ export interface PasswordResetEmailData {
   resetLink: string;
 }
 
+export interface EventApprovalEmailData {
+  name: string;
+  email: string;
+  eventName: string;
+  eventDate: string;
+  invitationCardUrl?: string;
+}
+
+
 export interface WelcomeEmailData {
   name: string;
   email: string;
+}
+
+export interface BillEmailData {
+  paymentId: string;
+  totalAmount: number;
+  paymentMethod: string;
+  transactionId?: string;
+  paymentDate: string;
+  user: {
+    name: string;
+    email: string;
+    phone: string;
+    city: string;
+  };
+  events: Array<{
+    eventId: string;
+    hostName: string;
+    eventDate: string;
+    eventLocation: string;
+    packageType: string;
+    inviteCount: number;
+    price: number;
+  }>;
+}
+
+export interface EventDetailsEmailData {
+  paymentId: string;
+  totalAmount: number;
+  paymentMethod: string;
+  transactionId?: string;
+  paymentDate: string;
+  user: {
+    name: string;
+    email: string;
+    phone: string;
+    city: string;
+  };
+  events: Array<{
+    eventId: string;
+    hostName: string;
+    eventDate: string;
+    eventLocation: string;
+    packageType: string;
+    inviteCount: number;
+    price: number;
+    invitationText: string;
+    startTime: string;
+    endTime: string;
+    additionalCards: number;
+    gateSupervisors: number;
+    fastDelivery: boolean;
+    detectedCity?: string;
+  }>;
 }
 
 class EmailService {
@@ -188,6 +250,488 @@ ${data.resetLink}
   }
 
   /**
+ * Create event approval email template
+ */
+private createEventApprovalTemplate(data: EventApprovalEmailData) {
+  const cardSection = data.invitationCardUrl 
+    ? `<p><a href="${data.invitationCardUrl}" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0;">عرض بطاقة الدعوة</a></p>`
+    : '';
+
+  const htmlTemplate = `
+  <!DOCTYPE html>
+  <html lang="ar" dir="rtl">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>تم الموافقة على حدثك</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; direction: rtl; text-align: center; padding: 20px; background-color: #f8f9fa;">
+      <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <h1 style="color: #28a745; margin-bottom: 20px;">🎉 تم الموافقة على حدثك!</h1>
+          <p style="font-size: 18px; color: #333;">مرحباً ${data.name}</p>
+          <p style="color: #666; line-height: 1.6;">نحن سعداء لإعلامك بأنه تم الموافقة على حدثك <strong>"${data.eventName}"</strong> المقرر بتاريخ <strong>${data.eventDate}</strong></p>
+          
+          ${cardSection}
+          
+          <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #28a745; margin-top: 0;">ماذا بعد؟</h3>
+              <p style="margin: 10px 0;">• يمكنك الآن إضافة ضيوفك إلى قائمة الدعوات</p>
+              <p style="margin: 10px 0;">• إرسال رسائل واتساب للضيوف</p>
+              <p style="margin: 10px 0;">• إدارة تفاصيل حدثك</p>
+          </div>
+          
+          <a href="${process.env.FRONTEND_URL}/dashboard" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; font-weight: bold;">انتقل إلى لوحة التحكم</a>
+          
+          <p style="color: #999; font-size: 14px; margin-top: 30px;">شكراً لاستخدامك منصة My Invitation<br>فريق My Invitation</p>
+      </div>
+  </body>
+  </html>
+  `;
+
+  const textTemplate = `
+مرحباً ${data.name}،
+
+🎉 تم الموافقة على حدثك!
+
+نحن سعداء لإعلامك بأنه تم الموافقة على حدثك "${data.eventName}" المقرر بتاريخ ${data.eventDate}
+
+${data.invitationCardUrl ? `رابط بطاقة الدعوة: ${data.invitationCardUrl}` : ''}
+
+ماذا بعد؟
+• يمكنك الآن إضافة ضيوفك إلى قائمة الدعوات
+• إرسال رسائل واتساب للضيوف  
+• إدارة تفاصيل حدثك
+
+انتقل إلى لوحة التحكم: ${process.env.FRONTEND_URL}/dashboard
+
+شكراً لاستخدامك منصة My Invitation،
+فريق My Invitation
+  `;
+
+  return {
+    subject: `تم الموافقة على حدثك - ${data.eventName}`,
+    html: htmlTemplate,
+    text: textTemplate
+  };
+}
+
+  /**
+   * Create detailed bill email template for accountant
+   */
+  createBillEmailTemplate(data: BillEmailData) {
+  const eventsTable = data.events.map(event => `
+    <tr style="border-bottom: 1px solid #e5e7eb;">
+      <td style="padding: 12px; text-align: right;">${event.eventId}</td>
+      <td style="padding: 12px; text-align: right;">${event.hostName}</td>
+      <td style="padding: 12px; text-align: right;">${event.eventDate}</td>
+      <td style="padding: 12px; text-align: right;">${event.eventLocation}</td>
+      <td style="padding: 12px; text-align: right;">${event.packageType}</td>
+      <td style="padding: 12px; text-align: right;">${event.inviteCount}</td>
+      <td style="padding: 12px; text-align: right; font-weight: bold; color: #C09B52;">${event.price.toLocaleString('ar-SA')} ريال</td>
+    </tr>
+  `).join('');
+
+  const htmlTemplate = `
+  <!DOCTYPE html>
+  <html lang="ar" dir="rtl">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>فاتورة دفع - My Invitation</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; direction: rtl; text-align: right; padding: 20px; background-color: #f8f9fa;">
+      <div style="max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #C09B52; padding-bottom: 20px;">
+              <h1 style="color: #C09B52; margin: 0; font-size: 28px;">فاتورة دفع</h1>
+              <p style="color: #666; margin: 10px 0 0 0;">My Invitation - منصة الدعوات الإلكترونية</p>
+          </div>
+
+          <div style="margin-bottom: 30px;">
+              <h2 style="color: #333; margin-bottom: 20px; font-size: 20px;">تفاصيل الدفع</h2>
+              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-right: 4px solid #C09B52;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                      <div>
+                          <strong>رقم الدفع:</strong> ${data.paymentId}
+                      </div>
+                      <div>
+                          <strong>تاريخ الدفع:</strong> ${data.paymentDate}
+                      </div>
+                      <div>
+                          <strong>طريقة الدفع:</strong> ${data.paymentMethod}
+                      </div>
+                      ${data.transactionId ? `<div><strong>رقم المعاملة:</strong> ${data.transactionId}</div>` : ''}
+                  </div>
+              </div>
+          </div>
+
+          <div style="margin-bottom: 30px;">
+              <h2 style="color: #333; margin-bottom: 20px; font-size: 20px;">تفاصيل العميل</h2>
+              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                      <div><strong>الاسم:</strong> ${data.user.name}</div>
+                      <div><strong>البريد الإلكتروني:</strong> ${data.user.email}</div>
+                      <div><strong>رقم الهاتف:</strong> ${data.user.phone}</div>
+                      <div><strong>المدينة:</strong> ${data.user.city}</div>
+                  </div>
+              </div>
+          </div>
+
+          <div style="margin-bottom: 30px;">
+              <h2 style="color: #333; margin-bottom: 20px; font-size: 20px;">تفاصيل المناسبات</h2>
+              <div style="overflow-x: auto;">
+                  <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                      <thead style="background: #C09B52; color: white;">
+                          <tr>
+                              <th style="padding: 15px; text-align: right; font-weight: bold;">رقم الحدث</th>
+                              <th style="padding: 15px; text-align: right; font-weight: bold;">اسم المضيف</th>
+                              <th style="padding: 15px; text-align: right; font-weight: bold;">تاريخ الحدث</th>
+                              <th style="padding: 15px; text-align: right; font-weight: bold;">مكان الحدث</th>
+                              <th style="padding: 15px; text-align: right; font-weight: bold;">نوع الباقة</th>
+                              <th style="padding: 15px; text-align: right; font-weight: bold;">عدد الدعوات</th>
+                              <th style="padding: 15px; text-align: right; font-weight: bold;">السعر</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          ${eventsTable}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+
+          <div style="text-align: left; margin-top: 30px; padding: 20px; background: #C09B52; color: white; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 24px; font-weight: bold;">المجموع الكلي:</span>
+                  <span style="font-size: 28px; font-weight: bold;">${data.totalAmount.toLocaleString('ar-SA')} ريال سعودي</span>
+              </div>
+          </div>
+
+          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+              <p style="color: #666; font-size: 14px;">تم إنشاء هذه الفاتورة تلقائياً من نظام My Invitation</p>
+              <p style="color: #999; font-size: 12px;">© ${new Date().getFullYear()} My Invitation. جميع الحقوق محفوظة.</p>
+          </div>
+      </div>
+  </body>
+  </html>
+  `;
+
+  const textTemplate = `
+فاتورة دفع - My Invitation
+
+تفاصيل الدفع:
+- رقم الدفع: ${data.paymentId}
+- تاريخ الدفع: ${data.paymentDate}
+- طريقة الدفع: ${data.paymentMethod}
+${data.transactionId ? `- رقم المعاملة: ${data.transactionId}` : ''}
+
+تفاصيل العميل:
+- الاسم: ${data.user.name}
+- البريد الإلكتروني: ${data.user.email}
+- رقم الهاتف: ${data.user.phone}
+- المدينة: ${data.user.city}
+
+تفاصيل المناسبات:
+${data.events.map(event => `
+- رقم الحدث: ${event.eventId}
+- اسم المضيف: ${event.hostName}
+- تاريخ الحدث: ${event.eventDate}
+- مكان الحدث: ${event.eventLocation}
+- نوع الباقة: ${event.packageType}
+- عدد الدعوات: ${event.inviteCount}
+- السعر: ${event.price.toLocaleString('ar-SA')} ريال
+`).join('')}
+
+المجموع الكلي: ${data.totalAmount.toLocaleString('ar-SA')} ريال سعودي
+
+تم إنشاء هذه الفاتورة تلقائياً من نظام My Invitation
+© ${new Date().getFullYear()} My Invitation. جميع الحقوق محفوظة.
+  `;
+
+  return {
+    subject: `فاتورة دفع - ${data.paymentId} - ${data.totalAmount.toLocaleString('ar-SA')} ريال`,
+    html: htmlTemplate,
+    text: textTemplate
+  };
+}
+
+/**
+ * Create event details email template for support team
+ */
+createEventDetailsEmailTemplate(data: EventDetailsEmailData) {
+  const eventsDetails = data.events.map(event => `
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-right: 4px solid #C09B52;">
+        <h3 style="color: #C09B52; margin-top: 0; margin-bottom: 15px;">${event.hostName}</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div><strong>رقم الحدث:</strong> ${event.eventId}</div>
+            <div><strong>نوع الباقة:</strong> ${event.packageType}</div>
+            <div><strong>تاريخ الحدث:</strong> ${event.eventDate}</div>
+            <div><strong>عدد الدعوات:</strong> ${event.inviteCount}</div>
+            <div><strong>وقت البداية:</strong> ${event.startTime}</div>
+            <div><strong>وقت النهاية:</strong> ${event.endTime}</div>
+            <div><strong>بطاقات إضافية:</strong> ${event.additionalCards}</div>
+            <div><strong>مشرفي البوابة:</strong> ${event.gateSupervisors}</div>
+            <div><strong>التوصيل السريع:</strong> ${event.fastDelivery ? 'نعم' : 'لا'}</div>
+            ${event.detectedCity ? `<div><strong>المدينة المكتشفة:</strong> ${event.detectedCity}</div>` : ''}
+        </div>
+        <div style="margin-top: 15px;">
+            <strong>مكان الحدث:</strong> ${event.eventLocation}
+        </div>
+        <div style="margin-top: 15px;">
+            <strong>نص الدعوة:</strong>
+            <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 10px; border: 1px solid #e5e7eb;">
+                ${event.invitationText}
+            </div>
+        </div>
+        <div style="text-align: left; margin-top: 15px; padding: 10px; background: #C09B52; color: white; border-radius: 5px;">
+            <strong>السعر: ${event.price.toLocaleString('ar-SA')} ريال سعودي</strong>
+        </div>
+    </div>
+  `).join('');
+
+  const htmlTemplate = `
+  <!DOCTYPE html>
+  <html lang="ar" dir="rtl">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>تفاصيل مناسبات جديدة - My Invitation</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; direction: rtl; text-align: right; padding: 20px; background-color: #f8f9fa;">
+      <div style="max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #C09B52; padding-bottom: 20px;">
+              <h1 style="color: #C09B52; margin: 0; font-size: 28px;">تفاصيل مناسبات جديدة</h1>
+              <p style="color: #666; margin: 10px 0 0 0;">My Invitation - منصة الدعوات الإلكترونية</p>
+          </div>
+
+          <div style="margin-bottom: 30px;">
+              <h2 style="color: #333; margin-bottom: 20px; font-size: 20px;">معلومات الدفع</h2>
+              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-right: 4px solid #C09B52;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                      <div><strong>رقم الدفع:</strong> ${data.paymentId}</div>
+                      <div><strong>تاريخ الدفع:</strong> ${data.paymentDate}</div>
+                      <div><strong>طريقة الدفع:</strong> ${data.paymentMethod}</div>
+                      ${data.transactionId ? `<div><strong>رقم المعاملة:</strong> ${data.transactionId}</div>` : ''}
+                  </div>
+              </div>
+          </div>
+
+          <div style="margin-bottom: 30px;">
+              <h2 style="color: #333; margin-bottom: 20px; font-size: 20px;">معلومات العميل</h2>
+              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                      <div><strong>الاسم:</strong> ${data.user.name}</div>
+                      <div><strong>البريد الإلكتروني:</strong> ${data.user.email}</div>
+                      <div><strong>رقم الهاتف:</strong> ${data.user.phone}</div>
+                      <div><strong>المدينة:</strong> ${data.user.city}</div>
+                  </div>
+              </div>
+          </div>
+
+          <div style="margin-bottom: 30px;">
+              <h2 style="color: #333; margin-bottom: 20px; font-size: 20px;">تفاصيل المناسبات (${data.events.length} مناسبة)</h2>
+              ${eventsDetails}
+          </div>
+
+          <div style="text-align: left; margin-top: 30px; padding: 20px; background: #C09B52; color: white; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 24px; font-weight: bold;">المجموع الكلي:</span>
+                  <span style="font-size: 28px; font-weight: bold;">${data.totalAmount.toLocaleString('ar-SA')} ريال سعودي</span>
+              </div>
+          </div>
+
+          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+              <p style="color: #666; font-size: 14px;">تم إرسال هذه التفاصيل تلقائياً من نظام My Invitation</p>
+              <p style="color: #999; font-size: 12px;">© ${new Date().getFullYear()} My Invitation. جميع الحقوق محفوظة.</p>
+          </div>
+      </div>
+  </body>
+  </html>
+  `;
+
+  const textTemplate = `
+تفاصيل مناسبات جديدة - My Invitation
+
+معلومات الدفع:
+- رقم الدفع: ${data.paymentId}
+- تاريخ الدفع: ${data.paymentDate}
+- طريقة الدفع: ${data.paymentMethod}
+${data.transactionId ? `- رقم المعاملة: ${data.transactionId}` : ''}
+
+معلومات العميل:
+- الاسم: ${data.user.name}
+- البريد الإلكتروني: ${data.user.email}
+- رقم الهاتف: ${data.user.phone}
+- المدينة: ${data.user.city}
+
+تفاصيل المناسبات (${data.events.length} مناسبة):
+${data.events.map(event => `
+${event.hostName}:
+- رقم الحدث: ${event.eventId}
+- نوع الباقة: ${event.packageType}
+- تاريخ الحدث: ${event.eventDate}
+- عدد الدعوات: ${event.inviteCount}
+- وقت البداية: ${event.startTime}
+- وقت النهاية: ${event.endTime}
+- مكان الحدث: ${event.eventLocation}
+- بطاقات إضافية: ${event.additionalCards}
+- مشرفي البوابة: ${event.gateSupervisors}
+- التوصيل السريع: ${event.fastDelivery ? 'نعم' : 'لا'}
+${event.detectedCity ? `- المدينة المكتشفة: ${event.detectedCity}` : ''}
+- نص الدعوة: ${event.invitationText}
+- السعر: ${event.price.toLocaleString('ar-SA')} ريال
+`).join('')}
+
+المجموع الكلي: ${data.totalAmount.toLocaleString('ar-SA')} ريال سعودي
+
+تم إرسال هذه التفاصيل تلقائياً من نظام My Invitation
+© ${new Date().getFullYear()} My Invitation. جميع الحقوق محفوظة.
+  `;
+
+  return {
+    subject: `تفاصيل مناسبات جديدة - ${data.events.length} مناسبة - ${data.totalAmount.toLocaleString('ar-SA')} ريال`,
+    html: htmlTemplate,
+    text: textTemplate
+  };
+}
+
+/**
+ * Send event approval email
+ */
+async sendEventApprovalEmail(data: EventApprovalEmailData): Promise<boolean> {
+  try {
+    logger.info('Sending event approval email', { 
+      email: data.email, 
+      eventName: data.eventName 
+    });
+
+    const template = this.createEventApprovalTemplate(data);
+    const recipients = [new Recipient(data.email, data.name)];
+
+    const emailParams = new EmailParams()
+      .setFrom(this.sender)
+      .setTo(recipients)
+      .setSubject(template.subject)
+      .setHtml(template.html)
+      .setText(template.text);
+
+    const response = await this.mailerSend.email.send(emailParams);
+
+    if (response?.statusCode && response.statusCode >= 400) {
+      throw new Error(`MailerSend API error: ${response.statusCode}`);
+    }
+
+    logger.info('Event approval email sent successfully', { 
+      email: data.email,
+      eventName: data.eventName 
+    });
+    return true;
+
+  } catch (error: any) {
+    logger.error('Failed to send event approval email', {
+      email: data.email,
+      eventName: data.eventName,
+      error: error.message
+    });
+    throw new Error('فشل في إرسال بريد الموافقة على الحدث');
+  }
+}
+
+  /**
+   * Send detailed bill email to accountant
+   */
+  async sendBillEmail(data: BillEmailData): Promise<boolean> {
+    try {
+      logger.info('Sending bill email to accountant', { 
+        paymentId: data.paymentId,
+        totalAmount: data.totalAmount 
+      });
+
+      const template = this.createBillEmailTemplate(data);
+      const recipients = [new Recipient('accountant@myinvitation-sa.com', 'محاسب My Invitation')];
+
+      const emailParams = new EmailParams()
+        .setFrom(this.sender)
+        .setTo(recipients)
+        .setSubject(template.subject)
+        .setHtml(template.html)
+        .setText(template.text);
+
+      const response = await this.mailerSend.email.send(emailParams);
+
+      if (response?.statusCode && response.statusCode >= 400) {
+        throw new Error(`MailerSend API error: ${response.statusCode}`);
+      }
+
+      logger.info('Bill email sent successfully to accountant', { 
+        paymentId: data.paymentId,
+        totalAmount: data.totalAmount 
+      });
+      return true;
+
+    } catch (error: any) {
+      logger.error('Failed to send bill email to accountant', {
+        paymentId: data.paymentId,
+        totalAmount: data.totalAmount,
+        error: error.message,
+        fullError: error,
+        apiResponse: error.response?.data,
+        statusCode: error.response?.status
+      });
+      throw new Error('فشل في إرسال فاتورة الدفع للمحاسب');
+    }
+  }
+
+  /**
+   * Send event details email to support team
+   */
+  async sendEventDetailsEmail(data: EventDetailsEmailData): Promise<boolean> {
+    try {
+      logger.info('Sending event details email to support team', { 
+        paymentId: data.paymentId,
+        eventsCount: data.events.length 
+      });
+
+      const template = this.createEventDetailsEmailTemplate(data);
+      
+      // Send to multiple recipients
+      const recipients = [
+        new Recipient('customersupport@myinvitation-sa.com', 'دعم العملاء'),
+        new Recipient('generalmanager@myinvitation-sa.com', 'المدير العام'),
+        new Recipient('ahmed.maher@myinvitation-sa.com', 'أحمد ماهر')
+      ];
+
+      const emailParams = new EmailParams()
+        .setFrom(this.sender)
+        .setTo(recipients)
+        .setSubject(template.subject)
+        .setHtml(template.html)
+        .setText(template.text);
+
+      const response = await this.mailerSend.email.send(emailParams);
+
+      if (response?.statusCode && response.statusCode >= 400) {
+        throw new Error(`MailerSend API error: ${response.statusCode}`);
+      }
+
+      logger.info('Event details email sent successfully to support team', { 
+        paymentId: data.paymentId,
+        eventsCount: data.events.length 
+      });
+      return true;
+
+    } catch (error: any) {
+      logger.error('Failed to send event details email to support team', {
+        paymentId: data.paymentId,
+        eventsCount: data.events.length,
+        error: error.message,
+        fullError: error,
+        apiResponse: error.response?.data,
+        statusCode: error.response?.status
+      });
+      throw new Error('فشل في إرسال تفاصيل المناسبات لفريق الدعم');
+    }
+  }
+
+  /**
    * General purpose email sender for future use
    */
   async sendEmail(
@@ -228,5 +772,7 @@ ${data.resetLink}
     }
   }
 }
+
+
 
 export const emailService = new EmailService();

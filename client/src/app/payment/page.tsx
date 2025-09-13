@@ -2,10 +2,12 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAppSelector, useAppDispatch } from '@/store';
+import { useAppDispatch } from '@/store';
 import { fetchCart } from '@/store/cartSlice';
 import { paymentAPI } from '@/lib/api/payment';
 import { useToast } from '@/hooks/useToast';
+import { useAuth } from '@/hooks/useAuth';
+import { InstantRouteGuard } from '@/components/auth/InstantRouteGuard';
 import { 
   CreditCard, 
   Calendar, 
@@ -35,10 +37,10 @@ interface PaymentSummary {
   }>;
 }
 
-const PaymentPage: React.FC = () => {
+const PaymentPageContent: React.FC = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { items: cartItems, isLoading } = useAppSelector((state) => state.cart);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
@@ -46,6 +48,7 @@ const PaymentPage: React.FC = () => {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(true);
 
+  // Load payment summary
   useEffect(() => {
     const loadPaymentSummary = async () => {
       try {
@@ -77,6 +80,23 @@ const PaymentPage: React.FC = () => {
 
     loadPaymentSummary();
   }, [dispatch, router, toast]);
+
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-white text-xl mb-4">جاري التحميل...</div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handlePayNow = async () => {
     if (!paymentSummary) return;
@@ -291,16 +311,12 @@ const PaymentPage: React.FC = () => {
                   <span>{paymentSummary.totalAmount.toLocaleString('ar-SA')} ر.س</span>
                 </div>
                 
-                <div className="flex justify-between items-center text-gray-300">
-                  <span>ضريبة القيمة المضافة (15%)</span>
-                  <span>{(paymentSummary.totalAmount * 0.15).toLocaleString('ar-SA')} ر.س</span>
-                </div>
                 
                 <div className="border-t border-[#C09B52]/30 pt-4">
                   <div className="flex justify-between items-center">
                     <span className="text-xl font-bold text-white">الإجمالي</span>
                     <span className="text-2xl font-bold text-[#C09B52]">
-                      {(paymentSummary.totalAmount * 1.15).toLocaleString('ar-SA')} ر.س
+                      {paymentSummary.totalAmount.toLocaleString('ar-SA')} ر.س
                     </span>
                   </div>
                 </div>
@@ -333,6 +349,14 @@ const PaymentPage: React.FC = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+const PaymentPage: React.FC = () => {
+  return (
+    <InstantRouteGuard allowedRoles={['user']}>
+      <PaymentPageContent />
+    </InstantRouteGuard>
   );
 };
 

@@ -14,14 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Eye, EyeOff, Loader2, User, Mail, Phone, MapPin, Lock, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-const saudiCities = [
-  'جدة',
-  'الرياض',
-  'الدمام',
-  'مكة المكرمة',
-  'الطائف'
-];
+import { saudiCities, passwordStrengthChecks, passwordStrengthLevels } from '@/constants';
 
 export function RegisterForm() {
   const router = useRouter();
@@ -60,22 +53,15 @@ export function RegisterForm() {
     if (!password) return { score: 0, text: '', color: '' };
     
     let score = 0;
-    const checks = [
-      { regex: /.{8,}/, point: 1 }, // Length
-      { regex: /[a-z]/, point: 1 }, // Lowercase
-      { regex: /[A-Z]/, point: 1 }, // Uppercase
-      { regex: /\d/, point: 1 }, // Number
-      { regex: /[!@#$%^&*(),.?":{}|<>]/, point: 1 }, // Special char
-    ];
     
-    checks.forEach(check => {
+    passwordStrengthChecks.forEach(check => {
       if (check.regex.test(password)) score += check.point;
     });
     
-    if (score <= 2) return { score, text: 'ضعيفة', color: 'text-red-400' };
-    if (score === 3) return { score, text: 'متوسطة', color: 'text-yellow-400' };
-    if (score === 4) return { score, text: 'جيدة', color: 'text-blue-400' };
-    return { score, text: 'قوية جداً', color: 'text-green-400' };
+    if (score <= 2) return passwordStrengthLevels.weak;
+    if (score === 3) return passwordStrengthLevels.medium;
+    if (score === 4) return passwordStrengthLevels.good;
+    return passwordStrengthLevels.strong;
   };
 
   const passwordStrength = getPasswordStrength(watchedPassword || '');

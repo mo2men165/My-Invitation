@@ -17,6 +17,8 @@ import compareRoutes from './routes/compare';
 import eventsRoutes from './routes/event';
 import paymentRoutes from './routes/payment';
 import dashboardRoutes from './routes/dashboard';
+import adminRoutes from './routes/admin';
+
 
 const app = express();
 
@@ -58,42 +60,9 @@ app.use('/api/compare', compareRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
 
-// Debug: List all routes
-app.get('/debug/routes', (req, res) => {
-  const routes: any[] = [];
-  
-  const extractRoutes = (stack: any[], prefix = '') => {
-    stack.forEach((middleware: any) => {
-      if (middleware.route) {
-        // Direct route
-        const methods = Object.keys(middleware.route.methods).join(', ').toUpperCase();
-        routes.push(`${methods} ${prefix}${middleware.route.path}`);
-      } else if (middleware.name === 'router') {
-        // Router middleware
-        const routerPrefix = middleware.regexp.source
-          .replace('\\', '')
-          .replace('(?:', '')
-          .replace('\\', '')
-          .replace('?', '')
-          .replace('$', '')
-          .replace('^', '');
-        
-        if (middleware.handle && middleware.handle.stack) {
-          extractRoutes(middleware.handle.stack, prefix + routerPrefix);
-        }
-      }
-    });
-  };
-  
-  extractRoutes(app._router.stack, '');
-  
-  res.json({ 
-    routes,
-    totalRoutes: routes.length,
-    timestamp: new Date().toISOString()
-  });
-});
+
 
 // Catch-all for undefined routes
 app.use('/', (req, res) => {

@@ -32,12 +32,12 @@ const DesignCard = memo<DesignCardProps>(({
   const currentPackage = packageData[packageType];
   
   const handleWishlistClick = useCallback(() => {
-    onToggleWishlist(design.id);
-  }, [design.id, onToggleWishlist]);
+    onToggleWishlist(design.id, packageType);
+  }, [design.id, packageType, onToggleWishlist]);
 
   const handleCompareClick = useCallback(() => {
-    onToggleCompare(design.id);
-  }, [design.id, onToggleCompare]);
+    onToggleCompare(design.id, packageType);
+  }, [design.id, packageType, onToggleCompare]);
 
   const handleImageClick = useCallback(() => {
     onViewImage(design);
@@ -64,7 +64,6 @@ const DesignCard = memo<DesignCardProps>(({
             display: 'block'
           }}
           onError={() => {
-            console.log(`Failed to load image: ${design.image}`);
           }}
           priority={false}
         />
@@ -121,7 +120,7 @@ const DesignCard = memo<DesignCardProps>(({
           {design.category}
         </span>
 
-        <div className="mb-4">
+        {/* <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <currentPackage.icon className="w-5 h-5 text-[#C09B52]" />
             <span className="text-white font-medium">مميزات باقة {currentPackage.name}</span>
@@ -137,7 +136,7 @@ const DesignCard = memo<DesignCardProps>(({
               <span className="text-xs text-gray-400">+{currentPackage.features.length - 3} مميزات أخرى</span>
             )}
           </div>
-        </div>
+        </div> */}
 
         <div className="mb-4">
           <div className="text-sm text-gray-400 mb-2">يبدأ من:</div>

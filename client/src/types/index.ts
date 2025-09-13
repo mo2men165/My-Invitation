@@ -2,6 +2,9 @@ import { CompareItem } from "@/lib/api/compare";
 import { WishlistItem } from "@/lib/api/wishlist";
 import { LucideIcon } from "lucide-react";
 
+// Re-export component types
+export * from './components';
+
 export interface PricingOption {
     invites: number;
     price: number;
@@ -47,7 +50,6 @@ export interface PricingOption {
   
   export interface CartForm {
     inviteCount: number;
-    qrCode: boolean;
     eventDate: string;
     startTime: string;
     endTime: string;
@@ -55,9 +57,10 @@ export interface PricingOption {
     hostName: string;
     eventLocation: string;
     additionalCards: number;
-    gateSupervisors: string;
-    fastDelivery: boolean;
-    // New location fields
+    gateSupervisors: number; // Changed from string to number
+    extraHours?: number;
+    expeditedDelivery?: boolean;
+    // Existing location fields
     locationCoordinates?: {
       lat: number;
       lng: number;

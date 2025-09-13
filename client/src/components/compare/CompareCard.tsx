@@ -12,7 +12,7 @@ interface CompareCardProps {
   addedDate: string;
   packageType: keyof PackageData; // Package type for this comparison item
   onRemove: (designId: string) => void;
-  onAddToWishlist: (designId: string) => void;
+  onAddToWishlist: (designId: string, packageType?: keyof PackageData) => void;
   onSelectPackage: (design: InvitationDesign, packageType: keyof PackageData) => void;
   isLoading: boolean;
   isInWishlist: boolean;
@@ -35,8 +35,8 @@ const CompareCard = memo<CompareCardProps>(({
   }, [design.id, onRemove]);
 
   const handleAddToWishlist = useCallback(() => {
-    onAddToWishlist(design.id);
-  }, [design.id, onAddToWishlist]);
+    onAddToWishlist(design.id, packageType);
+  }, [design.id, packageType, onAddToWishlist]);
 
   const handleSelectPackage = useCallback(() => {
     onSelectPackage(design, packageType);
@@ -76,7 +76,6 @@ const CompareCard = memo<CompareCardProps>(({
             }}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             onError={() => {
-              console.log(`Failed to load image: ${design.image}`);
             }}
           />
           <div className="absolute top-4 right-4 w-2 h-2 bg-[#C09B52] rounded-full animate-pulse"></div>

@@ -1,8 +1,7 @@
-// components/layout/Header.tsx
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { GitCompare, Heart, ShoppingCart, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { GitCompare, Heart, ShoppingCart, LogOut, Settings, ChevronDown, Shield } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppDispatch, useAppSelector } from '@/store';
@@ -11,10 +10,11 @@ import { fetchCart } from '@/store/cartSlice';
 import { fetchWishlist } from '@/store/wishlistSlice';
 import { fetchCompareList } from '@/store/compareSlice';
 import { usePathname } from 'next/navigation';
+import { navLinks } from '@/constants';
 
 export function Header() {
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, isInitialized } = useAuth();
   const dispatch = useAppDispatch();
   
   // Get Redux state for cart, wishlist, compare
@@ -77,25 +77,19 @@ export function Header() {
     }
   };
 
-  const navLinks = [
-    { href: '/', label: 'الرئيسية' },
-    { href: '/about', label: 'تعرف علينا' },
-    { href: '/packages', label: 'باقاتنا' },
-    { href: '/contact', label: 'اتصل بنا' }
-  ];
 
   const UserSection = () => {
-    if (isLoading) {
+    if (isLoading || !isInitialized) {
       return (
         <div className="animate-pulse">
-          <div className="w-10 h-10 bg-gray-700 rounded-full"></div>
+          <div className="w-8 h-8 bg-gray-700 rounded-full"></div>
         </div>
       );
     }
 
     if (isAuthenticated && user) {
       // Smart truncation for display name
-      const displayName = smartTruncate(user.firstName || '', 12);
+      const displayName = smartTruncate(user.firstName || '', 10);
       const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
       const truncatedFullName = smartTruncate(fullName, 20);
       const truncatedEmail = smartTruncate(user.email || '', 25);
@@ -106,10 +100,10 @@ export function Header() {
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             className="group flex items-center mr-3"
           >
-            <div className="flex items-center space-x-2  bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-full px-2 py-2.5 hover:border-[#C09B52] transition-all duration-300 hover:shadow-lg hover:shadow-[#C09B52]/20 min-w-[140px]">
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+            <div className="flex items-center space-x-2 bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-full px-2 py-2 hover:border-[#C09B52] transition-all duration-300 hover:shadow-lg hover:shadow-[#C09B52]/20 min-w-[120px]">
+              <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
               <span 
-                className="text-sm font-medium text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300 max-w-[80px] overflow-hidden whitespace-nowrap" 
+                className="text-xs font-medium text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300 max-w-[70px] overflow-hidden whitespace-nowrap" 
                 title={`مرحباً، ${user.firstName}`}
                 style={{
                   textOverflow: 'ellipsis',
@@ -118,8 +112,8 @@ export function Header() {
               >
                 مرحباً، {displayName}
               </span>
-              <div className="w-8 h-8 mr-2 rounded-full bg-gradient-to-br from-[#C09B52] to-amber-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-sm font-bold text-black">
+              <div className="w-7 h-7 mr-2 rounded-full bg-gradient-to-br from-[#C09B52] to-amber-600 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-bold text-black">
                   {user.firstName?.charAt(0)?.toUpperCase()}
                 </span>
               </div>
@@ -130,7 +124,7 @@ export function Header() {
           {isUserMenuOpen && (
             <div className="absolute top-full mt-2 left-0 w-64 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
               <div className="p-4 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-900">
-                <div className="flex items-center space-x-3 ">
+                <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#C09B52] to-amber-600 flex items-center justify-center flex-shrink-0">
                     <span className="text-lg font-bold text-black">
                       {user.firstName?.charAt(0)?.toUpperCase()}
@@ -162,9 +156,20 @@ export function Header() {
               </div>
 
               <div className="py-2">
+                {user.role === 'admin' && (
+                  <Link
+                    href="/admin"
+                    className="flex items-center space-x-3 px-4 py-3 text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
+                    onClick={() => setIsUserMenuOpen(false)}
+                  >
+                    <Shield className="w-5 h-5 flex-shrink-0" />
+                    <span className='mr-2'>لوحة الإدارة</span>
+                  </Link>
+                )}
+                
                 <Link
                   href="/dashboard"
-                  className="flex items-center space-x-3  px-4 py-3 text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
+                  className="flex items-center space-x-3 px-4 py-3 text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
                   onClick={() => setIsUserMenuOpen(false)}
                 >
                   <Settings className="w-5 h-5 flex-shrink-0" />
@@ -173,7 +178,7 @@ export function Header() {
                 
                 <button
                   onClick={handleSignOut}
-                  className="w-full flex items-center space-x-3  px-4 py-3 text-red-400 hover:text-red-300 hover:bg-gray-800 transition-all duration-200"
+                  className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-gray-800 transition-all duration-200"
                 >
                   <LogOut className="w-5 h-5 flex-shrink-0" />
                   <span className='mr-2'>تسجيل الخروج</span>
@@ -187,16 +192,16 @@ export function Header() {
 
     // Not authenticated
     return (
-      <div className="flex items-center space-x-3 ">
+      <div className="flex items-center space-x-3">
         <Link
           href="/login"
-          className="px-4 py-2 text-gray-300 hover:text-[#C09B52] transition-colors duration-300 font-medium"
+          className="px-3 py-1.5 text-sm text-gray-300 hover:text-[#C09B52] transition-colors duration-300 font-medium"
         >
           تسجيل الدخول
         </Link>
         <Link
           href="/register"
-          className="px-6 py-2.5 bg-gradient-to-r from-[#C09B52] to-amber-600 text-black font-bold rounded-full hover:from-amber-600 hover:to-[#C09B52] transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-[#C09B52]/30"
+          className="px-4 py-2 text-sm bg-gradient-to-r from-[#C09B52] to-amber-600 text-black font-bold rounded-full hover:from-amber-600 hover:to-[#C09B52] transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-[#C09B52]/30"
         >
           إنشاء حساب
         </Link>
@@ -206,8 +211,8 @@ export function Header() {
 
   return (
     <header className="bg-gray-900/60 border-b border-gray-700 sticky top-0 z-50 shadow-lg shadow-gray-900/50 backdrop-blur-sm">
-        <div className="container mx-auto px-8 py-10">
-        <div className="grid grid-cols-3 items-center min-h-[50px]">
+        <div className="container mx-auto px-8 py-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 items-center min-h-[50px]">
           
           {/* Logo - Right Side */}
           <div className="flex justify-center">
@@ -252,62 +257,62 @@ export function Header() {
           {/* Action Items - Left Side - Hidden on Mobile */}
           <div className="hidden lg:flex items-center justify-center">
             
-            {/* Show shopping features only if authenticated */}
-            {isAuthenticated && (
+            {/* Show shopping features only if authenticated and initialized */}
+            {isAuthenticated && isInitialized && (
               <>
                 {/* Compare Icon */}
-                <button className="group relative mr-6">
-                  <div className="p-2.5 rounded-full bg-gray-900 border border-gray-700 hover:border-[#C09B52] transition-all duration-300 hover:bg-gray-800 hover:shadow-lg hover:shadow-[#C09B52]/20">
+                <button className="group relative mr-4">
+                  <div className="p-2 rounded-full bg-gray-900 border border-gray-700 hover:border-[#C09B52] transition-all duration-300 hover:bg-gray-800 hover:shadow-lg hover:shadow-[#C09B52]/20">
                     <Link href='/compare'>
-                      <GitCompare className="w-5 h-5 text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300" />
+                      <GitCompare className="w-4 h-4 text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300" />
                     </Link>
                   </div>
                   {/* Badge */}
                   {compareCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-[#C09B52] text-black text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-black">
+                    <span className="absolute -top-1 -right-1 bg-[#C09B52] text-black text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold border-2 border-black">
                       {compareCount}
                     </span>
                   )}
                   {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-gray-800 border border-gray-700 text-[#C09B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-gray-800 border border-gray-700 text-[#C09B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
                     المقارنة
                   </div>
                 </button>
 
                 {/* Wishlist Icon */}
-                <button className="group relative mr-6">
-                  <div className="p-2.5 rounded-full bg-gray-900 border border-gray-700 hover:border-[#C09B52] transition-all duration-300 hover:bg-gray-800 hover:shadow-lg hover:shadow-[#C09B52]/20">
+                <button className="group relative mr-4">
+                  <div className="p-2 rounded-full bg-gray-900 border border-gray-700 hover:border-[#C09B52] transition-all duration-300 hover:bg-gray-800 hover:shadow-lg hover:shadow-[#C09B52]/20">
                     <Link href='/wishlist'>
-                      <Heart className="w-5 h-5 text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300 group-hover:fill-[#C09B52]" />
+                      <Heart className="w-4 h-4 text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300 group-hover:fill-[#C09B52]" />
                     </Link>
                   </div>
                   {/* Badge */}
                   {wishlistCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-[#C09B52] text-black text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-black">
+                    <span className="absolute -top-1 -right-1 bg-[#C09B52] text-black text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold border-2 border-black">
                       {wishlistCount}
                     </span>
                   )}
                   {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-gray-800 border border-gray-700 text-[#C09B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-gray-800 border border-gray-700 text-[#C09B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
                     المفضلة
                   </div>
                 </button>
 
                 {/* Cart with Total */}
-                <Link href="/cart" className="group relative mr-6">
-                  <div className="flex items-center bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-full px-5 py-2.5 hover:border-[#C09B52] transition-all duration-300 hover:shadow-lg hover:shadow-[#C09B52]/20 min-w-[130px]">
-                    <div className="relative ml-3">
-                      <ShoppingCart className="w-5 h-5 text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300" />
+                <Link href="/cart" className="group relative mr-4">
+                  <div className="flex items-center bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-full px-3 py-2 hover:border-[#C09B52] transition-all duration-300 hover:shadow-lg hover:shadow-[#C09B52]/20 min-w-[110px]">
+                    <div className="relative ml-2">
+                      <ShoppingCart className="w-4 h-4 text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300" />
                       {/* Cart items badge */}
                       {cartCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 bg-[#C09B52] text-black text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                        <span className="absolute -top-1 -right-1 bg-[#C09B52] text-black text-xs rounded-full w-3 h-3 flex items-center justify-center font-bold">
                           {cartCount}
                         </span>
                       )}
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors duration-300 leading-none">المجموع</span>
-                      <span className="text-sm font-bold text-[#C09B52] group-hover:text-amber-300 transition-colors duration-300 leading-none mt-0.5">
+                      <span className="text-xs font-bold text-[#C09B52] group-hover:text-amber-300 transition-colors duration-300 leading-none mt-0.5">
                         {cartTotal.toLocaleString('ar-SA')} ر.س
                       </span>
                     </div>
@@ -324,7 +329,7 @@ export function Header() {
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="lg:hidden flex items-center justify-start" ref={mobileMenuRef}>
+          <div className="lg:hidden flex items-center justify-end" ref={mobileMenuRef}>
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2.5 text-gray-300 hover:text-[#C09B52] transition-colors duration-300"
@@ -340,7 +345,7 @@ export function Header() {
 
             {/* Mobile Menu Dropdown */}
             {isMobileMenuOpen && (
-              <div className="absolute top-full left-0 right-0 bg-black border-t border-gray-800 shadow-2xl z-50">
+              <div className="absolute top-full left-0 right-0 bg-black border-t border-gray-800 shadow-2xl z-50 max-h-[80vh] overflow-y-auto scrollbar-hide">
                 <div className="container mx-auto px-8 py-6">
                   
                   {/* Navigation Links */}
@@ -365,11 +370,11 @@ export function Header() {
                   </nav>
 
                   {/* User Section for Mobile */}
-                  {isAuthenticated && user ? (
+                  {isAuthenticated && isInitialized && user ? (
                     <>
                       {/* User Info */}
                       <div className="border-t border-gray-800 pt-6 mb-6">
-                        <div className="flex items-center space-x-4  mb-4">
+                        <div className="flex items-center space-x-4 mb-4">
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#C09B52] to-amber-600 flex items-center justify-center flex-shrink-0">
                             <span className="text-lg font-bold text-black">
                               {user.firstName?.charAt(0)?.toUpperCase()}
@@ -387,10 +392,21 @@ export function Header() {
 
                         {/* User Actions */}
                         <div className="space-y-2">
+                          {user.role === 'admin' && (
+                            <Link
+                              href="/admin"
+                              onClick={() => setIsMobileMenuOpen(false)}
+                              className="flex items-center space-x-3 py-3 px-4 rounded-lg text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
+                            >
+                              <Shield className="w-5 h-5 flex-shrink-0" />
+                              <span>لوحة الإدارة</span>
+                            </Link>
+                          )}
+                          
                           <Link
                             href="/dashboard"
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className="flex items-center space-x-3  py-3 px-4 rounded-lg text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
+                            className="flex items-center space-x-3 py-3 px-4 rounded-lg text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
                           >
                             <Settings className="w-5 h-5 flex-shrink-0" />
                             <span>لوحة التحكم</span>
@@ -398,7 +414,7 @@ export function Header() {
                           
                           <button
                             onClick={handleSignOut}
-                            className="w-full flex items-center space-x-3  py-3 px-4 rounded-lg text-red-400 hover:text-red-300 hover:bg-gray-800 transition-all duration-200"
+                            className="w-full flex items-center space-x-3 py-3 px-4 rounded-lg text-red-400 hover:text-red-300 hover:bg-gray-800 transition-all duration-200"
                           >
                             <LogOut className="w-5 h-5 flex-shrink-0" />
                             <span>تسجيل الخروج</span>
@@ -416,7 +432,7 @@ export function Header() {
                             onClick={() => setIsMobileMenuOpen(false)}
                             className="flex items-center justify-between py-3 px-4 rounded-lg text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
                           >
-                            <div className="flex items-center space-x-3 ">
+                            <div className="flex items-center space-x-3">
                               <div className="relative">
                                 <ShoppingCart className="w-5 h-5" />
                                 {cartCount > 0 && (
@@ -438,7 +454,7 @@ export function Header() {
                             onClick={() => setIsMobileMenuOpen(false)}
                             className="flex items-center justify-between py-3 px-4 rounded-lg text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
                           >
-                            <div className="flex items-center space-x-3 ">
+                            <div className="flex items-center space-x-3">
                               <div className="relative">
                                 <Heart className="w-5 h-5" />
                                 {wishlistCount > 0 && (
@@ -458,7 +474,7 @@ export function Header() {
                             onClick={() => setIsMobileMenuOpen(false)}
                             className="flex items-center justify-between py-3 px-4 rounded-lg text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
                           >
-                            <div className="flex items-center space-x-3 ">
+                            <div className="flex items-center space-x-3">
                               <div className="relative">
                                 <GitCompare className="w-5 h-5" />
                                 {compareCount > 0 && (

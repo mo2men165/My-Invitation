@@ -10,8 +10,9 @@ import { useToast } from '@/hooks/useToast';
 import { useModal } from '@/hooks/useModal';
 import { formatCurrency } from '@/utils/calculations';
 import { invitationDesigns, packageData } from '@/constants';
-import CartModal from '@/components/packages/modals/cartModal/CartModal';
-import ConfirmationModal from '@/components/packages/modals/cartModal/ConfirmationModal';
+import { CartModal } from '@/components/cart/CartModal';
+import ConfirmationModal from '@/components/cart/CartModal/components/ConfirmationModal';
+import { InstantRouteGuard } from '@/components/auth/InstantRouteGuard';
 import Image from 'next/image';
 
 // Helper function to format date in Arabic
@@ -36,10 +37,10 @@ const formatArabicTime = (timeString: string) => {
   return `${displayHour}:${minutes.padStart(2, '0')} ${period}`;
 };
 
-export default function CartPage() {
+function CartPageContent() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const { items: cartItems, isLoading, error } = useAppSelector((state) => state.cart);
   const { toast } = useToast();
   
@@ -137,17 +138,6 @@ export default function CartPage() {
 
   // Checkout handler
   const handleCheckout = useCallback(() => {
-    if (!isAuthenticated) {
-      toast({
-        title: "يجب تسجيل الدخول",
-        description: "يرجى تسجيل الدخول لإتمام عملية الشراء",
-        variant: "destructive",
-        duration: 3000
-      });
-      router.push('/login');
-      return;
-    }
-
     if (cartItems.length === 0) {
       toast({
         title: "السلة فارغة",
@@ -159,7 +149,7 @@ export default function CartPage() {
     }
 
     router.push('/payment');
-  }, [isAuthenticated, cartItems.length, router, toast]);
+  }, [cartItems.length, router, toast]);
 
   // Loading state
   if (authLoading || (isLoading && cartItems.length === 0)) {
@@ -173,29 +163,6 @@ export default function CartPage() {
     );
   }
 
-  // Authentication required
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
-        <div className="text-center py-20">
-          <div className="bg-white/5 backdrop-blur-sm rounded-3xl p-12 border border-white/10 max-w-2xl mx-auto">
-            <AlertCircle className="w-20 h-20 text-red-400 mx-auto mb-6" />
-            <h2 className="text-2xl font-bold text-white mb-4">يجب تسجيل الدخول</h2>
-            <p className="text-gray-400 mb-8 text-lg">
-              يرجى تسجيل الدخول لعرض سلة التسوق
-            </p>
-            <button
-              onClick={() => router.push('/login')}
-              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-[#C09B52] to-amber-600 text-black font-bold rounded-xl hover:from-amber-600 hover:to-[#C09B52] transition-all duration-300 transform hover:scale-105"
-            >
-              <span>تسجيل الدخول</span>
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Error state
   if (error) {
@@ -350,7 +317,6 @@ export default function CartPage() {
                                   if (item._id) {
                                     handleRemoveItem(item._id);
                                   } else {
-                                    console.error("Item ID is undefined");
                                     // Optionally show a toast notification
                                     toast({
                                       title: "خطأ",
@@ -381,14 +347,9 @@ export default function CartPage() {
                                 مشرفين بوابة: {item.details.gateSupervisors}
                               </span>
                             )}
-                            {item.details.fastDelivery && (
+                            {item.details.expeditedDelivery && (
                               <span className="px-3 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
                                 تسليم سريع
-                              </span>
-                            )}
-                            {item.details.qrCode && (
-                              <span className="px-3 py-1 bg-[#C09B52]/20 text-[#C09B52] text-xs rounded-full border border-[#C09B52]/30">
-                                كود QR
                               </span>
                             )}
                           </div>
@@ -493,24 +454,7 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                {/* Trust Signals */}
-                <div className="bg-gradient-to-r from-[#C09B52]/10 to-amber-600/10 backdrop-blur-sm rounded-2xl p-6 border border-[#C09B52]/20">
-                  <h3 className="text-lg font-bold text-white mb-4">لماذا تختارنا؟</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-[#C09B52] rounded-full"></div>
-                      <span className="text-gray-300 text-sm">ضمان استرداد الأموال خلال 30 يوم</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-[#C09B52] rounded-full"></div>
-                      <span className="text-gray-300 text-sm">دعم فني متواصل 24/7</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-[#C09B52] rounded-full"></div>
-                      <span className="text-gray-300 text-sm">تحديثات مجانية مدى الحياة</span>
-                    </div>
-                  </div>
-                </div>
+               
 
                 {/* Customer Reviews */}
                 <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
@@ -559,5 +503,13 @@ export default function CartPage() {
         message="هل تريد حذف هذه المناسبة من السلة؟ لن يمكن التراجع عن هذا الإجراء."
       />
     </>
+  );
+}
+
+export default function CartPage() {
+  return (
+    <InstantRouteGuard allowedRoles={['user']}>
+      <CartPageContent />
+    </InstantRouteGuard>
   );
 }

@@ -21,7 +21,12 @@ export const useCartFormValidation = () => {
       const selectedDate = new Date(value);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (selectedDate < today) return 'لا يمكن اختيار تاريخ في الماضي';
+      
+      // Calculate minimum date (7 days from now)
+      const minDate = new Date(today.getTime() + (7 * 24 * 60 * 60 * 1000));
+      minDate.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < minDate) return 'يجب حجز المناسبة قبل 7 أيام على الأقل';
       return null;
     },
     startTime: (value: string) => {
@@ -45,6 +50,11 @@ export const useCartFormValidation = () => {
       if (value.trim().length < 10) return 'نص الدعوة قصير جداً';
       if (value.length > 1000) return 'نص الدعوة طويل جداً';
       return null;
+    },
+    // Add extra hours validation
+    extraHours: (value: number, form: CartForm) => {
+      if (value < 0 || value > 2) return 'الساعات الإضافية يجب أن تكون بين 0 و 2';
+      return null;
     }
   }), []);
 
@@ -52,13 +62,13 @@ export const useCartFormValidation = () => {
     const rule = validationRules[field as keyof typeof validationRules];
     if (!rule) return null;
     
-    // Check if the rule needs the form parameter (like endTime validation)
-    if (field === 'endTime' && form) {
-      return (rule as (value: string, form: CartForm) => string | null)(value, form);
+    // Check if the rule needs the form parameter
+    if (['endTime', 'extraHours'].includes(field) && form) {
+      return (rule as (value: any, form: CartForm) => string | null)(value, form);
     }
     
     // For other rules that only need the value
-    return (rule as (value: string) => string | null)(value);
+    return (rule as (value: any) => string | null)(value);
   }, [validationRules]);
 
   const validateFieldWithTouch = useCallback((field: string, value: any, form?: CartForm) => {
@@ -97,14 +107,31 @@ export const useCartFormValidation = () => {
       }
     });
 
-    // Special validation for map location if map is shown
-    if (showMap && !hasLocationCoords) {
-      newErrors.location = 'يرجى تحديد الموقع على الخريطة';
+    // Validate extra hours if present
+    if (form.extraHours !== undefined) {
+      const extraHoursError = validateField('extraHours', form.extraHours, form);
+      if (extraHoursError) {
+        newErrors.extraHours = extraHoursError;
+        isValid = false;
+      }
+    }
+
+    // Enhanced location validation with specific error messages
+    if (!form.eventLocation?.trim()) {
+      newErrors.eventLocation = 'موقع المناسبة مطلوب';
+      isValid = false;
+    } else if (form.eventLocation.trim().length < 3) {
+      newErrors.eventLocation = 'يرجى إدخال عنوان مفصل';
+      isValid = false;
+    } else if (showMap && !hasLocationCoords) {
+      // This is specifically for when map is shown but no coordinates are selected
+      newErrors.eventLocation = 'يرجى تحديد الموقع الدقيق على الخريطة';
+      newErrors.mapLocation = 'يرجى النقر على الخريطة لتحديد الموقع الدقيق';
       isValid = false;
     }
 
     setErrors(newErrors);
-    setTouchedFields(new Set(fieldsToValidate));
+    setTouchedFields(new Set([...fieldsToValidate, 'extraHours']));
     
     return isValid;
   }, [validateField]);
@@ -117,10 +144,35 @@ export const useCartFormValidation = () => {
   const clearLocationError = useCallback(() => {
     setErrors(prev => {
       const newErrors = { ...prev };
-      delete newErrors.location;
+      delete newErrors.eventLocation;
+      delete newErrors.mapLocation;
       return newErrors;
     });
   }, []);
+
+  // Get user-friendly error summary for toast messages
+  const getErrorSummary = useCallback(() => {
+    const errorFields = Object.keys(errors).filter(key => errors[key]);
+    if (errorFields.length === 0) return null;
+
+    const fieldNames: Record<string, string> = {
+      hostName: 'اسم المضيف',
+      eventDate: 'تاريخ المناسبة',
+      startTime: 'وقت البداية',
+      endTime: 'وقت النهاية',
+      eventLocation: 'موقع المناسبة',
+      invitationText: 'نص الدعوة',
+      extraHours: 'الساعات الإضافية',
+      mapLocation: 'تحديد الموقع على الخريطة'
+    };
+
+    if (errorFields.length === 1) {
+      const field = errorFields[0];
+      return `خطأ في ${fieldNames[field] || field}: ${errors[field]}`;
+    }
+
+    return `يوجد ${errorFields.length} أخطاء تحتاج إلى تصحيح: ${errorFields.map(f => fieldNames[f] || f).join('، ')}`;
+  }, [errors]);
 
   return {
     errors,
@@ -129,6 +181,7 @@ export const useCartFormValidation = () => {
     validateFieldWithTouch,
     validateAllFields,
     clearErrors,
-    clearLocationError
+    clearLocationError,
+    getErrorSummary
   };
 };

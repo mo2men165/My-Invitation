@@ -18,15 +18,19 @@ export function LoginForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   
-  const { isLoading, error, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { isLoading, error, isAuthenticated, user } = useAppSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
 
   // Redirect when authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/dashboard'); // or wherever you want to redirect
+    if (isAuthenticated && user) {
+      if (user.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, user, router]);
 
   const {
     register,

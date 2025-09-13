@@ -7,7 +7,8 @@ const saudiCities = [
   'الرياض', 
   'الدمام',
   'مكة المكرمة',
-  'الطائف'
+  'الطائف',
+  'المدينة المنورة'
 ] as const;
 
 export const registerSchema = z.object({

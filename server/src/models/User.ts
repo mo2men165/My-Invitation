@@ -9,7 +9,6 @@ export interface ICartItem {
   packageType: 'classic' | 'premium' | 'vip';
   details: {
     inviteCount: number;
-    qrCode: boolean;
     eventDate: Date;
     startTime: string;
     endTime: string;
@@ -17,14 +16,14 @@ export interface ICartItem {
     hostName: string;
     eventLocation: string;
     additionalCards: number;
-    gateSupervisors: string;
-    fastDelivery: boolean;
-    // New location fields
+    gateSupervisors: number; // Changed from string to number
+    extraHours?: number; // Added extraHours
+    expeditedDelivery: boolean; // Added expeditedDelivery field
     locationCoordinates?: {
       lat: number;
       lng: number;
     };
-    detectedCity?: string;
+    detectedCity: string; // Required field
   };
   totalPrice: number;
   addedAt: Date;
@@ -86,11 +85,7 @@ const cartItemSchema = new Schema<ICartItem>({
       type: Number,
       required: true,
       min: 100,
-      max: 700
-    },
-    qrCode: {
-      type: Boolean,
-      default: true
+      max: 500 // Changed from 700 to 500
     },
     eventDate: {
       type: Date,
@@ -128,13 +123,16 @@ const cartItemSchema = new Schema<ICartItem>({
       max: 100
     },
     gateSupervisors: {
-      type: String,
-      enum: ['', '100-300 مدعو', '300-500 مدعو', '500-700 مدعو'],
-      default: ''
+      type: Number, // Changed from String to Number
+      default: 0,
+      min: 0,
+      max: 10
     },
-    fastDelivery: {
-      type: Boolean,
-      default: false
+    extraHours: {
+      type: Number, // Added extraHours field
+      default: 0,
+      min: 0,
+      max: 3
     },
     locationCoordinates: {
       lat: {
@@ -150,7 +148,7 @@ const cartItemSchema = new Schema<ICartItem>({
     },
     detectedCity: {
       type: String,
-      enum: ['جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'],
+      enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'],
     }
   },
   totalPrice: {
@@ -225,14 +223,12 @@ const userSchema = new Schema<IUser>({
   phone: {
     type: String,
     required: true,
-    unique: true,
     index: true,
-    match: /^\+966[5][0-9]{8}$/
+    match: /^\+[1-9]\d{1,14}$/ // International phone number format (E.164)
   },
   email: {
     type: String,
     required: true,
-    unique: true,
     lowercase: true,
     index: true,
     match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -245,7 +241,7 @@ const userSchema = new Schema<IUser>({
   city: {
     type: String,
     required: true,
-    enum: ['جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
+    enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
   },
   role: {
     type: String,
@@ -318,8 +314,8 @@ userSchema.methods.comparePassword = async function(candidatePassword: string): 
 userSchema.index({ phone: 1 });
 userSchema.index({ email: 1 });
 userSchema.index({ status: 1, role: 1 });
-userSchema.index({ phone: 1, status: 1 });
-userSchema.index({ email: 1, status: 1 });
+userSchema.index({ email: 1, role: 1 }, { unique: true });
+userSchema.index({ phone: 1, role: 1 }, { unique: true });
 userSchema.index({ 'cart.designId': 1 });
 userSchema.index({ 'wishlist.designId': 1 });
 userSchema.index({ 'compareList.designId': 1 });

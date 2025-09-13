@@ -16,7 +16,8 @@ import CompareActions from './CompareActions';
 import EmptyCompare from './EmptyCompare';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
-import CartModal from '@/components/packages/modals/cartModal/CartModal';
+import { ComparePageSkeleton } from '@/components/ui/SkeletonLoader';
+import { CartModal } from '@/components/cart/CartModal';
 
 import { InvitationDesign, PackageData } from '@/types';
 import { getDesignById } from '@/utils/designHelpers';
@@ -46,9 +47,9 @@ const ComparePage: React.FC = () => {
     }
   }, [toggleCompare]);
 
-  const handleAddToWishlist = useCallback(async (designId: string) => {
+  const handleAddToWishlist = useCallback(async (designId: string, packageType?: keyof PackageData) => {
     try {
-      await toggleWishlist(designId);
+      await toggleWishlist(designId, packageType);
     } catch (error) {
       // Error handling is done in the hook
     }
@@ -59,13 +60,11 @@ const ComparePage: React.FC = () => {
     openCartModal(packageType, design);
   }, [openCartModal]);
 
-  // Get designs from items with default package types
-  // For now, we'll cycle through package types since we don't store them in the DB yet
-  const compareItemsWithPackages = items.map((item, index) => {
-    const packageTypes: (keyof PackageData)[] = ['classic', 'premium', 'vip'];
+  // Get designs from items with their actual package types
+  const compareItemsWithPackages = items.map((item) => {
     return {
       ...item,
-      packageType: packageTypes[index % 3] // Cycle through package types
+      packageType: item.packageType // Use the actual package type from the item
     };
   });
 
@@ -88,9 +87,7 @@ const ComparePage: React.FC = () => {
 
         {/* Loading State */}
         {isLoading && !isEmpty && (
-          <div className="flex justify-center py-20">
-            <LoadingSpinner size="lg" />
-          </div>
+          <ComparePageSkeleton />
         )}
 
         {/* Error State */}

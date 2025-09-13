@@ -8,65 +8,29 @@ interface CompareTableProps {
   packageTypes: (keyof PackageData)[]; // Array of package types being compared
 }
 
-// Real package features comparison based on your specifications
+// Map package features to comparison format based on actual packageData
 const getPackageFeatures = (packageType: keyof PackageData) => {
   const features: Record<string, string> = {};
+  const packageFeatures = packageData[packageType].features;
   
-  switch (packageType) {
-    case 'classic':
-      features['طريقة الإرسال'] = 'من التطبيق عبر واتساب العميل';
-      features['دعوة تجريبية'] = 'متاح';
-      features['تذكير قبل المناسبة'] = 'قبل يوم واحد';
-      features['القبول والاعتذار'] = 'متاح';
-      features['كود دخول خاص'] = 'متاح';
-      features['إحصائيات مفصلة'] = 'بالاسم والرقم';
-      features['مسح أكواد الدخول'] = 'من التطبيق';
-      features['متابعة قائمة الانتظار'] = 'غير متاح';
-      features['دعوات بديلة'] = 'غير متاح';
-      features['الدعم الفني'] = 'عادي';
-      features['داعي إضافي'] = 'غير متاح';
-      features['دعم متعدد اللغات'] = 'العربية فقط';
-      features['رسالة شكر'] = 'غير متاح';
-      features['قروب واتساب مخصص'] = 'غير متاح';
-      break;
-      
-    case 'premium':
-      features['طريقة الإرسال'] = 'من التطبيق عبر واتساب العميل';
-      features['دعوة تجريبية'] = 'متاح';
-      features['تذكير قبل المناسبة'] = 'قبل يوم واحد عبر واتساب';
-      features['القبول والاعتذار'] = 'متاح';
-      features['كود دخول خاص'] = 'متاح';
-      features['إحصائيات مفصلة'] = 'بالاسم والرقم';
-      features['مسح أكواد الدخول'] = 'عبر الدعم الفني';
-      features['متابعة قائمة الانتظار'] = 'عبر واتساب';
-      features['دعوات بديلة'] = '20% في حالة الاعتذار';
-      features['الدعم الفني'] = 'محسن';
-      features['داعي إضافي'] = 'غير متاح';
-      features['دعم متعدد اللغات'] = 'العربية فقط';
-      features['رسالة شكر'] = 'غير متاح';
-      features['قروب واتساب مخصص'] = 'غير متاح';
-      break;
-      
-    case 'vip':
-      features['طريقة الإرسال'] = 'الدعم الفني برقم مخصص';
-      features['دعوة تجريبية'] = 'متاح';
-      features['تذكير قبل المناسبة'] = 'قبل يوم واحد';
-      features['القبول والاعتذار'] = 'متاح';
-      features['كود دخول خاص'] = 'متاح';
-      features['إحصائيات مفصلة'] = 'بالاسم والرقم';
-      features['مسح أكواد الدخول'] = 'باركود أو جوال';
-      features['متابعة قائمة الانتظار'] = 'عبر واتساب';
-      features['دعوات بديلة'] = '50% في حالة الاعتذار';
-      features['الدعم الفني'] = 'مميز مع قروب مخصص';
-      features['داعي إضافي'] = 'متاح';
-      features['دعم متعدد اللغات'] = 'العربية والإنجليزية';
-      features['رسالة شكر'] = 'بعد المناسبة بيوم';
-      features['قروب واتساب مخصص'] = 'متاح';
-      break;
-      
-    default:
-      break;
-  }
+  // Map features to comparison categories
+  features['بطاقة الدعوة'] = packageFeatures.some(f => f.includes('بطاقة دعوة')) ? 'متاح' : 'غير متاح';
+  features['بطاقة الدخول'] = packageFeatures.some(f => f.includes('بطاقة دخول')) ? 'متاح' : 'غير متاح';
+  features['رمز الكيو آر كود'] = packageFeatures.some(f => f.includes('الكيو آر كود')) ? 'متاح' : 'غير متاح';
+  features['رقم تسلسلي'] = 'متاح'; // Available for all packages
+  features['إضافة مرافقين'] = packageFeatures.some(f => f.includes('مرافقين')) ? 'متاح' : 'غير متاح';
+  features['تصميم حسب الطلب'] = packageFeatures.some(f => f.includes('حسب الطلب')) ? 'متاح' : 'غير متاح';
+  features['إحصائية الحضور'] = packageFeatures.some(f => f.includes('إحصائية')) ? 'متاح' : 'غير متاح';
+  features['تذكير قبل المناسبة'] = packageFeatures.some(f => f.includes('تذكير')) ? 'متاح' : 'غير متاح';
+  features['رسالة شكر'] = packageFeatures.some(f => f.includes('رسالة شكر')) ? 'متاح' : 'غير متاح';
+  features['قروب واتساب مخصص'] = packageFeatures.some(f => f.includes('قروب واتساب')) ? 'متاح' : 'غير متاح';
+  features['دعم متعدد اللغات'] = packageFeatures.some(f => f.includes('لغتين') || f.includes('العربية / الإنجليزية')) ? 'متاح' : 'غير متاح';
+  features['فيديو دعوة 3D'] = packageFeatures.some(f => f.includes('فيديو دعوة')) ? 'متاح' : 'غير متاح';
+  features['رسالة تهنئة'] = packageFeatures.some(f => f.includes('رسالة تهنئة')) ? 'متاح' : 'غير متاح';
+  features['مشرف لقراءة الكود'] = packageFeatures.some(f => f.includes('مشرف لقراءة')) ? 'متاح' : 'غير متاح';
+  features['توزيع من العميل'] = packageFeatures.some(f => f.includes('توزيعها من قبل العميل')) ? 'متاح' : 'غير متاح';
+  features['توزيع من الفريق'] = packageFeatures.some(f => f.includes('من قبل فريقنا')) ? 'متاح' : 'غير متاح';
+  features['زيادة البطاقات'] = (packageType === 'premium' || packageType === 'vip') ? 'متاح' : 'غير متاح';
   
   return features;
 };

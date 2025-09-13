@@ -62,7 +62,6 @@ const WishlistCard = memo<WishlistCardProps>(({
             }}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             onError={() => {
-              console.log(`Failed to load image: ${design.image}`);
             }}
           />
 

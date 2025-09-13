@@ -15,7 +15,7 @@ router.use(checkJwt, extractUser, requireActiveUser);
 // Validation schemas
 const guestSchema = z.object({
   name: z.string().min(2).max(100),
-  phone: z.string().regex(/^[5][0-9]{8}$/, 'رقم الهاتف السعودي يجب أن يبدأ بـ 5 ويتكون من 9 أرقام'),
+  phone: z.string().regex(/^\+[1-9]\d{1,14}$/, 'رقم الهاتف يجب أن يكون بالصيغة الدولية (مثال: +966501234567)'),
   numberOfAccompanyingGuests: z.number().int().min(1).max(10)
 });
 
@@ -28,13 +28,17 @@ const updateGuestSchema = guestSchema.partial();
 router.get('/', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { status, limit = 10, page = 1 } = req.query;
+    const { status, approvalStatus, limit = 10, page = 1 } = req.query;
 
     const query: any = { userId: new Types.ObjectId(userId) };
     
     if (status && typeof status === 'string') {
       query.status = status;
     }
+    
+    if (approvalStatus && typeof approvalStatus === 'string') {
+      query.approvalStatus = approvalStatus;
+    }    
 
     const skip = (Number(page) - 1) * Number(limit);
 
@@ -146,8 +150,16 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
       });
     }
 
+    // For VIP packages, check if guest list is already confirmed
+    if (event.packageType === 'vip' && event.guestListConfirmed.isConfirmed) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'تم تأكيد قائمة الضيوف مسبقاً. لا يمكن إضافة ضيوف جدد' }
+      });
+    }
+
     // Check if guest already exists
-    const existingGuest = event.guests.find(guest => guest.phone === `+966${guestData.phone}`);
+    const existingGuest = event.guests.find(guest => guest.phone === guestData.phone);
     if (existingGuest) {
       return res.status(400).json({
         success: false,
@@ -169,7 +181,7 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
     // Add guest
     const newGuest = {
       name: guestData.name,
-      phone: `+966${guestData.phone}`,
+      phone: guestData.phone, // Keep the full international format
       numberOfAccompanyingGuests: guestData.numberOfAccompanyingGuests,
       whatsappMessageSent: false,
       addedAt: new Date(),
@@ -230,6 +242,14 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
       });
     }
 
+    // For VIP packages, check if guest list is already confirmed
+    if (event.packageType === 'vip' && event.guestListConfirmed.isConfirmed) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'تم تأكيد قائمة الضيوف مسبقاً. لا يمكن تعديل قائمة الضيوف' }
+      });
+    }
+
     const guestIndex = event.guests.findIndex(guest => guest._id?.toString() === guestId);
     if (guestIndex === -1) {
       return res.status(404).json({
@@ -242,7 +262,7 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
 
     // Update fields
     if (updateData.name) guest.name = updateData.name;
-    if (updateData.phone) guest.phone = `+966${updateData.phone}`;
+    if (updateData.phone) guest.phone = updateData.phone; // Keep the full international format
     if (updateData.numberOfAccompanyingGuests) {
       // Check invite limit when updating guest count
       const otherGuestsTotal = event.guests
@@ -280,6 +300,80 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/events/:id/guests/confirm
+ * Confirm final guest list for VIP packages
+ */
+router.post('/:id/guests/confirm', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    const event = await Event.findOne({
+      _id: new Types.ObjectId(id),
+      userId: new Types.ObjectId(userId)
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    // Only allow for VIP packages
+    if (event.packageType !== 'vip') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'تأكيد قائمة الضيوف متاح فقط لحزم VIP' }
+      });
+    }
+
+    // Check if already confirmed
+    if (event.guestListConfirmed.isConfirmed) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'تم تأكيد قائمة الضيوف مسبقاً' }
+      });
+    }
+
+    // Check if there are guests to confirm
+    if (event.guests.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'لا يمكن تأكيد قائمة فارغة' }
+      });
+    }
+
+    // Confirm the guest list
+    event.guestListConfirmed = {
+      isConfirmed: true,
+      confirmedAt: new Date(),
+      confirmedBy: new Types.ObjectId(userId)
+    };
+
+    await event.save();
+
+    logger.info(`Guest list confirmed for event ${id} by user ${userId}`);
+
+    return res.json({
+      success: true,
+      message: 'تم تأكيد قائمة الضيوف بنجاح. سيتم إرسال الدعوات قريباً',
+      data: {
+        confirmedAt: event.guestListConfirmed.confirmedAt,
+        guestCount: event.guests.length
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error confirming guest list:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تأكيد قائمة الضيوف' }
+    });
+  }
+});
+
+/**
  * DELETE /api/events/:id/guests/:guestId
  * Remove guest from event
  */
@@ -297,6 +391,14 @@ router.delete('/:id/guests/:guestId', async (req: Request, res: Response) => {
       return res.status(404).json({
         success: false,
         error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    // For VIP packages, check if guest list is already confirmed
+    if (event.packageType === 'vip' && event.guestListConfirmed.isConfirmed) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'تم تأكيد قائمة الضيوف مسبقاً. لا يمكن تعديل قائمة الضيوف' }
       });
     }
 

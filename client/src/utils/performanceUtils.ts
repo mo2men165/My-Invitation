@@ -8,7 +8,6 @@ export const performanceUtils = {
         
         const duration = endTime - startTime;
         if (duration > 16.67) {
-          console.warn(`${componentName} render took ${duration.toFixed(2)}ms`);
         }
         
         return result;

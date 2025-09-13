@@ -42,16 +42,12 @@ const CartPaymentButton: React.FC = () => {
           <span>{totalAmount.toLocaleString('ar-SA')} ر.س</span>
         </div>
         
-        <div className="flex justify-between items-center text-gray-300">
-          <span>ضريبة القيمة المضافة (15%)</span>
-          <span>{(totalAmount * 0.15).toLocaleString('ar-SA')} ر.س</span>
-        </div>
         
         <div className="border-t border-[#C09B52]/30 pt-3">
           <div className="flex justify-between items-center">
             <span className="text-lg font-bold text-white">الإجمالي</span>
             <span className="text-2xl font-bold text-[#C09B52]">
-              {(totalAmount * 1.15).toLocaleString('ar-SA')} ر.س
+              {totalAmount.toLocaleString('ar-SA')} ر.س
             </span>
           </div>
         </div>

@@ -1,53 +1,8 @@
 // components/dashboard/QuickActions.tsx
 'use client';
-import { Plus, Calendar, Settings, Download, Users, Heart, BarChart3, CreditCard } from 'lucide-react';
+import { quickActions } from '@/constants';
 
 export function QuickActions() {
-  const actions = [
-    {
-      title: 'إنشاء دعوة جديدة',
-      description: 'ابدأ في تصميم دعوة مميزة لمناسبتك',
-      icon: Plus,
-      color: 'from-[#C09B52] to-amber-600',
-      href: '/packages',
-      primary: true
-    },
-    {
-      title: 'إدارة المناسبات',
-      description: 'عرض وتعديل مناسباتك الحالية',
-      icon: Calendar,
-      color: 'from-blue-500 to-cyan-500',
-      href: '/events'
-    },
-    {
-      title: 'إعدادات الحساب',
-      description: 'تحديث معلوماتك الشخصية',
-      icon: Settings,
-      color: 'from-purple-500 to-pink-500',
-      href: '/settings'
-    },
-    // {
-    //   title: 'إدارة الضيوف',
-    //   description: 'إضافة وتنظيم قوائم الضيوف',
-    //   icon: Users,
-    //   color: 'from-orange-500 to-red-500',
-    //   href: '/guests'
-    // },
-    {
-      title: 'المفضلة',
-      description: 'عرض التصاميم المحفوظة',
-      icon: Heart,
-      color: 'from-red-500 to-rose-500',
-      href: '/wishlist'
-    },
-    // {
-    //   title: 'الفواتير',
-    //   description: 'عرض تاريخ المدفوعات',
-    //   icon: CreditCard,
-    //   color: 'from-yellow-500 to-orange-500',
-    //   href: '/billing'
-    // }
-  ];
 
   return (
     <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
@@ -59,7 +14,7 @@ export function QuickActions() {
 
       {/* Actions Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {actions.map((action, index) => {
+        {quickActions.map((action, index) => {
           const Icon = action.icon;
           return (
             <a

@@ -1,11 +1,11 @@
-// server/src/models/Event.ts
+// server/src/models/Event.ts - UPDATED VERSION
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IGuest {
   _id?: Types.ObjectId;
   name: string;
   phone: string;
-  numberOfAccompanyingGuests: number; // Total people (guest + accompanying)
+  numberOfAccompanyingGuests: number;
   whatsappMessageSent: boolean;
   addedAt: Date;
   updatedAt: Date;
@@ -25,7 +25,7 @@ export interface IEvent extends Document {
     hostName: string;
     eventLocation: string;
     additionalCards: number;
-    gateSupervisors: string;
+    gateSupervisors: number;
     fastDelivery: boolean;
     locationCoordinates?: {
       lat: number;
@@ -35,10 +35,24 @@ export interface IEvent extends Document {
   };
   totalPrice: number;
   status: 'upcoming' | 'cancelled' | 'done';
+  
+  // NEW: Admin approval fields
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  adminNotes?: string;
+  approvedBy?: Types.ObjectId;
+  approvedAt?: Date;
+  rejectedAt?: Date;
+  
   guests: IGuest[];
   paymentCompletedAt: Date;
+  guestListConfirmed: {
+    isConfirmed: boolean;
+    confirmedAt?: Date;
+    confirmedBy?: Types.ObjectId;
+  };
   createdAt: Date;
   updatedAt: Date;
+  invitationCardUrl: string;
 }
 
 const guestSchema = new Schema<IGuest>({
@@ -51,7 +65,7 @@ const guestSchema = new Schema<IGuest>({
   phone: {
     type: String,
     required: true,
-    match: /^\+966[5][0-9]{8}$/
+    match: /^\+[1-9]\d{1,14}$/ // International phone number format (E.164)
   },
   numberOfAccompanyingGuests: {
     type: Number,
@@ -138,9 +152,8 @@ const eventSchema = new Schema<IEvent>({
       max: 100
     },
     gateSupervisors: {
-      type: String,
-      enum: ['', '100-300 مدعو', '300-500 مدعو', '500-700 مدعو'],
-      default: ''
+      type: Number,
+      default: 0
     },
     fastDelivery: {
       type: Boolean,
@@ -160,7 +173,7 @@ const eventSchema = new Schema<IEvent>({
     },
     detectedCity: {
       type: String,
-      enum: ['جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
+      enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
     }
   },
   totalPrice: {
@@ -174,6 +187,29 @@ const eventSchema = new Schema<IEvent>({
     default: 'upcoming',
     index: true
   },
+  
+  // NEW: Admin approval fields
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+    index: true
+  },
+  adminNotes: {
+    type: String,
+    maxlength: 500
+  },
+  approvedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  approvedAt: {
+    type: Date
+  },
+  rejectedAt: {
+    type: Date
+  },
+  
   guests: {
     type: [guestSchema],
     default: [],
@@ -189,12 +225,39 @@ const eventSchema = new Schema<IEvent>({
     type: Date,
     required: true,
     index: true
-  }
-}, {
-  timestamps: true
-});
+  },
+  invitationCardUrl: {
+    type: String,
+    trim: true,
+    validate: {
+      validator: function(url: string) {
+        if (!url) return true; // Optional field
+        return url.includes('drive.google.com') || url.includes('docs.google.com');
+      },
+      message: 'يجب أن يكون الرابط من Google Drive'
+    }
+  },
+  guestListConfirmed: {
+    isConfirmed: {
+      type: Boolean,
+      default: false
+    },
+    confirmedAt: {
+      type: Date
+    },
+    confirmedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  },
+},{ timestamps: true});
 
-// Indexes
+// NEW: Indexes for admin functionality
+eventSchema.index({ approvalStatus: 1, paymentCompletedAt: 1 });
+eventSchema.index({ userId: 1, approvalStatus: 1 });
+eventSchema.index({ approvedBy: 1 });
+
+// Existing indexes
 eventSchema.index({ userId: 1, status: 1 });
 eventSchema.index({ 'details.eventDate': 1, status: 1 });
 eventSchema.index({ designId: 1, packageType: 1 });

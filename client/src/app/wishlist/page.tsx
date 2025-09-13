@@ -1,11 +1,11 @@
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { InstantRouteGuard } from "@/components/auth/InstantRouteGuard";
 import WishlistPage from "@/components/wishlist/WishlistPage";
 
 export default function Page() {
   return (
-    <ProtectedRoute requireAuth>
+    <InstantRouteGuard allowedRoles={['user']}>
       <WishlistPage />
-    </ProtectedRoute>
+    </InstantRouteGuard>
   )
 }
 

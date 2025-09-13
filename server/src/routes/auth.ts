@@ -85,8 +85,8 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const userData = transformRegisterData(validationResult.data);
 
-    // Check if phone number already exists
-    const existingUserByPhone = await User.findOne({ phone: userData.phone });
+    // Check if phone number already exists for the same role
+    const existingUserByPhone = await User.findOne({ phone: userData.phone, role: 'user' });
     if (existingUserByPhone) {
       return res.status(400).json({
         success: false,
@@ -94,13 +94,28 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Check if email already exists (now mandatory)
-    const existingUserByEmail = await User.findOne({ email: userData.email });
+    // Check if email already exists for the same role
+    const existingUserByEmail = await User.findOne({ email: userData.email, role: 'user' });
     if (existingUserByEmail) {
       return res.status(400).json({
         success: false,
         error: { message: 'البريد الإلكتروني مستخدم بالفعل' }
       });
+    }
+
+    // Check for password conflicts with existing accounts (same email/phone but different role)
+    const existingAccountsByEmail = await User.find({ email: userData.email, role: 'admin' });
+    const existingAccountsByPhone = await User.find({ phone: userData.phone, role: 'admin' });
+    
+    // Check if any existing account has the same password
+    for (const account of [...existingAccountsByEmail, ...existingAccountsByPhone]) {
+      const isPasswordSame = await account.comparePassword(userData.password);
+      if (isPasswordSame) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'كلمة المرور مستخدمة بالفعل لحساب آخر بنفس البريد الإلكتروني أو رقم الهاتف' }
+        });
+      }
     }
 
     // Create user in database
@@ -188,28 +203,34 @@ router.post('/login', async (req: Request, res: Response) => {
     // Parse identifier to determine if it's email or phone
     const { type, value } = parseIdentifier(identifier);
 
-    // Find user by email or phone
+    // Find all users with the same email or phone
     const query = type === 'email' ? { email: value } : { phone: value };
-    const user = await User.findOne(query);
+    const users = await User.find(query);
 
-    if (!user) {
+    if (users.length === 0) {
       return res.status(401).json({
         success: false,
         error: { message: 'بيانات تسجيل الدخول غير صحيحة' }
       });
     }
 
-    // Check if user is active
-    if (user.status === 'suspended') {
-      return res.status(403).json({
-        success: false,
-        error: { message: 'الحساب معلق. يرجى التواصل مع الدعم الفني' }
-      });
+    // Find the user with matching password
+    let authenticatedUser = null;
+    for (const user of users) {
+      // Check if user is active
+      if (user.status === 'suspended') {
+        continue; // Skip suspended accounts
+      }
+
+      // Verify password
+      const isPasswordValid = await user.comparePassword(password);
+      if (isPasswordValid) {
+        authenticatedUser = user;
+        break; // Found the correct user
+      }
     }
 
-    // Verify password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
+    if (!authenticatedUser) {
       return res.status(401).json({
         success: false,
         error: { message: 'بيانات تسجيل الدخول غير صحيحة' }
@@ -217,13 +238,13 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // Update last login time
-    user.lastLogin = new Date();
-    await user.save();
+    authenticatedUser.lastLogin = new Date();
+    await authenticatedUser.save();
 
     // Generate tokens
-    const tokens = authService.generateTokens(user);
+    const tokens = authService.generateTokens(authenticatedUser);
 
-    logger.info(`User logged in successfully: ${type === 'email' ? user.email : user.phone}`);
+    logger.info(`User logged in successfully: ${type === 'email' ? authenticatedUser.email : authenticatedUser.phone} (Role: ${authenticatedUser.role})`);
 
     return res.json({
       success: true,
@@ -235,16 +256,16 @@ router.post('/login', async (req: Request, res: Response) => {
         token_type: tokens.token_type
       },
       user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        city: user.city,
-        role: user.role,
-        status: user.status,
-        lastLogin: user.lastLogin
+        id: authenticatedUser._id,
+        firstName: authenticatedUser.firstName,
+        lastName: authenticatedUser.lastName,
+        name: authenticatedUser.name,
+        email: authenticatedUser.email,
+        phone: authenticatedUser.phone,
+        city: authenticatedUser.city,
+        role: authenticatedUser.role,
+        status: authenticatedUser.status,
+        lastLogin: authenticatedUser.lastLogin
       }
     });
 
@@ -457,8 +478,8 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
       firstName: z.string().min(1, 'الاسم الأول مطلوب').max(25, 'الاسم الأول لا يجب أن يتجاوز 25 حرف'),
       lastName: z.string().min(1, 'الاسم الأخير مطلوب').max(25, 'الاسم الأخير لا يجب أن يتجاوز 25 حرف'),
       email: z.string().email('البريد الإلكتروني غير صحيح'),
-      phone: z.string().regex(/^[5][0-9]{8}$/, 'رقم الهاتف يجب أن يكون 9 أرقام ويبدأ بـ 5'), // Changed: No +966
-      city: z.enum(['جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'])
+      phone: z.string().regex(/^\+[1-9]\d{1,14}$/, 'رقم الهاتف يجب أن يكون بالصيغة الدولية (مثال: +966501234567)'),
+      city: z.enum(['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'])
     });
 
     const validationResult = profileUpdateSchema.safeParse(req.body);
@@ -479,12 +500,22 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
 
     const { firstName, lastName, email, phone, city } = validationResult.data;
 
-    // FIXED: Prepare the full phone number with +966 prefix for database storage
-    const fullPhoneNumber = `+966${phone}`;
+    // Use the phone number as provided (already in international format)
+    const fullPhoneNumber = phone;
 
-    // Check if email is already taken by another user
+    // Get current user to check their role
+    const currentUser = await User.findById(userId);
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المستخدم غير موجود' }
+      });
+    }
+
+    // Check if email is already taken by another user with the same role
     const existingEmailUser = await User.findOne({ 
       email: email.toLowerCase(), 
+      role: currentUser.role,
       _id: { $ne: userId } 
     });
     
@@ -495,9 +526,10 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
       });
     }
 
-    // Check if phone is already taken by another user (using full phone number)
+    // Check if phone is already taken by another user with the same role
     const existingPhoneUser = await User.findOne({ 
       phone: fullPhoneNumber, 
+      role: currentUser.role,
       _id: { $ne: userId } 
     });
     
@@ -608,6 +640,29 @@ router.post('/change-password', checkJwt, extractUser, requireActiveUser, async 
         success: false,
         error: { message: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية' }
       });
+    }
+
+    // Check for password conflicts with other accounts (same email/phone but different role)
+    const otherAccountsByEmail = await User.find({ 
+      email: user.email, 
+      role: { $ne: user.role },
+      _id: { $ne: userId }
+    });
+    const otherAccountsByPhone = await User.find({ 
+      phone: user.phone, 
+      role: { $ne: user.role },
+      _id: { $ne: userId }
+    });
+    
+    // Check if any other account has the same password
+    for (const account of [...otherAccountsByEmail, ...otherAccountsByPhone]) {
+      const isPasswordSame = await account.comparePassword(newPassword);
+      if (isPasswordSame) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'كلمة المرور الجديدة مستخدمة بالفعل لحساب آخر بنفس البريد الإلكتروني أو رقم الهاتف' }
+        });
+      }
     }
 
     // Update password (will be hashed by pre-save middleware)

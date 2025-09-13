@@ -237,7 +237,6 @@ const cartSlice = createSlice({
         const itemId = action.meta.arg.id;
         delete state.fieldUpdateLoading[itemId];
         state.error = action.payload as string;
-        // TODO: Revert optimistic update if needed
       })
 
       // Remove from Cart

@@ -7,7 +7,6 @@ export interface CartItem {
   packageType: 'classic' | 'premium' | 'vip';
   details: {
     inviteCount: number;
-    qrCode: boolean;
     eventDate: string; // Will be converted to Date on backend
     startTime: string;
     endTime: string;
@@ -15,14 +14,15 @@ export interface CartItem {
     hostName: string;
     eventLocation: string;
     additionalCards: number;
-    gateSupervisors: string;
-    fastDelivery: boolean;
+    gateSupervisors: number;
+    extraHours: number;
+    expeditedDelivery: boolean;
     // New location fields
     locationCoordinates?: {
       lat: number;
       lng: number;
     };
-    detectedCity?: string;
+    detectedCity: string;
   };
   totalPrice: number;
   addedAt?: string;

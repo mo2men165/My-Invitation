@@ -41,7 +41,7 @@ interface PackageTabsProps {
 const PackageTabs: React.FC<PackageTabsProps> = ({ activeTab, onTabChange, packages }) => {
   return (
     <div className="flex justify-center mb-12">
-      <div className="flex gap-4 bg-white/5 backdrop-blur-sm rounded-2xl p-2 border border-white/10">
+      <div className="flex flex-col md:flex-row gap-4 bg-white/5 backdrop-blur-sm rounded-2xl p-2 border border-white/10">
         {(Object.keys(packages) as Array<keyof PackageData>).map((packageKey) => (
           <PackageTab
             key={packageKey}

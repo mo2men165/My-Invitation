@@ -7,7 +7,8 @@ const saudiCities = [
   'الرياض', 
   'الدمام',
   'مكة المكرمة',
-  'الطائف'
+  'الطائف',
+  'المدينة المنورة'
 ] as const;
 
 // Location coordinate validation
@@ -29,7 +30,7 @@ export const registerSchema = z.object({
     .regex(/^[a-zA-Z\u0600-\u06FF\s]+$/, 'الاسم يجب أن يحتوي على أحرف عربية أو إنجليزية فقط')
     .trim(),
   phone: z.string()
-    .regex(/^[5][0-9]{8}$/, 'رقم الهاتف السعودي يجب أن يبدأ بـ 5 ويتكون من 9 أرقام'),
+    .regex(/^\+[1-9]\d{1,14}$/, 'رقم الهاتف يجب أن يكون بالصيغة الدولية (مثال: +966501234567)'),
   email: z.string()
     .email('عنوان البريد الإلكتروني غير صحيح')
     .toLowerCase(),
@@ -49,9 +50,9 @@ export const loginSchema = z.object({
     .min(1, 'البريد الإلكتروني أو رقم الهاتف مطلوب')
     .refine((val) => {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const phoneRegex = /^[5][0-9]{8}$/;
+      const phoneRegex = /^\+[1-9]\d{1,14}$/; // International phone number format
       return emailRegex.test(val) || phoneRegex.test(val);
-    }, 'يجب إدخال بريد إلكتروني صحيح أو رقم هاتف سعودي صحيح'),
+    }, 'يجب إدخال بريد إلكتروني صحيح أو رقم هاتف دولي صحيح'),
   password: z.string().min(1, 'كلمة المرور مطلوبة')
 });
 
@@ -63,8 +64,7 @@ export const resetPasswordSchema = z.object({
 
 // Cart item details schema with location support
 const cartItemDetailsSchema = z.object({
-  inviteCount: z.number().int().min(100).max(700),
-  qrCode: z.boolean().default(true),
+  inviteCount: z.number().int().min(100).max(500), // Changed max from 700 to 500
   eventDate: z.string().transform((str) => {
     const date = new Date(str);
     if (isNaN(date.getTime())) {
@@ -89,12 +89,14 @@ const cartItemDetailsSchema = z.object({
     .min(1, 'عنوان المناسبة مطلوب')
     .max(200, 'عنوان المناسبة لا يجب أن يتجاوز 200 حرف'),
   additionalCards: z.number().int().min(0).max(100).default(0),
-  gateSupervisors: z.enum(['', '100-300 مدعو', '300-500 مدعو', '500-700 مدعو']).default(''),
-  fastDelivery: z.boolean().default(false),
+  gateSupervisors: z.number().int().min(0).max(10).default(0), // Changed to number
+  extraHours: z.number().int().min(0).max(3).default(0).optional(), // Added extraHours
+  expeditedDelivery: z.boolean().default(false), // Added expeditedDelivery
   locationCoordinates: locationCoordinatesSchema,
-  detectedCity: z.enum(saudiCities).optional()
+  detectedCity: z.enum(saudiCities, {
+    message: 'يجب اختيار مدينة صحيحة من القائمة المحددة'
+  })
 }).refine((data) => {
-  // Validate end time is after start time
   const [startHour, startMin] = data.startTime.split(':').map(Number);
   const [endHour, endMin] = data.endTime.split(':').map(Number);
   const startMinutes = startHour * 60 + startMin;
@@ -104,7 +106,6 @@ const cartItemDetailsSchema = z.object({
   message: 'وقت النهاية يجب أن يكون بعد وقت البداية',
   path: ['endTime']
 }).refine((data) => {
-  // If coordinates provided, city should also be provided
   if (data.locationCoordinates && !data.detectedCity) {
     return false;
   }
@@ -161,8 +162,10 @@ export const validateCityBoundary = (lat: number, lng: number): string | null =>
     'الرياض': { lat: 24.7136, lng: 46.6753, radius: 60 },
     'الدمام': { lat: 26.4207, lng: 50.0888, radius: 40 },
     'مكة المكرمة': { lat: 21.3891, lng: 39.8579, radius: 30 },
-    'الطائف': { lat: 21.2703, lng: 40.4034, radius: 35 }
+    'الطائف': { lat: 21.2703, lng: 40.4034, radius: 35 },
+    'المدينة المنورة': { lat: 24.5247, lng: 39.5692, radius: 40 }
   };
+  
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Earth's radius in km
@@ -191,18 +194,18 @@ export const transformRegisterData = (data: z.infer<typeof registerSchema>) => {
   return {
     ...data,
     name: `${data.firstName} ${data.lastName}`,
-    phone: `+966${data.phone}`
+    phone: data.phone // Already in international format
   };
 };
 
 export const parseIdentifier = (identifier: string) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRegex = /^[5][0-9]{8}$/;
+  const phoneRegex = /^\+[1-9]\d{1,14}$/; // International phone number format
   
   if (emailRegex.test(identifier)) {
     return { type: 'email', value: identifier.toLowerCase() };
   } else if (phoneRegex.test(identifier)) {
-    return { type: 'phone', value: `+966${identifier}` };
+    return { type: 'phone', value: identifier }; // Already in international format
   } else {
     throw new Error('نوع المعرف غير صحيح');
   }

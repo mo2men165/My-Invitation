@@ -36,6 +36,14 @@ export interface EventItem {
   };
   totalPrice: number;
   status: 'upcoming' | 'cancelled' | 'done';
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  invitationCardUrl?: string;
+  adminNotes?: string;
+  guestListConfirmed: {
+    isConfirmed: boolean;
+    confirmedAt?: string;
+    confirmedBy?: string;
+  };
   guests: Guest[];
   paymentCompletedAt: string;
   createdAt: string;
@@ -87,12 +95,14 @@ class EventsAPI {
 
   async getEvents(params?: {
     status?: string;
+    approvalStatus?: string;
     limit?: number;
     page?: number;
   }): Promise<EventsApiResponse<EventItem[]>> {
     const searchParams = new URLSearchParams();
     
     if (params?.status) searchParams.set('status', params.status);
+    if (params?.approvalStatus) searchParams.set('approvalStatus', params.approvalStatus);
     if (params?.limit) searchParams.set('limit', params.limit.toString());
     if (params?.page) searchParams.set('page', params.page.toString());
 
@@ -221,6 +231,21 @@ class EventsAPI {
     
     if (!response.ok) {
       throw new Error(result.error?.message || 'فشل في جلب إحصائيات المناسبات');
+    }
+
+    return result;
+  }
+
+  async confirmGuestList(eventId: string): Promise<EventsApiResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/guests/confirm`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في تأكيد قائمة الضيوف');
     }
 
     return result;

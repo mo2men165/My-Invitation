@@ -4,8 +4,9 @@ import { Inter } from 'next/font/google';
 import { StoreProvider } from '@/store/StoreProvider';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import './globals.css';
-import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer';
+import { ConditionalLayout } from '@/components/layout/ConditionalLayout';
+import { AdminRouteBlocker } from '@/components/auth/AdminRouteBlocker';
+import { UserToAdminBlocker } from '@/components/auth/UserToAdminBlocker';
 import { Toaster } from '@/components/ui/Toaster';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -25,10 +26,14 @@ export default function RootLayout({
       <body className={inter.className}>
         <StoreProvider>
           <AuthProvider>
-            <Header />
-            {children}
+            <AdminRouteBlocker>
+              <UserToAdminBlocker>
+                <ConditionalLayout>
+                  {children}
+                </ConditionalLayout>
+              </UserToAdminBlocker>
+            </AdminRouteBlocker>
             <Toaster />
-            <Footer />
           </AuthProvider>
         </StoreProvider>
       </body>

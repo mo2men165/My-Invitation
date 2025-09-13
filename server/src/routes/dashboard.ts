@@ -31,8 +31,8 @@ router.get('/stats', async (req: Request, res: Response) => {
     const endOfPreviousMonth = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999);
 
     // Get user's events with necessary fields
-    const events = await Event.find({ userId: new Types.ObjectId(userId) })
-      .select('status totalPrice guests details.inviteCount paymentCompletedAt')
+    const events = await Event.find({ userId: new Types.ObjectId(userId), approvalStatus: 'approved' })
+      .select('status totalPrice guests details.inviteCount details.eventDate paymentCompletedAt createdAt')
       .lean();
 
     // Calculate statistics
@@ -42,6 +42,9 @@ router.get('/stats', async (req: Request, res: Response) => {
     let upcomingEvents = 0;
     let completedEvents = 0;
     let cancelledEvents = 0;
+    
+    // Calculate next month date for upcoming events
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
     
     // Calculate current month orders and revenue
     let currentMonthOrders = 0;
@@ -58,9 +61,14 @@ router.get('/stats', async (req: Request, res: Response) => {
       totalGuests += eventGuests;
       
       // Count events by status
-      if (event.status === 'upcoming') upcomingEvents++;
       if (event.status === 'done') completedEvents++;
       if (event.status === 'cancelled') cancelledEvents++;
+      
+      // Count upcoming events within the next month
+      const eventDate = new Date(event.details.eventDate);
+      if (eventDate >= now && eventDate <= nextMonth && event.status === 'upcoming') {
+        upcomingEvents++;
+      }
       
       // Check if event is in current month
       if (event.paymentCompletedAt >= startOfCurrentMonth && event.paymentCompletedAt <= endOfCurrentMonth) {
@@ -119,8 +127,8 @@ router.get('/recent-orders', async (req: Request, res: Response) => {
     const { limit = 5 } = req.query;
     
     // Get user's recent events with populated design info
-    const events = await Event.find({ userId: new Types.ObjectId(userId) })
-      .sort({ createdAt: -1 })
+    const events = await Event.find({ userId: new Types.ObjectId(userId), approvalStatus: 'approved' })
+      .sort({ paymentCompletedAt: -1, createdAt: -1 })
       .limit(Number(limit))
       .populate('designId', 'title')
       .lean();
@@ -152,10 +160,19 @@ router.get('/recent-orders', async (req: Request, res: Response) => {
         default: statusArabic = event.status;
       }
       
+      // Format date in Arabic locale using Gregorian calendar
+      const eventDate = new Date(event.details.eventDate);
+      const formattedDate = eventDate.toLocaleDateString('ar-SA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        calendar: 'gregory'
+      });
+      
       return {
         id: event._id.toString(),
         event: eventName,
-        date: event.details.eventDate.toISOString().split('T')[0],
+        date: formattedDate,
         guests: totalGuests,
         status: statusArabic,
         statusColor,

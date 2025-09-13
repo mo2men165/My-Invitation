@@ -13,8 +13,20 @@ export function RecentOrders() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const { recentOrders, isLoadingOrders, ordersError } = useAppSelector((state) => state.dashboard);
+  const { recentOrders, isLoadingOrders, ordersError, lastFetched } = useAppSelector((state) => state.dashboard);
   const [showAll, setShowAll] = useState(false);
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+  const [isPageVisible, setIsPageVisible] = useState(true);
+
+  // Track page visibility for auto-refresh optimization
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Fetch orders on mount if authenticated
   useEffect(() => {
@@ -22,6 +34,22 @@ export function RecentOrders() {
       dispatch(fetchRecentOrders(showAll ? 10 : 5));
     }
   }, [dispatch, isAuthenticated, showAll]);
+
+  // Auto-refresh orders every 30 seconds for real-time updates (only when page is visible)
+  useEffect(() => {
+    if (!isAuthenticated || !isPageVisible) return;
+
+    const interval = setInterval(() => {
+      if (isPageVisible) {
+        setIsBackgroundRefreshing(true);
+        dispatch(fetchRecentOrders(showAll ? 10 : 5)).finally(() => {
+          setIsBackgroundRefreshing(false);
+        });
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [dispatch, isAuthenticated, showAll, isPageVisible]);
 
   // Handle errors with toast
   useEffect(() => {
@@ -37,6 +65,10 @@ export function RecentOrders() {
   }, [ordersError, toast, dispatch]);
 
   const handleRetry = () => {
+    dispatch(fetchRecentOrders(showAll ? 10 : 5));
+  };
+
+  const handleRefresh = () => {
     dispatch(fetchRecentOrders(showAll ? 10 : 5));
   };
 
@@ -89,8 +121,36 @@ export function RecentOrders() {
       {/* Header */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">الطلبات الأخيرة</h2>
-          <div className="flex items-center gap-2">
+          <div>
+            <h2 className="text-2xl font-bold text-white">الطلبات الأخيرة</h2>
+            {lastFetched && (
+              <p className="text-sm text-gray-400 mt-1 flex items-center gap-2">
+                آخر تحديث: {new Date(lastFetched).toLocaleString('ar-SA', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  calendar: 'gregory'
+                })}
+                {isBackgroundRefreshing && (
+                  <span className="flex items-center gap-1 text-[#C09B52]">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    جاري التحديث...
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRefresh}
+              disabled={isLoadingOrders}
+              className="flex items-center gap-2 px-3 py-1.5 bg-[#C09B52]/20 text-[#C09B52] rounded-lg hover:bg-[#C09B52]/30 transition-colors disabled:opacity-50 text-sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoadingOrders ? 'animate-spin' : ''}`} />
+              تحديث
+            </button>
             {isLoadingOrders && (
               <Loader2 className="w-4 h-4 text-[#C09B52] animate-spin" />
             )}

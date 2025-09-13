@@ -15,6 +15,7 @@ import {
   Heart,
   X,
 } from 'lucide-react';
+import { socialLinks, services, quickLinks } from '@/constants';
 
 export function Footer() {
   const ref = useRef(null);
@@ -43,39 +44,6 @@ export function Footer() {
     }
   };
 
-  const socialLinks = [
-    { icon: X, href: "#", label: "إكس", color: "#000" },
-    { icon: Instagram, href: "#", label: "إنستغرام", color: "#E4405F" },
-    { icon: Facebook, href: "#", label: "فيسبوك", color: "#1877F2" },
-    { icon: Linkedin, href: "#", label: "لينكد إن", color: "#0077B5" },
-  ];
-
-  const services = [
-    "دعوات الزفاف",
-    "دعوات الخطوبة", 
-    "دعوات التخرج",
-    "المناسبات الخاصة",
-    "حفلات الشركات",
-    "المؤتمرات والفعاليات"
-  ];
-
-  const quickLinks = [
-    { label: "الرئيسية", href: "/" },
-    { label: "تعرف علينا", href: "/about" },
-    { label: "باقاتنا", href: "/packages" },
-    { label: "تصاميمنا", href: "/designs" },
-    { label: "المدونة", href: "/blog" },
-    { label: "اتصل بنا", href: "/contact" }
-  ];
-
-  const supportLinks = [
-    { label: "مركز المساعدة", href: "/help" },
-    { label: "الأسئلة الشائعة", href: "/faq" },
-    { label: "الدعم الفني", href: "/support" },
-    { label: "شروط الاستخدام", href: "/terms" },
-    { label: "سياسة الخصوصية", href: "/privacy" },
-    { label: "سياسة الاسترداد", href: "/refund" }
-  ];
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -131,7 +99,7 @@ export function Footer() {
           initial="hidden"
           animate={isInView ? "visible" : "hidden"}
         >
-          <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-12">
+          <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-12">
             
             {/* Company Info */}
             <motion.div className="lg:col-span-1" variants={itemVariants}>
@@ -158,41 +126,41 @@ export function Footer() {
                 {/* Contact Info */}
                 <div className="space-y-3">
                   <motion.div 
-                    className="flex items-center space-x-3  group cursor-pointer"
+                    className="flex items-center group cursor-pointer"
                     whileHover={{ x: 5 }}
                   >
                     <div 
-                      className="p-2 rounded-lg ml-3"
+                      className="p-2 rounded-lg mr-3"
                       style={{ backgroundColor: 'rgba(192, 155, 82, 0.2)' }}
                     >
                       <Phone className="w-4 h-4" style={{ color: '#C09B52' }} />
                     </div>
-                    <span className="text-gray-300 group-hover:text-white transition-colors">
+                    <span className="text-gray-300 group-hover:text-white transition-colors" dir="ltr">
                       +966 50 123 4567
                     </span>
                   </motion.div>
 
                   <motion.div 
-                    className="flex items-center space-x-3  group cursor-pointer"
+                    className="flex items-center group cursor-pointer"
                     whileHover={{ x: 5 }}
                   >
                     <div 
-                      className="p-2 rounded-lg ml-3"
+                      className="p-2 rounded-lg mr-3"
                       style={{ backgroundColor: 'rgba(192, 155, 82, 0.2)' }}
                     >
                       <Mail className="w-4 h-4" style={{ color: '#C09B52' }} />
                     </div>
-                    <span className="text-gray-300 group-hover:text-white transition-colors">
+                    <span className="text-gray-300 group-hover:text-white transition-colors" dir="ltr">
                       info@myinvitation-sa.com
                     </span>
                   </motion.div>
 
                   <motion.div 
-                    className="flex items-center space-x-3  group cursor-pointer"
+                    className="flex items-center group cursor-pointer"
                     whileHover={{ x: 5 }}
                   >
                     <div 
-                      className="p-2 rounded-lg ml-3"
+                      className="p-2 rounded-lg mr-3"
                       style={{ backgroundColor: 'rgba(192, 155, 82, 0.2)' }}
                     >
                       <MapPin className="w-4 h-4" style={{ color: '#C09B52' }} />
@@ -276,47 +244,6 @@ export function Footer() {
                 ))}
               </div>
             </motion.div>
-
-            {/* Support & Newsletter */}
-            <motion.div variants={itemVariants}>
-              <h3 className="text-xl font-bold mb-6 flex items-center">
-                <span style={{ color: '#C09B52' }}>الدعم</span>
-                <motion.div 
-                  className="w-8 h-0.5 mr-3"
-                  style={{ backgroundColor: '#C09B52' }}
-                  animate={{ width: [0, 32, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 3, delay: 1 }}
-                />
-              </h3>
-              
-              <div className="space-y-6">
-                {/* Support Links */}
-                <ul className="space-y-3">
-                  {supportLinks.slice(0, 4).map((link, index) => (
-                    <motion.li
-                      key={index}
-                      whileHover={{ x: 5 }}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -20 }}
-                      transition={{ duration: 0.3, delay: index * 0.1 }}
-                    >
-                      <Link 
-                        href={link.href}
-                        className="flex items-center space-x-2  group"
-                      >
-                        <motion.div 
-                          className="w-1.5 ml-3 h-1.5 rounded-full group-hover:w-3 transition-all duration-300"
-                          style={{ backgroundColor: '#C09B52' }}
-                        />
-                        <span className="text-gray-300 mr-3 group-hover:text-white transition-colors">
-                          {link.label}
-                        </span>
-                      </Link>
-                    </motion.li>
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
           </div>
         </motion.div>
 
@@ -330,8 +257,8 @@ export function Footer() {
           <div className="flex flex-col lg:flex-row justify-between items-center space-y-6 lg:space-y-0">
             
             {/* Copyright */}
-            <div className="flex items-center space-x-4 ">
-              <div className="flex items-center space-x-2  text-gray-400">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 text-gray-400">
                 <span>&copy; 2024 منصة الدعوات.</span>
                 <span>جميع الحقوق محفوظة.</span>
                 <Heart className="w-4 h-4" style={{ color: '#C09B52' }} />
@@ -341,22 +268,41 @@ export function Footer() {
             {/* Social Links */}
             <div className="flex items-center space-x-4">
               <span className="text-gray-400 text-sm mr-4">تابعنا على:</span>
-              {socialLinks.map((social, index) => (
-                <motion.a
-                  key={index}
-                  href={social.href}
-                  className="p-3 bg-gray-800 rounded-full border border-gray-700 hover:border-yellow-500 transition-all duration-300 group"
-                  whileHover={{ 
-                    scale: 1.1, 
-                    backgroundColor: social.color,
-                    borderColor: social.color 
-                  }}
-                  whileTap={{ scale: 0.9 }}
-                  title={social.label}
-                >
-                  <social.icon className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
-                </motion.a>
-              ))}
+              {socialLinks.map((social, index) => {
+                const getIcon = (iconName: string) => {
+                  switch(iconName) {
+                    case 'X':
+                      return X;
+                    case 'Instagram':
+                      return Instagram;
+                    case 'Facebook':
+                      return Facebook;
+                    case 'Linkedin':
+                      return Linkedin;
+                    default:
+                      return X;
+                  }
+                };
+                
+                const IconComponent = getIcon(social.icon);
+                
+                return (
+                  <motion.a
+                    key={index}
+                    href={social.href}
+                    className="p-3 bg-gray-800 rounded-full border border-gray-700 hover:border-yellow-500 transition-all duration-300 group"
+                    whileHover={{ 
+                      scale: 1.1, 
+                      backgroundColor: social.color,
+                      borderColor: social.color 
+                    }}
+                    whileTap={{ scale: 0.9 }}
+                    title={social.label}
+                  >
+                    <IconComponent className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
+                  </motion.a>
+                );
+              })}
             </div>
 
             {/* Back to Top */}
@@ -373,6 +319,29 @@ export function Footer() {
               <ArrowUp className="w-5 h-5 group-hover:text-black transition-colors" style={{ color: '#C09B52' }} />
             </motion.button>
           </div>
+        </motion.div>
+
+        {/* Powered by Section */}
+        <motion.div 
+          className="border-t border-gray-800 py-4 text-center"
+          initial={{ opacity: 0 }}
+          animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+          transition={{ duration: 0.6, delay: 1 }}
+        >
+          <p className="text-gray-500 text-sm">
+            Powered by{' '}
+            <motion.a
+              href="https://www.outsourcing-eg.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold transition-colors duration-300"
+              style={{ color: '#ff6600' }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              5D Outsourcing
+            </motion.a>
+          </p>
         </motion.div>
       </div>
 

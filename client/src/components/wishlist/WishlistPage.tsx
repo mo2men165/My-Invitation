@@ -19,7 +19,7 @@ import EmptyWishlist from './EmptyWishlist';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import ImageModal from '@/components/packages/modals/ImageModal';
-import CartModal from '@/components/packages/modals/cartModal/CartModal';
+import { CartModal } from '@/components/cart/CartModal';
 
 import { InvitationDesign } from '@/types';
 
@@ -52,16 +52,16 @@ const WishlistPage: React.FC = () => {
 
   const handleAddToCompare = useCallback(async (designId: string) => {
     try {
-      await toggleCompare(designId);
+      await toggleCompare(designId, selectedPackageType);
     } catch (error) {
       // Error handling is done in the hook
     }
-  }, [toggleCompare]);
+  }, [toggleCompare, selectedPackageType]);
 
   const handleSelectPackage = useCallback((design: InvitationDesign) => {
-    // Open cart modal instead of redirecting
-    openCartModal('classic', design); // Default to classic, user can change in modal
-  }, [openCartModal]);
+    // Open cart modal with selected package type
+    openCartModal(selectedPackageType, design);
+  }, [openCartModal, selectedPackageType]);
 
   const handleViewImage = useCallback((design: InvitationDesign) => {
     openImageModal(design);

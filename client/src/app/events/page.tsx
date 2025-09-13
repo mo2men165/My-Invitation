@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { eventsAPI, EventItem } from '@/lib/api/events';
 import { useToast } from '@/hooks/useToast';
+import { InstantRouteGuard } from '@/components/auth/InstantRouteGuard';
 import { 
   Calendar, 
   MapPin, 
@@ -12,17 +13,22 @@ import {
   Loader2,
   Plus,
   Filter,
-  ChevronRight
+  ChevronRight,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
 
-const EventsPage: React.FC = () => {
+const EventsPageContent: React.FC = () => {
   const router = useRouter();
   const { toast } = useToast();
   
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -36,6 +42,9 @@ const EventsPage: React.FC = () => {
       
       if (statusFilter !== 'all') {
         params.status = statusFilter;
+      }
+      if (approvalStatusFilter !== 'all') {
+        params.approvalStatus = approvalStatusFilter;
       }
 
       const response = await eventsAPI.getEvents(params);
@@ -53,7 +62,7 @@ const EventsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, statusFilter, toast]);
+  }, [currentPage, statusFilter, approvalStatusFilter, toast]);
 
   useEffect(() => {
     loadEvents();
@@ -91,12 +100,46 @@ const EventsPage: React.FC = () => {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      calendar: 'gregory' // Force Gregorian calendar
     });
   };
 
   const getTotalGuests = (guests: any[]) => {
     return guests.reduce((total, guest) => total + guest.numberOfAccompanyingGuests, 0);
+  };
+
+  const getApprovalStatusDetails = (approvalStatus: string) => {
+    switch (approvalStatus) {
+      case 'pending':
+        return { 
+          name: 'في انتظار الموافقة', 
+          color: 'text-yellow-400', 
+          bgColor: 'bg-yellow-500/20',
+          icon: AlertCircle
+        };
+      case 'approved':
+        return { 
+          name: 'معتمد', 
+          color: 'text-green-400', 
+          bgColor: 'bg-green-500/20',
+          icon: CheckCircle
+        };
+      case 'rejected':
+        return { 
+          name: 'مرفوض', 
+          color: 'text-red-400', 
+          bgColor: 'bg-red-500/20',
+          icon: XCircle
+        };
+      default:
+        return { 
+          name: 'غير محدد', 
+          color: 'text-gray-400', 
+          bgColor: 'bg-gray-500/20',
+          icon: AlertCircle
+        };
+    }
   };
 
   if (loading) {
@@ -132,34 +175,116 @@ const EventsPage: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-700 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-yellow-400 text-sm font-medium">في انتظار الموافقة</p>
+                <p className="text-white text-2xl font-bold">
+                  {events.filter(e => e.approvalStatus === 'pending').length}
+                </p>
+              </div>
+              <AlertCircle className="w-8 h-8 text-yellow-400" />
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-green-900/30 to-green-800/20 border border-green-700 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-400 text-sm font-medium">معتمد</p>
+                <p className="text-white text-2xl font-bold">
+                  {events.filter(e => e.approvalStatus === 'approved').length}
+                </p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-400" />
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-red-900/30 to-red-800/20 border border-red-700 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-400 text-sm font-medium">مرفوض</p>
+                <p className="text-white text-2xl font-bold">
+                  {events.filter(e => e.approvalStatus === 'rejected').length}
+                </p>
+              </div>
+              <XCircle className="w-8 h-8 text-red-400" />
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-700 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-400 text-sm font-medium">إجمالي المناسبات</p>
+                <p className="text-white text-2xl font-bold">{events.length}</p>
+              </div>
+              <Calendar className="w-8 h-8 text-blue-400" />
+            </div>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Filter className="w-5 h-5 text-[#C09B52]" />
-            <span className="text-white font-medium">تصفية حسب الحالة:</span>
+            <span className="text-white font-medium">تصفية المناسبات:</span>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { value: 'all', label: 'الكل' },
-              { value: 'upcoming', label: 'قادمة' },
-              { value: 'done', label: 'مكتملة' },
-              { value: 'cancelled', label: 'ملغية' }
-            ].map((filter) => (
-              <button
-                key={filter.value}
-                onClick={() => {
-                  setStatusFilter(filter.value);
-                  setCurrentPage(1);
-                }}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  statusFilter === filter.value
-                    ? 'bg-[#C09B52] text-white'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+          
+          {/* Status Filter */}
+          <div className="mb-4">
+            <div className="text-sm text-gray-400 mb-2">حالة المناسبة:</div>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: 'all', label: 'الكل' },
+                { value: 'upcoming', label: 'قادمة' },
+                { value: 'done', label: 'مكتملة' },
+                { value: 'cancelled', label: 'ملغية' }
+              ].map((filter) => (
+                <button
+                  key={filter.value}
+                  onClick={() => {
+                    setStatusFilter(filter.value);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    statusFilter === filter.value
+                      ? 'bg-[#C09B52] text-white'
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Approval Status Filter */}
+          <div>
+            <div className="text-sm text-gray-400 mb-2">حالة الموافقة:</div>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: 'all', label: 'الكل' },
+                { value: 'pending', label: 'في انتظار الموافقة' },
+                { value: 'approved', label: 'معتمد' },
+                { value: 'rejected', label: 'مرفوض' }
+              ].map((filter) => (
+                <button
+                  key={filter.value}
+                  onClick={() => {
+                    setApprovalStatusFilter(filter.value);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    approvalStatusFilter === filter.value
+                      ? 'bg-[#C09B52] text-white'
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -187,7 +312,9 @@ const EventsPage: React.FC = () => {
               {events.map((event) => {
                 const packageDetails = getPackageDetails(event.packageType);
                 const statusDetails = getStatusDetails(event.status);
+                const approvalStatusDetails = getApprovalStatusDetails(event.approvalStatus);
                 const totalGuests = getTotalGuests(event.guests);
+                const ApprovalIcon = approvalStatusDetails.icon;
 
                 return (
                   <div
@@ -199,13 +326,24 @@ const EventsPage: React.FC = () => {
                       <div className={`px-3 py-1 rounded-full bg-gradient-to-r ${packageDetails.color} text-white text-sm font-medium`}>
                         {packageDetails.name}
                       </div>
-                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${statusDetails.bgColor} ${statusDetails.color}`}>
-                        {statusDetails.name}
+                      <div className="flex flex-col gap-2">
+                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${statusDetails.bgColor} ${statusDetails.color}`}>
+                          {statusDetails.name}
+                        </div>
+                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${approvalStatusDetails.bgColor} ${approvalStatusDetails.color} flex items-center gap-1`}>
+                          <ApprovalIcon className="w-3 h-3" />
+                          {approvalStatusDetails.name}
+                        </div>
                       </div>
                     </div>
 
-                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-[#C09B52] transition-colors">
+                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-[#C09B52] transition-colors flex items-center gap-2">
                       {event.details.hostName}
+                      {event.adminNotes && event.adminNotes.trim() && (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-900/30 text-red-400 border border-red-700" title="يوجد ملاحظات من الإدارة">
+                          <AlertCircle className="w-3 h-3" />
+                        </span>
+                      )}
                     </h3>
 
                     <div className="space-y-3 mb-6">
@@ -228,6 +366,21 @@ const EventsPage: React.FC = () => {
                         <Users className="w-4 h-4 text-[#C09B52]" />
                         {totalGuests} من {event.details.inviteCount} ضيف
                       </div>
+
+                      {event.invitationCardUrl && (
+                        <div className="flex items-center gap-2 text-gray-300 text-sm">
+                          <ExternalLink className="w-4 h-4 text-[#C09B52]" />
+                          <a
+                            href={event.invitationCardUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#C09B52] hover:text-[#B8935A] transition-colors truncate"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            بطاقة الدعوة متوفرة
+                          </a>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between pt-4 border-t border-white/10">
@@ -274,6 +427,14 @@ const EventsPage: React.FC = () => {
         )}
       </div>
     </div>
+  );
+};
+
+const EventsPage: React.FC = () => {
+  return (
+    <InstantRouteGuard allowedRoles={['user']}>
+      <EventsPageContent />
+    </InstantRouteGuard>
   );
 };
 

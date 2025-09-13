@@ -4,6 +4,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { eventsAPI, EventItem, GuestStats } from '@/lib/api/events';
 import { useToast } from '@/hooks/useToast';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+import './phone-input.css';
+import { isValidPhoneNumber, parsePhoneNumber } from 'libphonenumber-js';
 import { 
   Calendar, 
   MapPin, 
@@ -16,7 +20,14 @@ import {
   Trash2,
   Loader2,
   Package,
-  QrCode
+  QrCode,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  ExternalLink,
+  MessageSquare,
+  CheckSquare,
+  Users2
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -38,6 +49,8 @@ const EventDetailPage: React.FC = () => {
   const [guestStats, setGuestStats] = useState<GuestStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [addingGuest, setAddingGuest] = useState(false);
+  const [confirmingGuestList, setConfirmingGuestList] = useState(false);
+  const [phoneError, setPhoneError] = useState(false);
   
   // New guest form
   const [newGuest, setNewGuest] = useState<Guest>({
@@ -82,6 +95,17 @@ const EventDetailPage: React.FC = () => {
       return;
     }
 
+    // Validate phone number
+    if (!isValidPhoneNumber(newGuest.phone)) {
+      setPhoneError(true);
+      toast({
+        title: "رقم هاتف غير صحيح",
+        description: "يرجى إدخال رقم هاتف صحيح",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (newGuest.numberOfAccompanyingGuests < 1 || newGuest.numberOfAccompanyingGuests > 10) {
       toast({
         title: "خطأ في عدد الضيوف",
@@ -107,7 +131,7 @@ const EventDetailPage: React.FC = () => {
       setAddingGuest(true);
       const response = await eventsAPI.addGuest(eventId, {
         name: newGuest.name.trim(),
-        phone: newGuest.phone.replace(/^\+966/, ''),
+        phone: newGuest.phone, // Keep the full international format
         numberOfAccompanyingGuests: newGuest.numberOfAccompanyingGuests
       });
       
@@ -119,6 +143,7 @@ const EventDetailPage: React.FC = () => {
           numberOfAccompanyingGuests: 1,
           whatsappMessageSent: false
         });
+        setPhoneError(false);
         
         toast({
           title: "تم إضافة الضيف",
@@ -140,18 +165,29 @@ const EventDetailPage: React.FC = () => {
   const handleSendWhatsapp = async (guest: Guest) => {
     if (!guest._id || !event) return;
 
-    const message = `السلام عليكم ${guest.name},
+    let message = `بسم الله الرحمن الرحيم
 
-يسعدنا دعوتكم لحضور: ${event.details.hostName}
+دعوة كريمة
 
-📅 التاريخ: ${new Date(event.details.eventDate).toLocaleDateString('ar-SA')}
-🕐 الوقت: من ${event.details.startTime} إلى ${event.details.endTime}
-📍 المكان: ${event.details.eventLocation}
-👥 عدد الأشخاص المدعوين: ${guest.numberOfAccompanyingGuests}
+السلام عليكم ورحمة الله وبركاته الأستاذ الفاضل/ ${guest.name}
 
 ${event.details.invitationText}
 
-نتطلع لرؤيتكم معنا!`;
+تفاصيل المناسبة:
+- المضيف: ${event.details.hostName}
+- التاريخ: ${formatEventDate(event.details.eventDate)}
+- الوقت: من ${event.details.startTime} إلى ${event.details.endTime}
+- المكان: ${event.details.eventLocation}
+- عدد الأشخاص المدعوين: ${guest.numberOfAccompanyingGuests}`;
+
+    // Add invitation URL for all packages
+    if (event.invitationCardUrl) {
+      message += `\n\nرابط الدعوة: ${event.invitationCardUrl}`;
+    } else {
+      message += `\n\nرابط الدعوة سيتم إرساله قريباً بعد موافقة الإدارة`;
+    }
+
+    message += `\n\nنتشرف بحضوركم الكريم وننتظركم معنا في هذه المناسبة المباركة`;
 
     const whatsappUrl = `https://wa.me/${guest.phone.replace(/^\+/, '')}?text=${encodeURIComponent(message)}`;
     
@@ -198,6 +234,41 @@ ${event.details.invitationText}
     }
   };
 
+  const handleConfirmGuestList = async () => {
+    if (!event || event.guests.length === 0) {
+      toast({
+        title: "قائمة الضيوف فارغة",
+        description: "يرجى إضافة ضيوف قبل تأكيد القائمة",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setConfirmingGuestList(true);
+      
+      // Call the API to confirm the guest list
+      await eventsAPI.confirmGuestList(eventId);
+      
+      // Reload event details to get updated confirmation status
+      await loadEventDetails();
+      
+      toast({
+        title: "تم تأكيد قائمة الضيوف",
+        description: "سيقوم فريقنا بإرسال الدعوات للضيوف قريباً",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ في تأكيد القائمة",
+        description: error.message || "حدث خطأ غير متوقع",
+        variant: "destructive"
+      });
+    } finally {
+      setConfirmingGuestList(false);
+    }
+  };
+
   const getPackageDetails = (packageType: string) => {
     switch (packageType) {
       case 'classic':
@@ -221,6 +292,59 @@ ${event.details.invitationText}
         return { name: 'ملغية', color: 'text-red-400', bgColor: 'bg-red-500/20' };
       default:
         return { name: 'غير محدد', color: 'text-gray-400', bgColor: 'bg-gray-500/20' };
+    }
+  };
+
+  const getApprovalStatusDetails = (approvalStatus: string) => {
+    switch (approvalStatus) {
+      case 'pending':
+        return { 
+          name: 'في انتظار الموافقة', 
+          color: 'text-yellow-400', 
+          bgColor: 'bg-yellow-500/20',
+          icon: AlertCircle
+        };
+      case 'approved':
+        return { 
+          name: 'معتمد', 
+          color: 'text-green-400', 
+          bgColor: 'bg-green-500/20',
+          icon: CheckCircle
+        };
+      case 'rejected':
+        return { 
+          name: 'مرفوض', 
+          color: 'text-red-400', 
+          bgColor: 'bg-red-500/20',
+          icon: XCircle
+        };
+      default:
+        return { 
+          name: 'غير محدد', 
+          color: 'text-gray-400', 
+          bgColor: 'bg-gray-500/20',
+          icon: AlertCircle
+        };
+    }
+  };
+
+  const formatEventDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ar-SA', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      calendar: 'gregory' // Force Gregorian calendar
+    });
+  };
+
+  const getCountryFromPhone = (phone: string) => {
+    try {
+      const phoneNumber = parsePhoneNumber(phone);
+      return phoneNumber?.country || 'Unknown';
+    } catch {
+      return 'Unknown';
     }
   };
 
@@ -257,6 +381,8 @@ ${event.details.invitationText}
 
   const packageDetails = getPackageDetails(event.packageType);
   const statusDetails = getStatusDetails(event.status);
+  const approvalStatusDetails = getApprovalStatusDetails(event.approvalStatus);
+  const ApprovalIcon = approvalStatusDetails.icon;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800">
@@ -275,8 +401,14 @@ ${event.details.invitationText}
             <div className={`px-3 py-1 rounded-full bg-gradient-to-r ${packageDetails.color} text-white text-sm font-medium`}>
               {packageDetails.name}
             </div>
-            <div className={`px-2 py-1 rounded-full text-xs font-medium ${statusDetails.bgColor} ${statusDetails.color}`}>
-              {statusDetails.name}
+            <div className="flex gap-2">
+              <div className={`px-2 py-1 rounded-full text-xs font-medium ${statusDetails.bgColor} ${statusDetails.color}`}>
+                {statusDetails.name}
+              </div>
+              <div className={`px-2 py-1 rounded-full text-xs font-medium ${approvalStatusDetails.bgColor} ${approvalStatusDetails.color} flex items-center gap-1`}>
+                <ApprovalIcon className="w-3 h-3" />
+                {approvalStatusDetails.name}
+              </div>
             </div>
           </div>
           <h1 className="text-3xl font-bold text-white">{event.details.hostName}</h1>
@@ -300,12 +432,7 @@ ${event.details.invitationText}
                     <div>
                       <div className="text-white font-medium">التاريخ</div>
                       <div className="text-gray-300 text-sm">
-                        {new Date(event.details.eventDate).toLocaleDateString('ar-SA', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
+                        {formatEventDate(event.details.eventDate)}
                       </div>
                     </div>
                   </div>
@@ -371,6 +498,55 @@ ${event.details.invitationText}
               </div>
             </div>
 
+            {/* Admin Notes */}
+            {event.adminNotes && event.adminNotes.trim() && (
+              <div className="bg-gradient-to-br from-red-900/20 to-red-800/10 rounded-2xl border border-red-700/30 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <MessageSquare className="w-5 h-5 text-red-400" />
+                  <h3 className="text-lg font-bold text-white">ملاحظات الإدارة</h3>
+                </div>
+                <div className="bg-red-900/20 border border-red-700/30 rounded-xl p-4">
+                  <p className="text-red-100 leading-relaxed">{event.adminNotes}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Invitation Card URL */}
+            {event.invitationCardUrl && (
+              <div className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 rounded-2xl border border-blue-700/30 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <ExternalLink className="w-5 h-5 text-blue-400" />
+                  <h3 className="text-lg font-bold text-white">بطاقة الدعوة</h3>
+                </div>
+                <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0 max-w-xs">
+                      <p className="text-blue-100 text-sm mb-2">رابط بطاقة الدعوة:</p>
+                      <a
+                        href={event.invitationCardUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-300 hover:text-blue-200 text-sm block truncate text-left"
+                        title={event.invitationCardUrl}
+                        dir="ltr"
+                      >
+                        {event.invitationCardUrl}
+                      </a>
+                    </div>
+                    <a
+                      href={event.invitationCardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      عرض البطاقة
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Guest List */}
             <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
               <div className="flex items-center justify-between mb-6">
@@ -380,30 +556,103 @@ ${event.details.invitationText}
                 </div>
               </div>
 
+              {/* VIP Package Notice */}
+              {event.packageType === 'vip' && (
+                <div className={`rounded-xl p-4 mb-6 ${
+                  event.guestListConfirmed.isConfirmed 
+                    ? 'bg-gradient-to-r from-green-900/30 to-green-800/20 border border-green-700' 
+                    : 'bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-700'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <Users2 className={`w-5 h-5 ${
+                      event.guestListConfirmed.isConfirmed ? 'text-green-400' : 'text-yellow-400'
+                    }`} />
+                    <div>
+                      <h4 className={`font-medium ${
+                        event.guestListConfirmed.isConfirmed ? 'text-green-400' : 'text-yellow-400'
+                      }`}>
+                        حزمة VIP
+                      </h4>
+                      <p className={`text-sm ${
+                        event.guestListConfirmed.isConfirmed ? 'text-green-100' : 'text-yellow-100'
+                      }`}>
+                        {event.guestListConfirmed.isConfirmed 
+                          ? `تم تأكيد قائمة الضيوف. سيتم إرسال الدعوات قريباً (${event.guestListConfirmed.confirmedAt ? new Date(event.guestListConfirmed.confirmedAt).toLocaleDateString('ar-SA', { calendar: 'gregory' }) : ''})`
+                          : 'فريقنا سيتولى إرسال الدعوات للضيوف نيابة عنك. أضف جميع الضيوف ثم اضغط على &quot;تأكيد القائمة النهائية&quot;'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Add New Guest Form */}
-              <div className="bg-white/5 rounded-xl p-4 mb-6">
+              <div className={`rounded-xl p-4 mb-6 ${
+                event.packageType === 'vip' && event.guestListConfirmed.isConfirmed 
+                  ? 'bg-red-900/20 border border-red-700/30' 
+                  : 'bg-white/5'
+              }`}>
                 <h4 className="text-white font-medium mb-4">إضافة ضيف جديد</h4>
+                
+                {/* VIP Confirmation Warning */}
+                {event.packageType === 'vip' && event.guestListConfirmed.isConfirmed && (
+                  <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-400" />
+                      <p className="text-red-200 text-sm">
+                        تم تأكيد قائمة الضيوف. لا يمكن إضافة أو تعديل الضيوف بعد التأكيد.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="grid md:grid-cols-3 gap-4 mb-4">
                   <input
                     type="text"
                     value={newGuest.name}
                     onChange={(e) => setNewGuest(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="اسم الضيف"
-                    className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#C09B52] transition-colors"
+                    disabled={event.packageType === 'vip' && event.guestListConfirmed.isConfirmed}
+                    className={`px-3 py-2 border rounded-lg text-white placeholder-gray-400 focus:outline-none transition-colors ${
+                      event.packageType === 'vip' && event.guestListConfirmed.isConfirmed
+                        ? 'bg-gray-700/50 border-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-white/10 border-white/20 focus:border-[#C09B52]'
+                    }`}
                   />
                   
-                  <input
-                    type="tel"
+                  <PhoneInput
                     value={newGuest.phone}
-                    onChange={(e) => setNewGuest(prev => ({ ...prev, phone: e.target.value }))}
-                    placeholder="رقم الهاتف (5xxxxxxxx)"
-                    className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#C09B52] transition-colors"
+                    onChange={(value) => {
+                      if (event.packageType === 'vip' && event.guestListConfirmed.isConfirmed) return;
+                      setNewGuest(prev => ({ ...prev, phone: value || '' }));
+                      // Validate phone number on change
+                      if (value) {
+                        setPhoneError(!isValidPhoneNumber(value));
+                      } else {
+                        setPhoneError(false);
+                      }
+                    }}
+                    placeholder="رقم الهاتف"
+                    defaultCountry="SA"
+                    international
+                    countryCallingCodeEditable={false}
+                    disabled={event.packageType === 'vip' && event.guestListConfirmed.isConfirmed}
+                    className={`phone-input-custom ${phoneError ? 'phone-input-error' : ''} ${
+                      event.packageType === 'vip' && event.guestListConfirmed.isConfirmed ? 'phone-input-disabled' : ''
+                    }`}
                   />
+                  {phoneError && (
+                    <p className="text-red-400 text-xs mt-1">رقم هاتف غير صحيح</p>
+                  )}
                   
                   <select
                     value={newGuest.numberOfAccompanyingGuests}
                     onChange={(e) => setNewGuest(prev => ({ ...prev, numberOfAccompanyingGuests: parseInt(e.target.value) }))}
-                    className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#C09B52] transition-colors"
+                    disabled={event.packageType === 'vip' && event.guestListConfirmed.isConfirmed}
+                    className={`px-3 py-2 border rounded-lg text-white focus:outline-none transition-colors ${
+                      event.packageType === 'vip' && event.guestListConfirmed.isConfirmed
+                        ? 'bg-gray-700/50 border-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-white/10 border-white/20 focus:border-[#C09B52]'
+                    }`}
                   >
                     {Array.from({ length: 10 }, (_, i) => i + 1).map(num => (
                       <option key={num} value={num} className="bg-gray-800">
@@ -415,8 +664,12 @@ ${event.details.invitationText}
                 
                 <button
                   onClick={handleAddGuest}
-                  disabled={addingGuest || (guestStats?.remainingInvites || 0) <= 0}
-                  className="w-full md:w-auto px-6 py-2 bg-[#C09B52] text-white font-medium rounded-lg hover:bg-[#B8935A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  disabled={addingGuest || (guestStats?.remainingInvites || 0) <= 0 || (event.packageType === 'vip' && event.guestListConfirmed.isConfirmed)}
+                  className={`w-full md:w-auto px-6 py-2 font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                    event.packageType === 'vip' && event.guestListConfirmed.isConfirmed
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-[#C09B52] text-white hover:bg-[#B8935A] disabled:opacity-50 disabled:cursor-not-allowed'
+                  }`}
                 >
                   {addingGuest ? (
                     <>
@@ -450,23 +703,46 @@ ${event.details.invitationText}
                               {guest.numberOfAccompanyingGuests} {guest.numberOfAccompanyingGuests === 1 ? 'شخص' : 'أشخاص'}
                             </span>
                           </div>
-                          <div className="text-sm text-gray-300">{guest.phone}</div>
+                          <div className="text-sm text-gray-300">
+                            {guest.phone}
+                            <span className="ml-2 text-xs text-gray-400">
+                              ({getCountryFromPhone(guest.phone)})
+                            </span>
+                          </div>
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          {guest.whatsappMessageSent ? (
-                            <div className="flex items-center gap-1 px-3 py-1 bg-green-500/20 text-green-400 text-sm rounded-lg">
-                              <Check className="w-4 h-4" />
-                              تم الإرسال
+                          {/* Show WhatsApp button only for classic and premium packages */}
+                          {(event.packageType === 'classic' || event.packageType === 'premium') && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleSendWhatsapp(guest)}
+                                className={`flex items-center gap-1 px-3 py-1 text-white text-sm rounded-lg transition-colors ${
+                                  event.invitationCardUrl 
+                                    ? 'bg-green-600 hover:bg-green-700' 
+                                    : 'bg-yellow-600 hover:bg-yellow-700'
+                                }`}
+                                title={event.invitationCardUrl ? 'إرسال دعوة مع رابط الدعوة' : 'إرسال دعوة (رابط الدعوة سيتم إضافته لاحقاً)'}
+                              >
+                                <Send className="w-4 h-4" />
+                                {event.invitationCardUrl ? 'إرسال دعوة' : 'إرسال دعوة'}
+                              </button>
+                              
+                              {guest.whatsappMessageSent && (
+                                <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                                  <Check className="w-3 h-3" />
+                                  تم الإرسال
+                                </span>
+                              )}
                             </div>
-                          ) : (
-                            <button
-                              onClick={() => handleSendWhatsapp(guest)}
-                              className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                              <Send className="w-4 h-4" />
-                              إرسال دعوة
-                            </button>
+                          )}
+                          
+                          {/* For VIP packages, show a different status */}
+                          {event.packageType === 'vip' && (
+                            <div className="flex items-center gap-1 px-3 py-1 bg-yellow-500/20 text-yellow-400 text-sm rounded-lg">
+                              <Users2 className="w-4 h-4" />
+                              في انتظار الإرسال
+                            </div>
                           )}
                           
                           <button
@@ -479,6 +755,44 @@ ${event.details.invitationText}
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* VIP Package - Confirm Final Guest List Button */}
+              {event.packageType === 'vip' && event.guests.length > 0 && !event.guestListConfirmed.isConfirmed && (
+                <div className="mt-6 pt-6 border-t border-white/10">
+                  <div className="bg-gradient-to-r from-yellow-900/20 to-yellow-800/10 border border-yellow-700/30 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-yellow-400 font-medium mb-1">تأكيد القائمة النهائية</h4>
+                        <p className="text-yellow-100 text-sm mb-2">
+                          بعد التأكيد، سيقوم فريقنا بإرسال الدعوات لجميع الضيوف
+                        </p>
+                        <div className="bg-red-900/20 border border-red-700/30 rounded-lg p-3">
+                          <p className="text-red-300 text-xs font-medium">
+                            ⚠️ تحذير: بعد النقر على تأكيد القائمة، ستكون القائمة نهائية ولن يمكن تعديلها أو إضافة/حذف ضيوف
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleConfirmGuestList}
+                        disabled={confirmingGuestList}
+                        className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors duration-200 flex items-center gap-2"
+                      >
+                        {confirmingGuestList ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            جاري التأكيد...
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare className="w-4 h-4" />
+                            تأكيد القائمة النهائية
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -530,6 +844,38 @@ ${event.details.invitationText}
               </div>
             </div>
 
+            {/* Approval Status Info */}
+            <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
+              <h3 className="text-lg font-bold text-white mb-4">حالة الموافقة</h3>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-300">الحالة</span>
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${approvalStatusDetails.bgColor} ${approvalStatusDetails.color} flex items-center gap-2`}>
+                    <ApprovalIcon className="w-4 h-4" />
+                    {approvalStatusDetails.name}
+                  </div>
+                </div>
+                
+                {event.approvalStatus === 'approved' && event.invitationCardUrl && (
+                  <div className="pt-2 border-t border-white/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300 text-sm">بطاقة الدعوة</span>
+                      <a
+                        href={event.invitationCardUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        متوفرة
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Event Timeline */}
             <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
               <h3 className="text-lg font-bold text-white mb-4">الجدول الزمني</h3>
@@ -540,7 +886,9 @@ ${event.details.invitationText}
                   <div>
                     <div className="text-white font-medium">تم إتمام الدفع</div>
                     <div className="text-gray-400">
-                      {new Date(event.paymentCompletedAt).toLocaleDateString('ar-SA')}
+                      {new Date(event.paymentCompletedAt).toLocaleDateString('ar-SA', {
+                        calendar: 'gregory'
+                      })}
                     </div>
                   </div>
                 </div>
@@ -550,10 +898,39 @@ ${event.details.invitationText}
                   <div>
                     <div className="text-white font-medium">تاريخ المناسبة</div>
                     <div className="text-gray-400">
-                      {new Date(event.details.eventDate).toLocaleDateString('ar-SA')}
+                      {formatEventDate(event.details.eventDate)}
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Guest Management Info */}
+            <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
+              <h3 className="text-lg font-bold text-white mb-4">إدارة الضيوف</h3>
+              
+              <div className="space-y-3 text-sm">
+                {event.packageType === 'vip' ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-yellow-400">
+                      <Users2 className="w-4 h-4" />
+                      <span className="font-medium">خدمة VIP</span>
+                    </div>
+                    <p className="text-gray-300 text-xs leading-relaxed">
+                      فريقنا سيتولى إرسال الدعوات للضيوف نيابة عنك. أضف جميع الضيوف ثم اضغط على &quot;تأكيد القائمة النهائية&quot;
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-green-400">
+                      <Send className="w-4 h-4" />
+                      <span className="font-medium">إرسال شخصي</span>
+                    </div>
+                    <p className="text-gray-300 text-xs leading-relaxed">
+                      يمكنك إرسال الدعوات للضيوف مباشرة عبر واتساب. ستتضمن الرسائل رابط الدعوة تلقائياً
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion, useInView, easeOut } from 'framer-motion';
 import { useRef, useState } from 'react';
+import { ctaFeatures } from '@/constants';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, Sparkles, Check, Star, Zap, Gift } from 'lucide-react';
 
@@ -11,23 +12,6 @@ export function CTA() {
   const isInView = useInView(ref, { once: true, amount: 0.1 });
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
 
-  const features = [
-    {
-      icon: Zap,
-      title: "إنشاء فوري",
-      description: "دعوتك جاهزة في دقائق"
-    },
-    {
-      icon: Gift,
-      title: "تجربة مجانية",
-      description: "ابدأ بدون أي تكلفة"
-    },
-    {
-      icon: Star,
-      title: "تصاميم حصرية", 
-      description: "أكثر من 500 تصميم مميز"
-    }
-  ];
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -161,7 +145,7 @@ export function CTA() {
             className="grid md:grid-cols-3 gap-8 mb-12"
             variants={itemVariants}
           >
-            {features.map((feature, index) => (
+            {ctaFeatures.map((feature, index) => (
               <motion.div
                 key={index}
                 className="text-center group cursor-pointer"

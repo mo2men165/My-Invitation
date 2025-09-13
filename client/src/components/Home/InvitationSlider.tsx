@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Heart, Eye, Download } from 'lucide-react';
+import { invitationSliderData } from '@/constants';
 import Image from 'next/image';
 
 export function InvitationSlider() {
@@ -97,8 +98,8 @@ export function InvitationSlider() {
   const getVisibleSlides = () => {
     const slides: Invitation[] = [];
     for (let i = 0; i < 3; i++) {
-      const index = (currentSlide + i) % invitations.length;
-      slides.push({ ...invitations[index], position: i });
+      const index = (currentSlide + i) % invitationSliderData.length;
+      slides.push({ ...invitationSliderData[index], position: i });
     }
     return slides;
   };

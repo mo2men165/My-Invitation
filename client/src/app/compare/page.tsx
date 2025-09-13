@@ -1,11 +1,15 @@
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { InstantRouteGuard } from "@/components/auth/InstantRouteGuard";
 import ComparePage from "@/components/compare/ComparePage";
+import { ComparePageSkeleton } from "@/components/ui/SkeletonLoader";
 
 export default function Page() {
   return (
-    <ProtectedRoute requireAuth>
+    <InstantRouteGuard 
+      allowedRoles={['user']}
+      fallback={<ComparePageSkeleton />}
+    >
       <ComparePage />
-    </ProtectedRoute>
+    </InstantRouteGuard>
   )
 }
 
