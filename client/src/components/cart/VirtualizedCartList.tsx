@@ -1,5 +1,4 @@
 import React, { memo, useMemo, useCallback } from 'react';
-import { FixedSizeList as List } from 'react-window';
 import { Edit3, Trash2, Calendar, MapPin, Users, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/utils/calculations';
@@ -193,15 +192,19 @@ const VirtualizedCartList = memo<VirtualizedCartListProps>(({
 
   return (
     <div className="w-full">
-      <List
-        height={height}
-        itemCount={items.length}
-        itemSize={itemHeight}
-        itemData={itemData}
+      <div 
         className="scrollbar-thin scrollbar-thumb-[#C09B52]/30 scrollbar-track-transparent"
+        style={{ height: height, overflowY: 'auto' }}
       >
-        {CartItemComponent}
-      </List>
+        {items.map((item, index) => (
+          <CartItemComponent
+            key={item._id}
+            index={index}
+            style={{ height: itemHeight }}
+            data={itemData}
+          />
+        ))}
+      </div>
     </div>
   );
 });

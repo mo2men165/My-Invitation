@@ -19,15 +19,18 @@ export const useCartModalPerformance = () => {
   }, [startRender, endRender]);
 
   // Optimized event handlers
+  const handleInputChange = useCallback((field: string, value: any) => {
+    // Debounced input handling - placeholder for actual implementation
+  }, []);
+  
+  const handleSubmit = useCallback((data: any) => {
+    // Optimized submit handling - placeholder for actual implementation
+  }, []);
+
   const optimizedHandlers = useMemo(() => ({
-    handleInputChange: useCallback((field: string, value: any) => {
-      // Debounced input handling - placeholder for actual implementation
-    }, []),
-    
-    handleSubmit: useCallback((data: any) => {
-      // Optimized submit handling - placeholder for actual implementation
-    }, [])
-  }), []);
+    handleInputChange,
+    handleSubmit
+  }), [handleInputChange, handleSubmit]);
 
   return {
     memoizedCalculations,

@@ -7,7 +7,7 @@ import { Users, Search, UserCheck, UserX, Shield, User, RefreshCw } from 'lucide
 import { adminAPI } from '@/lib/api/admin';
 
 interface AdminUser {
-  _id: string;
+  id: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -82,7 +82,7 @@ export default function AdminUsersPage() {
     try {
       await adminAPI.updateUserStatus(userId, newStatus);
       setUsers(prev => prev.map(user => 
-        user._id === userId ? { ...user, status: newStatus } : user
+        user.id === userId ? { ...user, status: newStatus } : user
       ));
       setSuccessMessage(`تم ${newStatus === 'active' ? 'تفعيل' : 'تعليق'} الحساب بنجاح`);
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -99,7 +99,7 @@ export default function AdminUsersPage() {
     try {
       await adminAPI.updateUserRole(userId, newRole);
       setUsers(prev => prev.map(user => 
-        user._id === userId ? { ...user, role: newRole } : user
+        user.id === userId ? { ...user, role: newRole } : user
       ));
       setSuccessMessage(`تم تغيير الدور إلى ${newRole === 'admin' ? 'مدير' : 'مستخدم'} بنجاح`);
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -292,7 +292,7 @@ export default function AdminUsersPage() {
               {/* Table Body */}
               <div className="divide-y divide-gray-700">
                 {users.map((user) => (
-                  <div key={user._id} className="px-6 py-5 hover:bg-gray-800/30 transition-colors duration-200">
+                  <div key={user.id} className="px-6 py-5 hover:bg-gray-800/30 transition-colors duration-200">
                     <div className="grid grid-cols-6 gap-6 items-center">
                       {/* User Info */}
                       <div className="flex items-center">
@@ -382,15 +382,15 @@ export default function AdminUsersPage() {
 
                       {/* Actions */}
                       <div className="flex items-center justify-center gap-3">
-                        {user._id !== currentUser?._id && (
+                        {user.id !== currentUser?.id && (
                           <>
                             {/* Status Toggle */}
                             <button
                               onClick={() => handleUpdateStatus(
-                                user._id, 
+                                user.id, 
                                 user.status === 'active' ? 'suspended' : 'active'
                               )}
-                              disabled={processing.includes(user._id)}
+                              disabled={processing.includes(user.id)}
                               className={`p-2.5 rounded-lg transition-colors duration-200 disabled:opacity-50 ${
                                 user.status === 'active'
                                   ? 'bg-red-600 hover:bg-red-700 text-white'
@@ -408,10 +408,10 @@ export default function AdminUsersPage() {
                             {/* Role Toggle */}
                             <button
                               onClick={() => handleUpdateRole(
-                                user._id, 
+                                user.id, 
                                 user.role === 'user' ? 'admin' : 'user'
                               )}
-                              disabled={processing.includes(user._id)}
+                              disabled={processing.includes(user.id)}
                               className={`p-2.5 rounded-lg transition-colors duration-200 disabled:opacity-50 ${
                                 user.role === 'user'
                                   ? 'bg-purple-600 hover:bg-purple-700 text-white'

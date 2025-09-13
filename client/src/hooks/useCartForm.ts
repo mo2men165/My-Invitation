@@ -14,7 +14,7 @@ export const useCartForm = () => {
     hostName: '',
     eventLocation: '',
     additionalCards: 0,
-    gateSupervisors: '',
+    gateSupervisors: 0,
     fastDelivery: false,
     expeditedDelivery: false
   });
@@ -56,7 +56,7 @@ export const useCartForm = () => {
       hostName: '',
       eventLocation: '',
       additionalCards: 0,
-      gateSupervisors: '',
+      gateSupervisors: 0,
       fastDelivery: false,
       expeditedDelivery: false
     });

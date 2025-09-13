@@ -4,6 +4,8 @@ import { useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { useToast } from '@/hooks/useToast';
 import { invitationDesigns } from '@/constants';
+import { addToWishlist, removeFromWishlist } from '@/store/wishlistSlice';
+import { addToCompare, removeFromCompare } from '@/store/compareSlice';
 
 // Generic types for item management
 interface ItemManagementConfig {
@@ -49,10 +51,11 @@ export const useItemManagement = (config: ItemManagementConfig) => {
     try {
       if (isInList(designId)) {
         // Remove item
-        await dispatch({
-          type: `${config.sliceName}/removeFrom${config.sliceName.charAt(0).toUpperCase() + config.sliceName.slice(1)}`,
-          payload: designId
-        }).unwrap();
+        if (config.sliceName === 'wishlist') {
+          await dispatch(removeFromWishlist(designId)).unwrap();
+        } else {
+          await dispatch(removeFromCompare(designId)).unwrap();
+        }
         
         toast({
           title: config.toastMessages.remove.title,
@@ -73,10 +76,11 @@ export const useItemManagement = (config: ItemManagementConfig) => {
         }
 
         // Add item
-        await dispatch({
-          type: `${config.sliceName}/addTo${config.sliceName.charAt(0).toUpperCase() + config.sliceName.slice(1)}`,
-          payload: { designId, packageType }
-        }).unwrap();
+        if (config.sliceName === 'wishlist') {
+          await dispatch(addToWishlist({ designId, packageType: packageType || 'classic' })).unwrap();
+        } else {
+          await dispatch(addToCompare({ designId, packageType: packageType || 'classic' })).unwrap();
+        }
         
         toast({
           title: config.toastMessages.add.title,

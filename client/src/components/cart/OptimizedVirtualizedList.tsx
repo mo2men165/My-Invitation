@@ -1,5 +1,4 @@
 import React, { memo, useMemo, useCallback, useRef, useEffect } from 'react';
-import { FixedSizeList as List } from 'react-window';
 import { Edit3, Trash2, Calendar, MapPin, Users, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/utils/calculations';
@@ -178,7 +177,7 @@ const OptimizedVirtualizedList = memo<OptimizedVirtualizedListProps>(({
   height = 600,
   itemHeight = 200
 }) => {
-  const listRef = useRef<List>(null);
+  const listRef = useRef<any>(null);
 
   // Memoize item data to prevent unnecessary re-renders
   const itemData = useMemo(() => ({
@@ -216,20 +215,16 @@ const OptimizedVirtualizedList = memo<OptimizedVirtualizedListProps>(({
 
   return (
     <SmoothScrollContainer height={height} className="w-full">
-      <List
-        ref={listRef}
-        height={height}
-        itemCount={items.length}
-        itemSize={itemHeight}
-        itemData={itemData}
-        // Performance optimizations
-        overscanCount={3} // Render 3 extra items outside viewport for smoother scrolling
-        initialScrollOffset={0}
-        // Better scroll performance
-        useIsScrolling={true}
-      >
-        {CartItemComponent}
-      </List>
+      <div className="space-y-4">
+        {items.map((item, index) => (
+          <CartItemComponent
+            key={item._id}
+            index={index}
+            style={{ height: itemHeight }}
+            data={itemData}
+          />
+        ))}
+      </div>
     </SmoothScrollContainer>
   );
 });

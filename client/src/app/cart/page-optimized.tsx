@@ -18,7 +18,8 @@ import ScrollPerformanceMonitor from '@/components/cart/ScrollPerformanceMonitor
 import { Button } from '@/components/ui/Button';
 
 // Memoized components for better performance
-const CartHeader = React.memo(() => (
+const CartHeader = React.memo(function CartHeader() {
+  return (
   <div className="flex items-center justify-between mb-8">
     <div className="flex items-center gap-4">
       <div className="relative">
@@ -33,9 +34,11 @@ const CartHeader = React.memo(() => (
       </div>
     </div>
   </div>
-));
+  );
+});
 
-const CartSummary = React.memo<{ total: number; itemCount: number }>(({ total, itemCount }) => (
+const CartSummary = React.memo<{ total: number; itemCount: number }>(function CartSummary({ total, itemCount }) {
+  return (
   <div className="bg-gradient-to-br from-[#C09B52]/10 via-[#C09B52]/5 to-transparent rounded-2xl border border-[#C09B52]/20 p-6 mb-8">
     <h3 className="text-xl font-bold text-white mb-4">ملخص الطلب</h3>
     
@@ -69,18 +72,22 @@ const CartSummary = React.memo<{ total: number; itemCount: number }>(({ total, i
       متابعة للدفع
     </Button>
   </div>
-));
+  );
+});
 
-const LoadingState = React.memo(() => (
+const LoadingState = React.memo(function LoadingState() {
+  return (
   <div className="flex items-center justify-center h-64">
     <div className="text-center">
       <Loader2 className="w-12 h-12 text-[#C09B52] mx-auto mb-4 animate-spin" />
       <p className="text-white text-lg">جاري تحميل السلة...</p>
     </div>
   </div>
-));
+  );
+});
 
-const ErrorState = React.memo<{ error: string; onRetry: () => void }>(({ error, onRetry }) => (
+const ErrorState = React.memo<{ error: string; onRetry: () => void }>(function ErrorState({ error, onRetry }) {
+  return (
   <div className="flex items-center justify-center h-64">
     <div className="text-center">
       <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -93,7 +100,8 @@ const ErrorState = React.memo<{ error: string; onRetry: () => void }>(({ error, 
       </Button>
     </div>
   </div>
-));
+  );
+});
 
 function CartPageContent() {
   const router = useRouter();

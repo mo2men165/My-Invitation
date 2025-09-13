@@ -228,7 +228,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user, onSubmit, isLoading }) 
             className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-[#C09B52]"
           >
             <option value="" className="bg-gray-800">اختر المدينة</option>
-            {cities.map(city => (
+            {saudiCities.map(city => (
               <option key={city} value={city} className="bg-gray-800">
                 {city}
               </option>

@@ -13,7 +13,7 @@ const ScrollPerformanceMonitor = memo<ScrollPerformanceMonitorProps>(({
   const [isLowFps, setIsLowFps] = useState(false);
   const frameCount = useRef(0);
   const lastTime = useRef(performance.now());
-  const animationId = useRef<number>();
+  const animationId = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!enabled) return;

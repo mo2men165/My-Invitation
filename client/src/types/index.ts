@@ -59,6 +59,8 @@ export interface PricingOption {
     additionalCards: number;
     gateSupervisors: number; // Changed from string to number
     extraHours?: number;
+    qrCode?: boolean;
+    fastDelivery?: boolean;
     expeditedDelivery?: boolean;
     // Existing location fields
     locationCoordinates?: {
