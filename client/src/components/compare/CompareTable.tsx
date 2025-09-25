@@ -13,24 +13,28 @@ const getPackageFeatures = (packageType: keyof PackageData) => {
   const features: Record<string, string> = {};
   const packageFeatures = packageData[packageType].features;
   
-  // Map features to comparison categories
-  features['بطاقة الدعوة'] = packageFeatures.some(f => f.includes('بطاقة دعوة')) ? 'متاح' : 'غير متاح';
+  // Map features to comparison categories based on new feature set
+  features['بطاقة الدعوة'] = packageFeatures.some(f => f.includes('بطاقة دعوة') || f.includes('بطاقة دعوه')) ? 'متاح' : 'غير متاح';
   features['بطاقة الدخول'] = packageFeatures.some(f => f.includes('بطاقة دخول')) ? 'متاح' : 'غير متاح';
-  features['رمز الكيو آر كود'] = packageFeatures.some(f => f.includes('الكيو آر كود')) ? 'متاح' : 'غير متاح';
-  features['رقم تسلسلي'] = 'متاح'; // Available for all packages
+  features['رمز الكيو آر كود'] = packageFeatures.some(f => f.includes('الكيوار كود') || f.includes('الكيو ار كود')) ? 'متاح' : 'غير متاح';
+  features['رقم تسلسلي'] = packageFeatures.some(f => f.includes('رقم تسلسلي')) ? 'متاح' : 'غير متاح';
   features['إضافة مرافقين'] = packageFeatures.some(f => f.includes('مرافقين')) ? 'متاح' : 'غير متاح';
-  features['تصميم حسب الطلب'] = packageFeatures.some(f => f.includes('حسب الطلب')) ? 'متاح' : 'غير متاح';
-  features['إحصائية الحضور'] = packageFeatures.some(f => f.includes('إحصائية')) ? 'متاح' : 'غير متاح';
-  features['تذكير قبل المناسبة'] = packageFeatures.some(f => f.includes('تذكير')) ? 'متاح' : 'غير متاح';
+  features['تصميم حسب الطلب'] = packageFeatures.some(f => f.includes('حسب الطلب') && f.includes('ثيم المناسبة')) ? 'متاح' : 'غير متاح';
+  features['إحصائية دقيقة'] = packageFeatures.some(f => f.includes('إحصائية دقيقة') || f.includes('أحصائية دقيقة')) ? 'متاح' : 'غير متاح';
+  features['قالب واتساب تفاعلي'] = packageFeatures.some(f => f.includes('قالب واتساب') && f.includes('القبول أو الأعتذار')) ? 'متاح' : 'غير متاح';
+  features['زيادة البطاقات'] = packageFeatures.some(f => f.includes('زيادة عدد البطاقات') || f.includes('أمكانية زيادة')) ? 'متاح' : 'غير متاح';
+  features['حسابات متعددة'] = packageFeatures.some(f => f.includes('حساب دعوة اضافي') && f.includes('تقسيم البطاقات')) ? 'متاح' : 'غير متاح';
+  features['دعوات بديلة'] = packageFeatures.some(f => f.includes('دعوات بديلة')) ? 
+    packageFeatures.find(f => f.includes('دعوات بديلة'))?.match(/\d+\s*%/)?.[0] || 'متاح' : 'غير متاح';
   features['رسالة شكر'] = packageFeatures.some(f => f.includes('رسالة شكر')) ? 'متاح' : 'غير متاح';
-  features['قروب واتساب مخصص'] = packageFeatures.some(f => f.includes('قروب واتساب')) ? 'متاح' : 'غير متاح';
-  features['دعم متعدد اللغات'] = packageFeatures.some(f => f.includes('لغتين') || f.includes('العربية / الإنجليزية')) ? 'متاح' : 'غير متاح';
-  features['فيديو دعوة 3D'] = packageFeatures.some(f => f.includes('فيديو دعوة')) ? 'متاح' : 'غير متاح';
+  features['فيديو دعوة 3D'] = packageFeatures.some(f => f.includes('فيديو دعوة') && f.includes('3D')) ? 'متاح' : 'غير متاح';
   features['رسالة تهنئة'] = packageFeatures.some(f => f.includes('رسالة تهنئة')) ? 'متاح' : 'غير متاح';
-  features['مشرف لقراءة الكود'] = packageFeatures.some(f => f.includes('مشرف لقراءة')) ? 'متاح' : 'غير متاح';
-  features['توزيع من العميل'] = packageFeatures.some(f => f.includes('توزيعها من قبل العميل')) ? 'متاح' : 'غير متاح';
-  features['توزيع من الفريق'] = packageFeatures.some(f => f.includes('من قبل فريقنا')) ? 'متاح' : 'غير متاح';
-  features['زيادة البطاقات'] = (packageType === 'premium' || packageType === 'vip') ? 'متاح' : 'غير متاح';
+  features['واتساب مخصص'] = packageFeatures.some(f => f.includes('بوتساب مخصص') || f.includes('INVITATION')) ? 'متاح' : 'غير متاح';
+  features['تذكير 5 أيام'] = packageFeatures.some(f => f.includes('تذكير') && f.includes('5 أيام')) ? 'متاح' : 'غير متاح';
+  features['مشرف مجاني'] = packageFeatures.some(f => f.includes('مشرف لقراءة') && !f.includes('برسوم')) ? 'متاح' : 'غير متاح';
+  features['مشرف برسوم إضافية'] = packageFeatures.some(f => f.includes('مشرف') && f.includes('برسوم أضافيه')) ? 'متاح' : 'غير متاح';
+  features['توزيع العميل'] = packageFeatures.some(f => f.includes('من قبل العميل')) ? 'متاح' : 'غير متاح';
+  features['موقع المناسبة'] = packageFeatures.some(f => f.includes('موقع المناسبة')) ? 'متاح' : 'غير متاح';
   
   return features;
 };

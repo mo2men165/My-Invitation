@@ -2,9 +2,10 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Send, User, Mail, MessageSquare, Phone, CheckCircle, AlertCircle } from 'lucide-react';
+import { contactAPI, type ContactFormData } from '@/lib/api/contact';
 
 export function ContactFormSection() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ContactFormData>({
     name: '',
     email: '',
     phone: '',
@@ -42,15 +43,27 @@ export function ContactFormSection() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmitStatus('success');
-      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+    try {
+      const response = await contactAPI.submitForm(formData);
+
+      if (response.success) {
+        setSubmitStatus('success');
+        setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+        
+        // Reset status after 5 seconds
+        setTimeout(() => setSubmitStatus('idle'), 5000);
+      } else {
+        throw new Error(response.error?.message || 'حدث خطأ أثناء الإرسال');
+      }
+    } catch (error: any) {
+      console.error('Contact form submission error:', error);
+      setSubmitStatus('error');
       
       // Reset status after 5 seconds
       setTimeout(() => setSubmitStatus('idle'), 5000);
-    }, 2000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const subjects = [
@@ -119,8 +132,8 @@ export function ContactFormSection() {
                       <h3 className="text-white font-bold text-lg group-hover:text-[#C09B52] transition-colors duration-300">
                         اتصل بنا
                       </h3>
-                      <p className="text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
-                        +966 50 123 4567
+                      <p dir="ltr" className="text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
+                        +966 59 270 6600
                       </p>
                     </div>
                   </div>
@@ -138,7 +151,7 @@ export function ContactFormSection() {
                         راسلنا
                       </h3>
                       <p className="text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
-                        info@invitation.com
+                      customersupport@myinvitation-sa.com
                       </p>
                     </div>
                   </div>

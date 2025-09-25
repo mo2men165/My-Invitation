@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { socialLinks, services, quickLinks } from '@/constants';
+import { compareAPI } from '@/lib/api/compare';
 
 export function Footer() {
   const ref = useRef(null);
@@ -135,8 +136,8 @@ export function Footer() {
                     >
                       <Phone className="w-4 h-4" style={{ color: '#C09B52' }} />
                     </div>
-                    <span className="text-gray-300 group-hover:text-white transition-colors" dir="ltr">
-                      +966 50 123 4567
+                    <span className="text-gray-300 mr-3 group-hover:text-white transition-colors" dir="ltr">
+                      +966 59 270 6600
                     </span>
                   </motion.div>
 
@@ -150,8 +151,8 @@ export function Footer() {
                     >
                       <Mail className="w-4 h-4" style={{ color: '#C09B52' }} />
                     </div>
-                    <span className="text-gray-300 group-hover:text-white transition-colors" dir="ltr">
-                      info@myinvitation-sa.com
+                    <span onClick={() => window.open('mailto:customersupport@myinvitation-sa.com')} className="text-gray-300 mr-3 group-hover:text-white transition-colors" dir="ltr">
+                      customersupport@myinvitation-sa.com
                     </span>
                   </motion.div>
 
@@ -165,8 +166,8 @@ export function Footer() {
                     >
                       <MapPin className="w-4 h-4" style={{ color: '#C09B52' }} />
                     </div>
-                    <span className="text-gray-300 group-hover:text-white transition-colors">
-                      الرياض، المملكة العربية السعودية
+                    <span className="text-gray-300 mr-3 group-hover:text-white transition-colors">
+                      جدة، المملكة العربية السعودية
                     </span>
                   </motion.div>
                 </div>
@@ -259,51 +260,12 @@ export function Footer() {
             {/* Copyright */}
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 text-gray-400">
-                <span>&copy; 2024 منصة الدعوات.</span>
+                <span>&copy; منصة  MY INVITATION.</span>
                 <span>جميع الحقوق محفوظة.</span>
-                <Heart className="w-4 h-4" style={{ color: '#C09B52' }} />
               </div>
             </div>
 
-            {/* Social Links */}
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-400 text-sm mr-4">تابعنا على:</span>
-              {socialLinks.map((social, index) => {
-                const getIcon = (iconName: string) => {
-                  switch(iconName) {
-                    case 'X':
-                      return X;
-                    case 'Instagram':
-                      return Instagram;
-                    case 'Facebook':
-                      return Facebook;
-                    case 'Linkedin':
-                      return Linkedin;
-                    default:
-                      return X;
-                  }
-                };
-                
-                const IconComponent = getIcon(social.icon);
-                
-                return (
-                  <motion.a
-                    key={index}
-                    href={social.href}
-                    className="p-3 bg-gray-800 rounded-full border border-gray-700 hover:border-yellow-500 transition-all duration-300 group"
-                    whileHover={{ 
-                      scale: 1.1, 
-                      backgroundColor: social.color,
-                      borderColor: social.color 
-                    }}
-                    whileTap={{ scale: 0.9 }}
-                    title={social.label}
-                  >
-                    <IconComponent className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
-                  </motion.a>
-                );
-              })}
-            </div>
+            
 
             {/* Back to Top */}
             <motion.button

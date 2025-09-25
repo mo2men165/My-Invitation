@@ -18,6 +18,8 @@ import eventsRoutes from './routes/event';
 import paymentRoutes from './routes/payment';
 import dashboardRoutes from './routes/dashboard';
 import adminRoutes from './routes/admin';
+import contactRoutes from './routes/contact';
+import collaborationRoutes from './routes/collaboration';
 
 
 const app = express();
@@ -61,6 +63,8 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/contact', contactRoutes);
+app.use('/api/collaboration', collaborationRoutes);
 
 
 

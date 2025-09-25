@@ -1,11 +1,13 @@
 // routes/events.ts
 import { Router, Request, Response } from 'express';
 import { Event } from '../models/Event';
+import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { eventStatusService } from '../services/eventStatusService';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { phoneValidationSchema, normalizePhoneNumber } from '../utils/phoneValidation';
 
 const router = Router();
 
@@ -15,7 +17,7 @@ router.use(checkJwt, extractUser, requireActiveUser);
 // Validation schemas
 const guestSchema = z.object({
   name: z.string().min(2).max(100),
-  phone: z.string().regex(/^\+[1-9]\d{1,14}$/, 'رقم الهاتف يجب أن يكون بالصيغة الدولية (مثال: +966501234567)'),
+  phone: phoneValidationSchema,
   numberOfAccompanyingGuests: z.number().int().min(1).max(10)
 });
 
@@ -119,7 +121,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 /**
  * POST /api/events/:id/guests
- * Add guest to event
+ * Add guest to event (supports both owners and collaborators)
  */
 router.post('/:id/guests', async (req: Request, res: Response) => {
   try {
@@ -138,16 +140,63 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
 
     const guestData = validationResult.data;
 
-    const event = await Event.findOne({
+    // Check if user owns the event
+    let event = await Event.findOne({
       _id: new Types.ObjectId(id),
       userId: new Types.ObjectId(userId)
     });
 
+    let userRole: 'owner' | 'collaborator' = 'owner';
+    let collaboratorPermissions: any = null;
+    let allocatedInvites = 0;
+    let usedInvites = 0;
+
     if (!event) {
-      return res.status(404).json({
-        success: false,
-        error: { message: 'المناسبة غير موجودة' }
+      // Check if user is a collaborator
+      event = await Event.findOne({
+        _id: new Types.ObjectId(id),
+        'collaborators.userId': new Types.ObjectId(userId)
       });
+
+      if (!event) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'المناسبة غير موجودة أو ليس لديك صلاحية للوصول إليها' }
+        });
+      }
+
+      // Find collaborator details
+      const collaboration = event.collaborators?.find(
+        collab => collab.userId.toString() === userId
+      );
+
+      if (!collaboration) {
+        return res.status(403).json({
+          success: false,
+          error: { message: 'ليس لديك صلاحية لإضافة ضيوف' }
+        });
+      }
+
+      userRole = 'collaborator';
+      collaboratorPermissions = collaboration.permissions;
+      allocatedInvites = collaboration.allocatedInvites;
+      usedInvites = collaboration.usedInvites;
+
+      // Check if collaborator has permission to add guests
+      if (!collaboratorPermissions.canAddGuests) {
+        return res.status(403).json({
+          success: false,
+          error: { message: 'ليس لديك صلاحية لإضافة ضيوف' }
+        });
+      }
+
+      // Check if collaborator has reached their allocation limit
+      if (usedInvites + guestData.numberOfAccompanyingGuests > allocatedInvites) {
+        return res.status(400).json({
+          success: false,
+          error: { message: `تجاوز العدد المسموح لك. المتبقي: ${allocatedInvites - usedInvites} دعوة` }
+        });
+      }
     }
 
     // For VIP packages, check if guest list is already confirmed
@@ -178,17 +227,47 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
       });
     }
 
-    // Add guest
+    // Add guest with tracking info
     const newGuest = {
       name: guestData.name,
-      phone: guestData.phone, // Keep the full international format
+      phone: normalizePhoneNumber(guestData.phone), // Normalize to international format
       numberOfAccompanyingGuests: guestData.numberOfAccompanyingGuests,
       whatsappMessageSent: false,
       addedAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      addedBy: {
+        type: userRole,
+        userId: new Types.ObjectId(userId),
+        ...(userRole === 'collaborator' && { collaboratorEmail: req.user!.email })
+      }
     };
 
     event.guests.push(newGuest);
+
+    // Update collaborator's used invites if applicable
+    if (userRole === 'collaborator') {
+      const collaboratorIndex = event.collaborators?.findIndex(
+        collab => collab.userId.toString() === userId
+      );
+      
+      if (collaboratorIndex !== undefined && collaboratorIndex !== -1 && event.collaborators && event.collaborators[collaboratorIndex]) {
+        event.collaborators[collaboratorIndex].usedInvites += guestData.numberOfAccompanyingGuests;
+      }
+
+      // Update in user's collaborated events as well
+      await User.updateOne(
+        { 
+          _id: new Types.ObjectId(userId),
+          'collaboratedEvents.eventId': new Types.ObjectId(id)
+        },
+        {
+          $inc: {
+            'collaboratedEvents.$.usedInvites': guestData.numberOfAccompanyingGuests
+          }
+        }
+      );
+    }
+
     await event.save();
 
     logger.info(`Guest added to event ${id} for user ${userId}`);
@@ -262,7 +341,7 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
 
     // Update fields
     if (updateData.name) guest.name = updateData.name;
-    if (updateData.phone) guest.phone = updateData.phone; // Keep the full international format
+    if (updateData.phone) guest.phone = normalizePhoneNumber(updateData.phone); // Normalize to international format
     if (updateData.numberOfAccompanyingGuests) {
       // Check invite limit when updating guest count
       const otherGuestsTotal = event.guests

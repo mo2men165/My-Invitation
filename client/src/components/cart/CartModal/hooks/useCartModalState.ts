@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { CartModalState, CartFormData, LocationData, FormErrors } from '../types';
 
 const initialFormData: CartFormData = {
+  eventName: '',
   inviteCount: 100,
   eventDate: '',
   startTime: '',
@@ -15,6 +16,8 @@ const initialFormData: CartFormData = {
   qrCode: true,
   fastDelivery: false,
   expeditedDelivery: false,
+  isCustomDesign: false,
+  customDesignNotes: '',
 };
 
 const initialLocationData: LocationData = {

@@ -18,6 +18,7 @@ export class PaymentService {
       amount: number;
       paymentMethod: string;
       transactionId?: string;
+      source?: string; // 'paymob' or 'manual'
     }
   ) {
     try {
@@ -87,7 +88,7 @@ export class PaymentService {
         const billEmailData: BillEmailData = {
           paymentId: paymentDetails.paymentId,
           totalAmount: paymentDetails.amount,
-          paymentMethod: paymentDetails.paymentMethod,
+          paymentMethod: paymentDetails.paymentMethod === 'paymob' ? 'Paymob' : paymentDetails.paymentMethod,
           transactionId: paymentDetails.transactionId,
           paymentDate: paymentCompletedAt.toLocaleDateString('ar-SA', {
             year: 'numeric',
@@ -104,6 +105,7 @@ export class PaymentService {
           },
           events: createdEvents.map(event => ({
             eventId: (event._id as Types.ObjectId).toString(),
+            eventName: event.details.eventName,
             hostName: event.details.hostName,
             eventDate: event.details.eventDate.toLocaleDateString('ar-SA'),
             eventLocation: event.details.eventLocation,
@@ -117,7 +119,7 @@ export class PaymentService {
         const eventDetailsEmailData: EventDetailsEmailData = {
           paymentId: paymentDetails.paymentId,
           totalAmount: paymentDetails.amount,
-          paymentMethod: paymentDetails.paymentMethod,
+          paymentMethod: paymentDetails.paymentMethod === 'paymob' ? 'Paymob' : paymentDetails.paymentMethod,
           transactionId: paymentDetails.transactionId,
           paymentDate: paymentCompletedAt.toLocaleDateString('ar-SA', {
             year: 'numeric',
@@ -134,6 +136,7 @@ export class PaymentService {
           },
           events: createdEvents.map(event => ({
             eventId: (event._id as Types.ObjectId).toString(),
+            eventName: event.details.eventName,
             hostName: event.details.hostName,
             eventDate: event.details.eventDate.toLocaleDateString('ar-SA'),
             eventLocation: event.details.eventLocation,
@@ -245,6 +248,7 @@ export class PaymentService {
           id: item._id,
           designId: item.designId,
           packageType: item.packageType,
+          eventName: item.details.eventName,
           hostName: item.details.hostName,
           eventDate: item.details.eventDate,
           eventLocation: item.details.eventLocation,

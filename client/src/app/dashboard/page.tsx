@@ -5,6 +5,7 @@ import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { RecentOrders } from '@/components/dashboard/RecentOrders';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { CollaborationDashboard } from '@/components/collaboration/CollaborationDashboard';
 import { InstantRouteGuard } from '@/components/auth/InstantRouteGuard';
 import { DashboardSkeleton } from '@/components/ui/SkeletonLoader';
 import { useAuth } from '@/hooks/useAuth';
@@ -55,9 +56,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Right Column - Sidebar */}
-            {/* <div className="space-y-8">
-              <ActivityFeed />
-            </div> */}
+            <div className="space-y-8">
+              <CollaborationDashboard />
+            </div>
 
           </div>
         </div>

@@ -14,6 +14,8 @@ import PackageTabs from './PackageTabs';
 import PackageOverview from './PackageOverview';
 import DesignGrid from './DesignGrid';
 import CategoryFilter from './CategoryFilter';
+import DesignModeToggle from './DesignModeToggle';
+import CustomDesignView from './CustomDesignView';
 import { CartModal } from '@/components/cart/CartModal';
 import ImageModal from './modals/ImageModal';
 import AdditionalServices from './AdditionalServices';
@@ -37,7 +39,9 @@ export default function PackagesPage() {
     selectedCategories,
     filteredDesigns,
     isLoading,
-    toggleCategory
+    designMode,
+    toggleCategory,
+    setDesignMode
   } = usePackagesLogic();
 
   return (
@@ -53,38 +57,59 @@ export default function PackagesPage() {
         
         <PackageOverview package={currentPackage} />
         
-        {/* Category Filter */}
-        <div className="mb-8">
-          <h3 className="text-xl font-semibold text-white mb-4 text-center">
-            اختر <span className="text-[#C09B52]">الفئات</span> المطلوبة
-          </h3>
-          <CategoryFilter
-            selectedCategories={selectedCategories}
-            onToggleCategory={toggleCategory}
-            categories={[
-              { value: 'عيد ميلاد', label: 'عيد ميلاد' },
-              { value: 'حفل تخرج', label: 'حفل تخرج' },
-              { value: 'حفل زفاف', label: 'حفل زفاف' }
-            ]}
-          />
-          <p className="text-gray-400 text-center mt-2 text-sm">
-            عدد التصاميم المعروضة: {filteredDesigns.length}
-          </p>
-        </div>
-        
-        <DesignGrid
-          designs={filteredDesigns}
+        {/* Design Mode Toggle - Only for Premium/VIP */}
+        <DesignModeToggle
+          designMode={designMode}
+          onModeChange={setDesignMode}
           packageType={activeTab}
-          onAddToCart={openCartModal}
-          onToggleWishlist={toggleWishlist}
-          onToggleCompare={toggleCompare}
-          onViewImage={openImageModal}
-          isInWishlist={isInWishlist}
-          isInCompare={isInCompare}
-          isLoading={isLoading}
         />
         
-        <AdditionalServices />
+        {designMode === 'custom' ? (
+          /* Custom Design View */
+          <CustomDesignView
+            packageType={activeTab}
+            onAddToCart={openCartModal}
+          />
+        ) : (
+          /* Regular Design Selection */
+          <>
+            {/* Category Filter */}
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold text-white mb-4 text-center">
+                اختر <span className="text-[#C09B52]">الفئات</span> المطلوبة
+              </h3>
+              <CategoryFilter
+                selectedCategories={selectedCategories}
+                onToggleCategory={toggleCategory}
+                categories={[
+                  { value: 'عيد ميلاد', label: 'عيد ميلاد' },
+                  { value: 'حفل تخرج', label: 'حفل تخرج' },
+                  { value: 'حفل زفاف', label: 'حفل زفاف' }
+                ]}
+              />
+              <p className="text-gray-400 text-center mt-2 text-sm">
+                {selectedCategories.length === 0 
+                  ? `جميع التصاميم معروضة: ${filteredDesigns.length}` 
+                  : `عدد التصاميم المعروضة: ${filteredDesigns.length}`
+                }
+              </p>
+            </div>
+            
+            <DesignGrid
+              designs={filteredDesigns}
+              packageType={activeTab}
+              onAddToCart={openCartModal}
+              onToggleWishlist={toggleWishlist}
+              onToggleCompare={toggleCompare}
+              onViewImage={openImageModal}
+              isInWishlist={isInWishlist}
+              isInCompare={isInCompare}
+              isLoading={isLoading}
+            />
+          </>
+        )}
+        
+        {/* <AdditionalServices /> */}
       </div>
 
       <CartModal 

@@ -1,5 +1,6 @@
 // server/src/models/Event.ts - UPDATED VERSION
 import mongoose, { Document, Schema, Types } from 'mongoose';
+import { ALLOWED_PHONE_PATTERN } from '../utils/phoneValidation';
 
 export interface IGuest {
   _id?: Types.ObjectId;
@@ -9,6 +10,12 @@ export interface IGuest {
   whatsappMessageSent: boolean;
   addedAt: Date;
   updatedAt: Date;
+  // Optional field to track who added this guest
+  addedBy?: {
+    type: 'owner' | 'collaborator';
+    userId?: Types.ObjectId;
+    collaboratorEmail?: string;
+  };
 }
 
 export interface IEvent extends Document {
@@ -16,6 +23,7 @@ export interface IEvent extends Document {
   designId: Types.ObjectId;
   packageType: 'classic' | 'premium' | 'vip';
   details: {
+    eventName?: string;
     inviteCount: number;
     qrCode: boolean;
     eventDate: Date;
@@ -50,6 +58,23 @@ export interface IEvent extends Document {
     confirmedAt?: Date;
     confirmedBy?: Types.ObjectId;
   };
+  
+  // Collaboration tracking (optional fields)
+  collaborators?: {
+    userId: Types.ObjectId;
+    allocatedInvites: number;
+    usedInvites: number;
+    permissions: {
+      canAddGuests: boolean;
+      canEditGuests: boolean;
+      canDeleteGuests: boolean;
+      canViewFullEvent: boolean;
+    };
+    addedAt: Date;
+    addedBy: Types.ObjectId;
+  }[];
+  totalAllocatedInvites?: number;
+  
   createdAt: Date;
   updatedAt: Date;
   invitationCardUrl: string;
@@ -65,7 +90,7 @@ const guestSchema = new Schema<IGuest>({
   phone: {
     type: String,
     required: true,
-    match: /^\+[1-9]\d{1,14}$/ // International phone number format (E.164)
+    match: ALLOWED_PHONE_PATTERN // Restricted to allowed countries
   },
   numberOfAccompanyingGuests: {
     type: Number,
@@ -84,6 +109,20 @@ const guestSchema = new Schema<IGuest>({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  // Optional field to track who added this guest
+  addedBy: {
+    type: {
+      type: String,
+      enum: ['owner', 'collaborator']
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    collaboratorEmail: {
+      type: String
+    }
   }
 }, { _id: true });
 
@@ -105,6 +144,11 @@ const eventSchema = new Schema<IEvent>({
     required: true
   },
   details: {
+    eventName: {
+      type: String,
+      maxlength: 100,
+      trim: true
+    },
     inviteCount: {
       type: Number,
       required: true,
@@ -250,6 +294,61 @@ const eventSchema = new Schema<IEvent>({
       ref: 'User'
     }
   },
+  
+  // Collaboration tracking (optional fields)
+  collaborators: {
+    type: [{
+      userId: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      allocatedInvites: {
+        type: Number,
+        required: true,
+        min: 1,
+        max: 500
+      },
+      usedInvites: {
+        type: Number,
+        default: 0,
+        min: 0
+      },
+      permissions: {
+        canAddGuests: {
+          type: Boolean,
+          default: true
+        },
+        canEditGuests: {
+          type: Boolean,
+          default: false
+        },
+        canDeleteGuests: {
+          type: Boolean,
+          default: false
+        },
+        canViewFullEvent: {
+          type: Boolean,
+          default: false
+        }
+      },
+      addedAt: {
+        type: Date,
+        default: Date.now
+      },
+      addedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      }
+    }],
+    default: []
+  },
+  totalAllocatedInvites: {
+    type: Number,
+    default: 0,
+    min: 0
+  }
 },{ timestamps: true});
 
 // NEW: Indexes for admin functionality
@@ -263,5 +362,9 @@ eventSchema.index({ 'details.eventDate': 1, status: 1 });
 eventSchema.index({ designId: 1, packageType: 1 });
 eventSchema.index({ 'details.locationCoordinates': '2dsphere' });
 eventSchema.index({ 'guests.phone': 1 });
+
+// New indexes for collaboration
+eventSchema.index({ 'collaborators.userId': 1 });
+eventSchema.index({ userId: 1, 'collaborators.userId': 1 });
 
 export const Event = mongoose.model<IEvent>('Event', eventSchema);

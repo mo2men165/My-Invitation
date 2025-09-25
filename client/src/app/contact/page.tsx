@@ -33,7 +33,7 @@ export default function ContactPage() {
       </div>
       
       {/* Contact Information Section */}
-      <ContactInfoSection />
+      {/* <ContactInfoSection /> */}
       
       {/* FAQ Section */}
       <FAQSection />

@@ -9,6 +9,7 @@ export interface PackageLogicState {
   selectedCategories: string[];
   filteredDesigns: any[];
   isLoading: boolean;
+  designMode: 'regular' | 'custom';
 }
 
 export interface PackageLogicActions {
@@ -16,6 +17,7 @@ export interface PackageLogicActions {
   selectAllCategories: () => void;
   clearCategories: () => void;
   getCategoryStats: () => Record<string, number>;
+  setDesignMode: (mode: 'regular' | 'custom') => void;
 }
 
 const categories = [
@@ -27,25 +29,44 @@ const categories = [
 export function usePackagesLogic(): PackageLogicState & PackageLogicActions {
   const { isLoading: cartLoading } = useAppSelector((state) => state.cart);
   
-  // Category filter state
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([
-    'عيد ميلاد', 'حفل تخرج', 'حفل زفاف'
-  ]);
+  // Category filter state - start with no categories selected
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  
+  // Design mode state - start with regular designs
+  const [designMode, setDesignMode] = useState<'regular' | 'custom'>('regular');
 
-  // Filter designs based on selected categories - memoized for performance
+  // Filter designs based on selected categories and design mode - memoized for performance
   const filteredDesigns = useMemoizedFilter(
     invitationDesigns,
-    (design) => selectedCategories.includes(design.category),
-    [selectedCategories]
+    (design) => {
+      // Filter out custom design from regular mode
+      if (designMode === 'regular' && design.isCustom) {
+        return false;
+      }
+      
+      // In custom mode, only show custom design
+      if (designMode === 'custom') {
+        return design.isCustom === true;
+      }
+      
+      // For regular mode, apply category filters
+      if (selectedCategories.length === 0) {
+        return true;
+      }
+      
+      return selectedCategories.includes(design.category);
+    },
+    [selectedCategories, designMode]
   );
 
   // Toggle category selection - memoized callback
   const toggleCategory = useMemoizedCallback((category: string) => {
     setSelectedCategories(prev => {
       if (prev.includes(category)) {
-        // Don't allow deselecting all categories
-        return prev.length > 1 ? prev.filter(c => c !== category) : prev;
+        // Remove category from selection
+        return prev.filter(c => c !== category);
       } else {
+        // Add category to selection
         return [...prev, category];
       }
     });
@@ -56,9 +77,9 @@ export function usePackagesLogic(): PackageLogicState & PackageLogicActions {
     setSelectedCategories(categories.map(cat => cat.value));
   }, []);
 
-  // Clear all categories (except one to prevent empty state)
+  // Clear all categories
   const clearCategories = useMemoizedCallback(() => {
-    setSelectedCategories([categories[0].value]);
+    setSelectedCategories([]);
   }, []);
 
   // Get category statistics
@@ -75,9 +96,11 @@ export function usePackagesLogic(): PackageLogicState & PackageLogicActions {
     selectedCategories,
     filteredDesigns,
     isLoading: cartLoading,
+    designMode,
     toggleCategory,
     selectAllCategories,
     clearCategories,
-    getCategoryStats
+    getCategoryStats,
+    setDesignMode
   };
 }

@@ -26,7 +26,13 @@ const CartSummary = memo<CartSummaryProps>(({
     const extraCardsPrice = (formData.additionalCards || 0) * getExtraCardPrice(packageType);
     const extraHoursPrice = (formData.extraHours || 0) * CART_MODAL_CONSTANTS.EXTRA_HOUR_COST;
     const gateSupervisorsPrice = (typeof formData.gateSupervisors === 'number' ? formData.gateSupervisors : 0) * CART_MODAL_CONSTANTS.GATE_SUPERVISOR_COST;
-    const expeditedDeliveryPrice = (formData.expeditedDelivery ? CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST : 0);
+    // Get expedited delivery price based on package type
+    const getExpeditedDeliveryPrice = (pkgType: string, isExpedited: boolean) => {
+      if (!isExpedited) return 0;
+      return CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST[pkgType as keyof typeof CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST] || CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST.classic;
+    };
+    
+    const expeditedDeliveryPrice = getExpeditedDeliveryPrice(packageType, formData.expeditedDelivery);
     
     const subtotal = basePrice + extraCardsPrice + extraHoursPrice + gateSupervisorsPrice + expeditedDeliveryPrice;
     const total = subtotal;
@@ -93,7 +99,7 @@ const CartSummary = memo<CartSummaryProps>(({
         {/* Expedited Delivery */}
         {formData.expeditedDelivery && (
           <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
-            <span className="text-gray-300">توصيل سريع</span>
+            <span className="text-gray-300">نسليم سريع</span>
             <span className="text-white font-semibold">
               {formatCurrency(pricing.expeditedDeliveryPrice)}
             </span>

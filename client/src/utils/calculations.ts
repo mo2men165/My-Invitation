@@ -35,10 +35,23 @@ export const calculatePackagePrice = (
     gateSupervisorsPrice = form.gateSupervisors * 450;
   }
   
-  const expeditedDeliveryPrice = form.expeditedDelivery ? 3000 : 0;
+  // Get expedited delivery price based on package type
+  const getExpeditedDeliveryPrice = (pkgType: string, isExpedited: boolean) => {
+    if (!isExpedited) return 0;
+    
+    const EXPEDITED_COSTS = {
+      classic: 600,
+      premium: 1000,
+      vip: 1500,
+    };
+    
+    return EXPEDITED_COSTS[pkgType as keyof typeof EXPEDITED_COSTS] || EXPEDITED_COSTS.classic;
+  };
   
-  // Add extra hours cost (250 SAR per hour)
-  const extraHoursPrice = (form.extraHours || 0) * 250;
+  const expeditedDeliveryPrice = getExpeditedDeliveryPrice(packageType, form.expeditedDelivery || false);
+  
+  // Add extra hours cost (150 SAR per hour)
+  const extraHoursPrice = (form.extraHours || 0) * 150;
   
   return basePrice + additionalCardsPrice + gateSupervisorsPrice + expeditedDeliveryPrice + extraHoursPrice;
 };

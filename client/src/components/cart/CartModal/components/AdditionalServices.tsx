@@ -106,9 +106,11 @@ const AdditionalServices = memo<AdditionalServicesProps>(({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-[#C09B52]" />
-            <span className="text-white font-medium">توصيل سريع</span>
+            <span className="text-white font-medium">نسليم سريع</span>
           </div>
-          <span className="text-[#C09B52]">{CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST.toLocaleString()} ر.س</span>
+          <span className="text-[#C09B52]">
+            {CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST[packageType as keyof typeof CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST]?.toLocaleString() || CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST.classic.toLocaleString()} ر.س
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <div className="text-gray-300 text-sm">

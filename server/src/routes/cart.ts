@@ -113,11 +113,19 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Create new cart item
+    // Create new cart item with data sanitization
+    const sanitizedDetails = {
+      ...cartItemData.details,
+      // Ensure gateSupervisors is always a number
+      gateSupervisors: typeof cartItemData.details.gateSupervisors === 'string' 
+        ? parseInt(cartItemData.details.gateSupervisors, 10) || 0
+        : cartItemData.details.gateSupervisors || 0
+    };
+
     const newCartItem = {
       designId: new Types.ObjectId(cartItemData.designId),
       packageType: cartItemData.packageType,
-      details: cartItemData.details,
+      details: sanitizedDetails,
       totalPrice: cartItemData.totalPrice,
       addedAt: new Date(),
       updatedAt: new Date()

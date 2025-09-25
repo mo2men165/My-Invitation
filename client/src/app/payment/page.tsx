@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAppDispatch } from '@/store';
 import { fetchCart } from '@/store/cartSlice';
 import { paymentAPI } from '@/lib/api/payment';
+import { paymobAPI } from '@/lib/api/paymob';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/hooks/useAuth';
 import { InstantRouteGuard } from '@/components/auth/InstantRouteGuard';
@@ -104,36 +105,37 @@ const PaymentPageContent: React.FC = () => {
     setIsProcessingPayment(true);
 
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Get user profile information
+      const authAPI = await import('@/lib/api/auth');
+      const userResponse = await authAPI.authAPI.getCurrentUser();
+      
+      if (!userResponse.success || !userResponse.user) {
+        throw new Error('فشل في جلب بيانات المستخدم');
+      }
 
-      // Process successful payment
-      const paymentResult = await paymentAPI.processPayment({
-        paymentId: `PAY_${Date.now()}`,
-        amount: paymentSummary.totalAmount,
-        paymentMethod: 'credit_card',
-        transactionId: `TXN_${Date.now()}`
+      const user = userResponse.user;
+
+      // Create Paymob order with user profile information
+      const orderResult = await paymobAPI.createOrder({
+        customerInfo: {
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          city: user.city || 'الرياض' // Default city if not set
+        }
       });
 
-      if (paymentResult.success) {
-        setPaymentSuccess(true);
-        
-        toast({
-          title: "تم الدفع بنجاح",
-          description: `تم إنشاء ${paymentResult.eventsCreated} مناسبة بنجاح`,
-          variant: "default",
-          duration: 4000
-        });
-
-        // Redirect after showing success message
-        setTimeout(() => {
-          router.push('/events');
-        }, 2000);
+      if (orderResult.success) {
+        // Redirect to Paymob iframe
+        window.location.href = orderResult.iframeUrl;
+      } else {
+        throw new Error('فشل في إنشاء طلب الدفع');
       }
     } catch (error: any) {
       toast({
-        title: "فشل في معالجة الدفع",
-        description: error.message || "حدث خطأ أثناء معالجة الدفع",
+        title: "فشل في إنشاء طلب الدفع",
+        description: error.message || "حدث خطأ أثناء إنشاء طلب الدفع",
         variant: "destructive",
         duration: 4000
       });
@@ -141,6 +143,7 @@ const PaymentPageContent: React.FC = () => {
       setIsProcessingPayment(false);
     }
   };
+
 
   const getPackageDetails = (packageType: string) => {
     switch (packageType) {
@@ -263,7 +266,12 @@ const PaymentPageContent: React.FC = () => {
                       <div className="grid md:grid-cols-3 gap-4 text-sm">
                         <div className="flex items-center gap-2 text-gray-300">
                           <Calendar className="w-4 h-4 text-[#C09B52]" />
-                          {eventDate.toLocaleDateString('ar-SA')}
+                          {eventDate.toLocaleDateString('ar-SA', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            calendar: 'gregory' // Force Gregorian calendar
+                          })}
                         </div>
                         <div className="flex items-center gap-2 text-gray-300">
                           <MapPin className="w-4 h-4 text-[#C09B52]" />
@@ -330,7 +338,7 @@ const PaymentPageContent: React.FC = () => {
                 {isProcessingPayment ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    جاري معالجة الدفع...
+                    جاري إنشاء طلب الدفع...
                   </>
                 ) : (
                   <>
@@ -348,6 +356,7 @@ const PaymentPageContent: React.FC = () => {
           </div>
         </div>
       </div>
+
     </div>
   );
 };

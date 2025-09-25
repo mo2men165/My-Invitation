@@ -122,7 +122,7 @@ const CartItemComponent = memo<{
           {item.details.expeditedDelivery && (
             <div className="col-span-full flex items-center gap-2 text-[#C09B52] bg-[#C09B52]/10 rounded-lg p-2">
               <Zap className="w-4 h-4" />
-              <span className="text-sm font-medium">توصيل سريع - 24-48 ساعة</span>
+              <span className="text-sm font-medium">نسليم سريع - 24-48 ساعة</span>
             </div>
           )}
           

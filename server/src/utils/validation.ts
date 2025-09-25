@@ -1,5 +1,6 @@
 // server/src/utils/validation.ts
 import { z } from 'zod';
+import { phoneValidationSchema, normalizePhoneNumber } from './phoneValidation';
 
 // Saudi cities enum
 const saudiCities = [
@@ -29,8 +30,7 @@ export const registerSchema = z.object({
     .max(25, 'الاسم الأخير طويل جداً')
     .regex(/^[a-zA-Z\u0600-\u06FF\s]+$/, 'الاسم يجب أن يحتوي على أحرف عربية أو إنجليزية فقط')
     .trim(),
-  phone: z.string()
-    .regex(/^\+[1-9]\d{1,14}$/, 'رقم الهاتف يجب أن يكون بالصيغة الدولية (مثال: +966501234567)'),
+  phone: phoneValidationSchema,
   email: z.string()
     .email('عنوان البريد الإلكتروني غير صحيح')
     .toLowerCase(),
@@ -50,9 +50,12 @@ export const loginSchema = z.object({
     .min(1, 'البريد الإلكتروني أو رقم الهاتف مطلوب')
     .refine((val) => {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const phoneRegex = /^\+[1-9]\d{1,14}$/; // International phone number format
-      return emailRegex.test(val) || phoneRegex.test(val);
-    }, 'يجب إدخال بريد إلكتروني صحيح أو رقم هاتف دولي صحيح'),
+      if (emailRegex.test(val)) return true;
+      
+      // Use our custom phone validation
+      const phoneValidation = phoneValidationSchema.safeParse(val);
+      return phoneValidation.success;
+    }, 'يجب إدخال بريد إلكتروني صحيح أو رقم هاتف من الدول المسموحة'),
   password: z.string().min(1, 'كلمة المرور مطلوبة')
 });
 
@@ -89,7 +92,14 @@ const cartItemDetailsSchema = z.object({
     .min(1, 'عنوان المناسبة مطلوب')
     .max(200, 'عنوان المناسبة لا يجب أن يتجاوز 200 حرف'),
   additionalCards: z.number().int().min(0).max(100).default(0),
-  gateSupervisors: z.number().int().min(0).max(10).default(0), // Changed to number
+  gateSupervisors: z.union([
+    z.number().int().min(0).max(10),
+    z.string().transform((val) => {
+      const parsed = parseInt(val, 10);
+      if (isNaN(parsed)) return 0;
+      return Math.max(0, Math.min(10, parsed));
+    })
+  ]).default(0), // Handle both number and string inputs
   extraHours: z.number().int().min(0).max(3).default(0).optional(), // Added extraHours
   expeditedDelivery: z.boolean().default(false), // Added expeditedDelivery
   locationCoordinates: locationCoordinatesSchema,
@@ -194,20 +204,23 @@ export const transformRegisterData = (data: z.infer<typeof registerSchema>) => {
   return {
     ...data,
     name: `${data.firstName} ${data.lastName}`,
-    phone: data.phone // Already in international format
+    phone: normalizePhoneNumber(data.phone) // Normalize to international format
   };
 };
 
 export const parseIdentifier = (identifier: string) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const phoneRegex = /^\+[1-9]\d{1,14}$/; // International phone number format
   
   if (emailRegex.test(identifier)) {
     return { type: 'email', value: identifier.toLowerCase() };
-  } else if (phoneRegex.test(identifier)) {
-    return { type: 'phone', value: identifier }; // Already in international format
   } else {
-    throw new Error('نوع المعرف غير صحيح');
+    // Use our custom phone validation
+    const phoneValidation = phoneValidationSchema.safeParse(identifier);
+    if (phoneValidation.success) {
+      return { type: 'phone', value: normalizePhoneNumber(identifier) };
+    } else {
+      throw new Error('نوع المعرف غير صحيح');
+    }
   }
 };
 

@@ -1,6 +1,7 @@
 // server/src/models/User.ts
 import mongoose, { Document, Schema, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { ALLOWED_PHONE_PATTERN } from '../utils/phoneValidation';
 
 // Cart item interface with location fields
 export interface ICartItem {
@@ -8,6 +9,7 @@ export interface ICartItem {
   designId: Types.ObjectId;
   packageType: 'classic' | 'premium' | 'vip';
   details: {
+    eventName?: string;
     inviteCount: number;
     eventDate: Date;
     startTime: string;
@@ -24,6 +26,9 @@ export interface ICartItem {
       lng: number;
     };
     detectedCity: string; // Required field
+    // Custom design fields
+    isCustomDesign?: boolean;
+    customDesignNotes?: string;
   };
   totalPrice: number;
   addedAt: Date;
@@ -62,6 +67,26 @@ export interface IUser extends Document {
   wishlist: IWishlistItem[];
   compareList: ICompareItem[];
   
+  // Collaboration tracking (optional fields)
+  collaboratedEvents?: {
+    eventId: Types.ObjectId;
+    role: 'owner' | 'collaborator';
+    permissions: {
+      canAddGuests: boolean;
+      canEditGuests: boolean;
+      canDeleteGuests: boolean;
+      canViewFullEvent: boolean;
+    };
+    addedAt: Date;
+    addedBy: Types.ObjectId;
+    allocatedInvites?: number;
+    usedInvites?: number;
+  }[];
+  
+  // Account origin tracking (optional fields)
+  accountOrigin?: 'self_registered' | 'collaborator_invited';
+  invitedBy?: Types.ObjectId;
+  
   createdAt: Date;
   updatedAt: Date;
   
@@ -72,8 +97,7 @@ export interface IUser extends Document {
 const cartItemSchema = new Schema<ICartItem>({
   designId: {
     type: Schema.Types.ObjectId,
-    required: true,
-    index: true
+    required: true
   },
   packageType: {
     type: String,
@@ -81,6 +105,11 @@ const cartItemSchema = new Schema<ICartItem>({
     required: true
   },
   details: {
+    eventName: {
+      type: String,
+      maxlength: 100,
+      trim: true
+    },
     inviteCount: {
       type: Number,
       required: true,
@@ -149,6 +178,16 @@ const cartItemSchema = new Schema<ICartItem>({
     detectedCity: {
       type: String,
       enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'],
+    },
+    // Custom design fields
+    isCustomDesign: {
+      type: Boolean,
+      default: false
+    },
+    customDesignNotes: {
+      type: String,
+      maxlength: 500,
+      default: ''
     }
   },
   totalPrice: {
@@ -170,8 +209,7 @@ const cartItemSchema = new Schema<ICartItem>({
 const wishlistItemSchema = new Schema<IWishlistItem>({
   designId: {
     type: Schema.Types.ObjectId,
-    required: true,
-    index: true
+    required: true
   },
   packageType: {
     type: String,
@@ -187,8 +225,7 @@ const wishlistItemSchema = new Schema<IWishlistItem>({
 const compareItemSchema = new Schema<ICompareItem>({
   designId: {
     type: Schema.Types.ObjectId,
-    required: true,
-    index: true
+    required: true
   },
   packageType: {
     type: String,
@@ -198,6 +235,57 @@ const compareItemSchema = new Schema<ICompareItem>({
   addedAt: {
     type: Date,
     default: Date.now
+  }
+}, { _id: true });
+
+// Collaborated events schema
+const collaboratedEventSchema = new Schema({
+  eventId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Event',
+    required: true
+  },
+  role: {
+    type: String,
+    enum: ['owner', 'collaborator'],
+    required: true
+  },
+  permissions: {
+    canAddGuests: {
+      type: Boolean,
+      default: true
+    },
+    canEditGuests: {
+      type: Boolean,
+      default: false
+    },
+    canDeleteGuests: {
+      type: Boolean,
+      default: false
+    },
+    canViewFullEvent: {
+      type: Boolean,
+      default: false
+    }
+  },
+  addedAt: {
+    type: Date,
+    default: Date.now
+  },
+  addedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  allocatedInvites: {
+    type: Number,
+    min: 0,
+    max: 500
+  },
+  usedInvites: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 }, { _id: true });
 
@@ -223,14 +311,12 @@ const userSchema = new Schema<IUser>({
   phone: {
     type: String,
     required: true,
-    index: true,
-    match: /^\+[1-9]\d{1,14}$/ // International phone number format (E.164)
+    match: ALLOWED_PHONE_PATTERN // Restricted to allowed countries
   },
   email: {
     type: String,
     required: true,
     lowercase: true,
-    index: true,
     match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   },
   password: {
@@ -285,6 +371,29 @@ const userSchema = new Schema<IUser>({
       },
       message: 'Compare list cannot contain more than 3 items'
     }
+  },
+  
+  // Collaboration tracking (optional fields)
+  collaboratedEvents: {
+    type: [collaboratedEventSchema],
+    default: [],
+    validate: {
+      validator: function(collaboratedEvents: any[]) {
+        return collaboratedEvents.length <= 50; // Reasonable limit
+      },
+      message: 'Cannot collaborate on more than 50 events'
+    }
+  },
+  
+  // Account origin tracking (optional fields)
+  accountOrigin: {
+    type: String,
+    enum: ['self_registered', 'collaborator_invited'],
+    default: 'self_registered'
+  },
+  invitedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, {
   timestamps: true
@@ -320,5 +429,10 @@ userSchema.index({ 'cart.designId': 1 });
 userSchema.index({ 'wishlist.designId': 1 });
 userSchema.index({ 'compareList.designId': 1 });
 userSchema.index({ 'cart.details.locationCoordinates': '2dsphere' });
+
+// New indexes for collaboration
+userSchema.index({ 'collaboratedEvents.eventId': 1 });
+userSchema.index({ accountOrigin: 1 });
+userSchema.index({ invitedBy: 1 });
 
 export const User = mongoose.model<IUser>('User', userSchema);

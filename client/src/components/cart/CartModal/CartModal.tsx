@@ -15,6 +15,7 @@ import '../cart-scroll.css';
 import CartHeader from './components/CartHeader';
 import EventDetailsForm from './components/EventDetailsForm';
 import LocationSection from './components/LocationSection';
+import CustomDesignSection from './components/CustomDesignSection';
 import AdditionalServices from './components/AdditionalServices';
 import CartSummary from './components/CartSummary';
 import CartActions from './components/CartActions';
@@ -109,6 +110,18 @@ const CartModal = memo<CartModalProps>(({
     }
   }, [editItem, isOpen, state.isEditMode, setEditMode, updateFormField, updateLocation, toggleMap]);
 
+  // Detect custom design selection and set appropriate form fields
+  useEffect(() => {
+    if (isOpen && selectedDesign && selectedDesign.isCustom && !state.isEditMode) {
+      updateFormField('isCustomDesign', true);
+      // Pre-populate invitation text with a helpful message for custom design
+      updateFormField('invitationText', 'سيتم تصميم الدعوة حسب طلبك. يرجى إضافة أي ملاحظات خاصة في الحقل المخصص أدناه.');
+    } else if (isOpen && selectedDesign && !selectedDesign.isCustom && !state.isEditMode) {
+      updateFormField('isCustomDesign', false);
+      updateFormField('customDesignNotes', '');
+    }
+  }, [isOpen, selectedDesign, state.isEditMode, updateFormField]);
+
   // Pre-populate user data when opening for new item
   useEffect(() => {
     if (isOpen && !editItem && !hasPopulatedUserData.current) {
@@ -151,21 +164,33 @@ const CartModal = memo<CartModalProps>(({
   }, [isOpen, setEditMode, resetForm]);
 
   // Prepare the data with ALL required fields and proper defaults
-  const details = useMemo(() => ({
-    inviteCount: formData.inviteCount || 100,
-    eventDate: formData.eventDate ? new Date(formData.eventDate).toISOString() : new Date().toISOString(),
-    startTime: formData.startTime || '12:00',
-    endTime: formData.endTime || '13:00',
-    invitationText: formData.invitationText || '',
-    hostName: formData.hostName || '',
-    eventLocation: formData.eventLocation || '',
-    additionalCards: formData.additionalCards || 0,
-    gateSupervisors: typeof formData.gateSupervisors === 'number' ? formData.gateSupervisors : 0,
-    extraHours: formData.extraHours || 0,
-    expeditedDelivery: formData.expeditedDelivery || false,
-    locationCoordinates: locationData.coordinates,
-    detectedCity: locationData.city || 'الرياض' // Always pass city, default to Riyadh if empty
-  }), [formData, locationData]);
+  const details = useMemo(() => {
+    // Ensure gateSupervisors is always a number, handle any string values
+    let gateSupervisorsValue = 0;
+    if (typeof formData.gateSupervisors === 'number') {
+      gateSupervisorsValue = formData.gateSupervisors;
+    } else if (typeof formData.gateSupervisors === 'string') {
+      // Try to extract number from string, default to 0 if parsing fails
+      const parsed = parseInt(formData.gateSupervisors, 10);
+      gateSupervisorsValue = isNaN(parsed) ? 0 : parsed;
+    }
+
+    return {
+      inviteCount: formData.inviteCount || 100,
+      eventDate: formData.eventDate ? new Date(formData.eventDate).toISOString() : new Date().toISOString(),
+      startTime: formData.startTime || '12:00',
+      endTime: formData.endTime || '13:00',
+      invitationText: formData.invitationText || '',
+      hostName: formData.hostName || '',
+      eventLocation: formData.eventLocation || '',
+      additionalCards: formData.additionalCards || 0,
+      gateSupervisors: gateSupervisorsValue,
+      extraHours: formData.extraHours || 0,
+      expeditedDelivery: formData.expeditedDelivery || false,
+      locationCoordinates: locationData.coordinates,
+      detectedCity: locationData.city || 'الرياض' // Always pass city, default to Riyadh if empty
+    };
+  }, [formData, locationData]);
 
   const itemData = useMemo(() => {
     // Only calculate price if we have valid package and design
@@ -197,7 +222,11 @@ const CartModal = memo<CartModalProps>(({
     return {
       designId: selectedDesign.id,
       packageType: selectedPackage as 'classic' | 'premium' | 'vip',
-      details,
+      details: {
+        ...details,
+        isCustomDesign: selectedDesign.isCustom || false,
+        customDesignNotes: formData.customDesignNotes || ''
+      },
       totalPrice: calculatedPrice
     };
   }, [selectedDesign, selectedPackage, details, formData, isOpen]);
@@ -349,6 +378,12 @@ const CartModal = memo<CartModalProps>(({
                     />
                   </div>
                 }
+              />
+              
+              <CustomDesignSection
+                formData={formData}
+                errors={errors}
+                onInputChange={updateFormField}
               />
             </div>
 

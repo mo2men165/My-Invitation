@@ -7,9 +7,15 @@ export const CART_MODAL_CONSTANTS = {
   MIN_BOOKING_DAYS: 7,
   
   // Pricing
-  EXTRA_HOUR_COST: 250,
+  EXTRA_HOUR_COST: 150,
   GATE_SUPERVISOR_COST: 450,
-  EXPEDITED_DELIVERY_COST: 3000,
+  
+  // Tiered expedited delivery pricing by package type
+  EXPEDITED_DELIVERY_COST: {
+    classic: 600,
+    premium: 1000,
+    vip: 1500,
+  } as const,
   
   // Package pricing per extra card
   EXTRA_CARD_PRICES: {

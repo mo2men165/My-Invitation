@@ -60,7 +60,7 @@ export function AboutSection() {
               >
                 <Star className="w-4 h-4 mr-2 ml-2" style={{ color: '#C09B52' }} />
                 <span className="text-sm font-medium text-gray-700">
-                  أول منصة سعودية متخصصة في دعوات المناسبات
+                المنصة الرائدة في السعودية لدعوات المناسبات
                 </span>
               </motion.div>
 

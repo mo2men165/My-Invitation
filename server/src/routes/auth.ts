@@ -13,6 +13,7 @@ import { authService } from '../services/authService';
 import { passwordResetService } from '../services/passwordResetService';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { z } from 'zod';
+import { phoneValidationSchema, normalizePhoneNumber } from '../utils/phoneValidation';
 
 const router = Router();
 
@@ -478,7 +479,7 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
       firstName: z.string().min(1, 'الاسم الأول مطلوب').max(25, 'الاسم الأول لا يجب أن يتجاوز 25 حرف'),
       lastName: z.string().min(1, 'الاسم الأخير مطلوب').max(25, 'الاسم الأخير لا يجب أن يتجاوز 25 حرف'),
       email: z.string().email('البريد الإلكتروني غير صحيح'),
-      phone: z.string().regex(/^\+[1-9]\d{1,14}$/, 'رقم الهاتف يجب أن يكون بالصيغة الدولية (مثال: +966501234567)'),
+      phone: phoneValidationSchema,
       city: z.enum(['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'])
     });
 
@@ -500,8 +501,8 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
 
     const { firstName, lastName, email, phone, city } = validationResult.data;
 
-    // Use the phone number as provided (already in international format)
-    const fullPhoneNumber = phone;
+    // Normalize the phone number to international format
+    const fullPhoneNumber = normalizePhoneNumber(phone);
 
     // Get current user to check their role
     const currentUser = await User.findById(userId);

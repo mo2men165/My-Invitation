@@ -122,22 +122,6 @@ export default function NotFound() {
             </div>
           </div>
 
-          {/* Search Bar */}
-          <div className={`transition-all duration-1000 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <div className="max-w-2xl mx-auto mb-12">
-              <div className="relative">
-                <Search className="absolute right-4 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="ابحث عن الباقات والتصاميم..."
-                  className="w-full pl-6 pr-16 py-4 bg-white/10 border border-white/20 text-white placeholder-gray-400 rounded-2xl backdrop-blur-sm focus:border-[#C09B52] focus:ring-2 focus:ring-[#C09B52]/20 transition-all"
-                />
-                <button className="absolute left-2 top-1/2 transform -translate-y-1/2 px-6 py-2 bg-gradient-to-r from-[#C09B52] to-amber-600 text-black font-bold rounded-xl hover:from-amber-600 hover:to-[#C09B52] transition-all duration-300">
-                  بحث
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Quick Navigation */}
           <div className={`transition-all duration-1000 delay-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>

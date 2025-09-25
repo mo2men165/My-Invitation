@@ -42,7 +42,10 @@ router.get('/dashboard/stats', async (req: Request, res: Response) => {
       rejectedEvents,
       monthlyRevenue,
       activeUsers,
-      suspendedUsers
+      suspendedUsers,
+      eventsWithCollaborators,
+      totalCollaborations,
+      collaboratorInvitedUsers
     ] = await Promise.all([
       User.countDocuments(),
       Event.countDocuments(),
@@ -64,10 +67,17 @@ router.get('/dashboard/stats', async (req: Request, res: Response) => {
         }
       ]),
       User.countDocuments({ status: 'active' }),
-      User.countDocuments({ status: 'suspended' })
+      User.countDocuments({ status: 'suspended' }),
+      Event.countDocuments({ 'collaborators.0': { $exists: true } }),
+      Event.aggregate([
+        { $unwind: '$collaborators' },
+        { $count: 'total' }
+      ]),
+      User.countDocuments({ accountOrigin: 'collaborator_invited' })
     ]);
 
     const revenue = monthlyRevenue.length > 0 ? monthlyRevenue[0].total : 0;
+    const totalCollaborationsCount = totalCollaborations.length > 0 ? totalCollaborations[0].total : 0;
 
     return res.json({
       success: true,
@@ -75,16 +85,24 @@ router.get('/dashboard/stats', async (req: Request, res: Response) => {
         users: {
           total: totalUsers,
           active: activeUsers,
-          suspended: suspendedUsers
+          suspended: suspendedUsers,
+          collaboratorInvited: collaboratorInvitedUsers
         },
         events: {
           total: totalEvents,
           pendingApprovals,
           approved: approvedEvents,
-          rejected: rejectedEvents
+          rejected: rejectedEvents,
+          withCollaborators: eventsWithCollaborators
         },
         revenue: {
           thisMonth: revenue
+        },
+        collaboration: {
+          eventsWithCollaborators,
+          totalCollaborations: totalCollaborationsCount,
+          collaboratorInvitedUsers,
+          conversionRate: totalUsers > 0 ? Math.round((collaboratorInvitedUsers / totalUsers) * 100) : 0
         }
       }
     });
@@ -113,6 +131,7 @@ router.get('/events/pending', async (req: Request, res: Response) => {
 
     const events = await Event.find({ approvalStatus: 'pending' })
       .populate('userId', 'firstName lastName email phone city')
+      .populate('collaborators.userId', 'firstName lastName email')
       .sort({ paymentCompletedAt: 1 }) // Oldest first
       .skip(skip)
       .limit(Number(limit))
@@ -125,6 +144,32 @@ router.get('/events/pending', async (req: Request, res: Response) => {
       const guestsToShow = event.packageType === 'vip' && !event.guestListConfirmed?.isConfirmed 
         ? [] 
         : event.guests || [];
+
+      // Format guests with added by information
+      const formattedGuests = guestsToShow.map(guest => ({
+        ...guest,
+        addedByInfo: guest.addedBy ? {
+          type: guest.addedBy.type,
+          isOwner: guest.addedBy.type === 'owner',
+          isCollaborator: guest.addedBy.type === 'collaborator',
+          collaboratorEmail: guest.addedBy.collaboratorEmail
+        } : {
+          type: 'owner', // Default for existing guests
+          isOwner: true,
+          isCollaborator: false
+        }
+      }));
+
+      // Format collaborators
+      const collaborators = event.collaborators?.map(collab => ({
+        id: (collab.userId as any)?._id,
+        name: (collab.userId as any) ? `${(collab.userId as any).firstName} ${(collab.userId as any).lastName}` : 'Unknown',
+        email: (collab.userId as any)?.email,
+        allocatedInvites: collab.allocatedInvites,
+        usedInvites: collab.usedInvites,
+        permissions: collab.permissions,
+        addedAt: collab.addedAt
+      })) || [];
 
       return {
         id: event._id,
@@ -144,10 +189,20 @@ router.get('/events/pending', async (req: Request, res: Response) => {
         totalPrice: event.totalPrice,
         paymentCompletedAt: event.paymentCompletedAt,
         status: event.status,
-        guests: guestsToShow,
+        guests: formattedGuests,
         guestListConfirmed: event.guestListConfirmed,
         // Show guest count for VIP packages even if not confirmed
-        guestCount: event.guests?.length || 0
+        guestCount: event.guests?.length || 0,
+        
+        // Collaboration information
+        hasCollaborators: collaborators.length > 0,
+        collaborators,
+        collaborationStats: {
+          totalCollaborators: collaborators.length,
+          totalAllocatedInvites: event.totalAllocatedInvites || 0,
+          guestsAddedByOwner: formattedGuests.filter(g => g.addedByInfo.isOwner).length,
+          guestsAddedByCollaborators: formattedGuests.filter(g => g.addedByInfo.isCollaborator).length
+        }
       };
     });
 
@@ -204,6 +259,7 @@ router.get('/events/all', async (req: Request, res: Response) => {
       Event.find(query)
         .populate('userId', 'firstName lastName email phone')
         .populate('approvedBy', 'firstName lastName')
+        .populate('collaborators.userId', 'firstName lastName email')
         .sort({ paymentCompletedAt: -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -216,6 +272,32 @@ router.get('/events/all', async (req: Request, res: Response) => {
       const guestsToShow = event.packageType === 'vip' && !event.guestListConfirmed?.isConfirmed 
         ? [] 
         : event.guests || [];
+
+      // Format guests with added by information
+      const formattedGuests = guestsToShow.map(guest => ({
+        ...guest,
+        addedByInfo: guest.addedBy ? {
+          type: guest.addedBy.type,
+          isOwner: guest.addedBy.type === 'owner',
+          isCollaborator: guest.addedBy.type === 'collaborator',
+          collaboratorEmail: guest.addedBy.collaboratorEmail
+        } : {
+          type: 'owner', // Default for existing guests
+          isOwner: true,
+          isCollaborator: false
+        }
+      }));
+
+      // Format collaborators
+      const collaborators = event.collaborators?.map(collab => ({
+        id: (collab.userId as any)?._id,
+        name: (collab.userId as any) ? `${(collab.userId as any).firstName} ${(collab.userId as any).lastName}` : 'Unknown',
+        email: (collab.userId as any)?.email,
+        allocatedInvites: collab.allocatedInvites,
+        usedInvites: collab.usedInvites,
+        permissions: collab.permissions,
+        addedAt: collab.addedAt
+      })) || [];
 
       return {
         id: event._id,
@@ -239,10 +321,20 @@ router.get('/events/all', async (req: Request, res: Response) => {
         approvedAt: event.approvedAt,
         rejectedAt: event.rejectedAt,
         paymentCompletedAt: event.paymentCompletedAt,
-        guests: guestsToShow,
+        guests: formattedGuests,
         guestListConfirmed: event.guestListConfirmed,
         // Show guest count for VIP packages even if not confirmed
-        guestCount: event.guests?.length || 0
+        guestCount: event.guests?.length || 0,
+        
+        // Collaboration information
+        hasCollaborators: collaborators.length > 0,
+        collaborators,
+        collaborationStats: {
+          totalCollaborators: collaborators.length,
+          totalAllocatedInvites: event.totalAllocatedInvites || 0,
+          guestsAddedByOwner: formattedGuests.filter(g => g.addedByInfo.isOwner).length,
+          guestsAddedByCollaborators: formattedGuests.filter(g => g.addedByInfo.isCollaborator).length
+        }
       };
     });
 
@@ -462,6 +554,7 @@ router.get('/events/:eventId/guests', async (req: Request, res: Response) => {
 
     const event = await Event.findById(eventId)
       .populate('userId', 'firstName lastName email phone')
+      .populate('collaborators.userId', 'firstName lastName email')
       .lean();
 
     if (!event) {
@@ -476,9 +569,37 @@ router.get('/events/:eventId/guests', async (req: Request, res: Response) => {
       ? [] 
       : event.guests || [];
 
+    // Format guests with added by information
+    const formattedGuests = guestsToShow.map(guest => ({
+      ...guest,
+      addedByInfo: guest.addedBy ? {
+        type: guest.addedBy.type,
+        isOwner: guest.addedBy.type === 'owner',
+        isCollaborator: guest.addedBy.type === 'collaborator',
+        collaboratorEmail: guest.addedBy.collaboratorEmail
+      } : {
+        type: 'owner', // Default for existing guests
+        isOwner: true,
+        isCollaborator: false
+      }
+    }));
+
+    // Format collaborators
+    const collaborators = event.collaborators?.map(collab => ({
+      id: (collab.userId as any)?._id,
+      name: (collab.userId as any) ? `${(collab.userId as any).firstName} ${(collab.userId as any).lastName}` : 'Unknown',
+      email: (collab.userId as any)?.email,
+      allocatedInvites: collab.allocatedInvites,
+      usedInvites: collab.usedInvites,
+      permissions: collab.permissions,
+      addedAt: collab.addedAt
+    })) || [];
+
     // Calculate guest statistics based on actual guests shown
     const totalInvited = guestsToShow.reduce((sum, guest) => sum + guest.numberOfAccompanyingGuests, 0);
     const whatsappSent = guestsToShow.filter(guest => guest.whatsappMessageSent).length;
+    const guestsAddedByOwner = formattedGuests.filter(g => g.addedByInfo.isOwner).length;
+    const guestsAddedByCollaborators = formattedGuests.filter(g => g.addedByInfo.isCollaborator).length;
 
     return res.json({
       success: true,
@@ -497,16 +618,35 @@ router.get('/events/:eventId/guests', async (req: Request, res: Response) => {
             email: (event.userId as any).email,
             phone: (event.userId as any).phone
           },
-          guestListConfirmed: event.guestListConfirmed
+          guestListConfirmed: event.guestListConfirmed,
+          
+          // Collaboration information
+          hasCollaborators: collaborators.length > 0,
+          collaborators,
+          collaborationStats: {
+            totalCollaborators: collaborators.length,
+            totalAllocatedInvites: event.totalAllocatedInvites || 0
+          }
         },
-        guests: guestsToShow,
+        guests: formattedGuests,
         guestStats: {
           totalGuests: guestsToShow.length,
           totalInvited,
           whatsappMessagesSent: whatsappSent,
           remainingInvites: event.details.inviteCount - totalInvited,
           // Show actual guest count for VIP packages even if not confirmed
-          actualGuestCount: event.guests?.length || 0
+          actualGuestCount: event.guests?.length || 0,
+          
+          // Collaboration guest stats
+          guestsAddedByOwner,
+          guestsAddedByCollaborators,
+          guestsByCollaborator: collaborators.map(collab => ({
+            collaboratorName: collab.name,
+            collaboratorEmail: collab.email,
+            guestsAdded: formattedGuests.filter(g => 
+              g.addedByInfo.isCollaborator && g.addedByInfo.collaboratorEmail === collab.email
+            ).length
+          }))
         }
       }
     });
@@ -611,13 +751,26 @@ router.get('/users', async (req: Request, res: Response) => {
       User.countDocuments(query)
     ]);
 
-    // Get event counts for each user
+    // Get event counts and collaboration stats for each user
     const usersWithStats = await Promise.all(
       users.map(async (user) => {
-        const eventCount = await Event.countDocuments({ userId: user._id });
+        const [eventCount, collaboratedEventCount, collaborationsCreated] = await Promise.all([
+          Event.countDocuments({ userId: user._id }),
+          Event.countDocuments({ 'collaborators.userId': user._id }),
+          Event.countDocuments({ 
+            userId: user._id, 
+            'collaborators.0': { $exists: true } 
+          })
+        ]);
+
         return {
           ...user,
-          eventCount
+          eventCount,
+          collaborationStats: {
+            collaboratedIn: collaboratedEventCount,
+            collaborationsCreated,
+            isCollaboratorInvited: user.accountOrigin === 'collaborator_invited'
+          }
         };
       })
     );
@@ -736,6 +889,146 @@ router.put('/users/:userId/role', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { message: 'خطأ في تحديث دور المستخدم' }
+    });
+  }
+});
+
+/**
+ * GET /api/admin/collaboration/analytics
+ * Get detailed collaboration analytics
+ */
+router.get('/collaboration/analytics', async (req: Request, res: Response) => {
+  try {
+    // Get collaboration statistics
+    const [
+      eventsWithCollaborators,
+      totalCollaborations,
+      collaboratorInvitedUsers,
+      packageBreakdown,
+      topCollaborators,
+      recentCollaborations
+    ] = await Promise.all([
+      // Events with collaborators
+      Event.countDocuments({ 'collaborators.0': { $exists: true } }),
+      
+      // Total collaborations count
+      Event.aggregate([
+        { $unwind: '$collaborators' },
+        { $count: 'total' }
+      ]),
+      
+      // Users invited as collaborators
+      User.countDocuments({ accountOrigin: 'collaborator_invited' }),
+      
+      // Collaboration breakdown by package type
+      Event.aggregate([
+        { $match: { 'collaborators.0': { $exists: true } } },
+        {
+          $group: {
+            _id: '$packageType',
+            count: { $sum: 1 },
+            totalCollaborators: { $sum: { $size: '$collaborators' } }
+          }
+        }
+      ]),
+      
+      // Top collaborators (most active)
+      Event.aggregate([
+        { $unwind: '$collaborators' },
+        {
+          $group: {
+            _id: '$collaborators.userId',
+            eventsCollaborated: { $sum: 1 },
+            totalInvitesUsed: { $sum: '$collaborators.usedInvites' }
+          }
+        },
+        { $sort: { eventsCollaborated: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: 'users',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'userInfo'
+          }
+        },
+        { $unwind: '$userInfo' }
+      ]),
+      
+      // Recent collaborations
+      Event.aggregate([
+        { $match: { 'collaborators.0': { $exists: true } } },
+        { $unwind: '$collaborators' },
+        { $sort: { 'collaborators.addedAt': -1 } },
+        { $limit: 20 },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'eventOwner'
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'collaborators.userId',
+            foreignField: '_id',
+            as: 'collaboratorInfo'
+          }
+        },
+        { $unwind: '$eventOwner' },
+        { $unwind: '$collaboratorInfo' }
+      ])
+    ]);
+
+    const totalCollaborationsCount = totalCollaborations.length > 0 ? totalCollaborations[0].total : 0;
+
+    return res.json({
+      success: true,
+      data: {
+        overview: {
+          eventsWithCollaborators,
+          totalCollaborations: totalCollaborationsCount,
+          collaboratorInvitedUsers,
+          averageCollaboratorsPerEvent: eventsWithCollaborators > 0 
+            ? Math.round((totalCollaborationsCount / eventsWithCollaborators) * 10) / 10 
+            : 0
+        },
+        packageBreakdown,
+        topCollaborators: topCollaborators.map(collab => ({
+          id: collab._id,
+          name: `${collab.userInfo.firstName} ${collab.userInfo.lastName}`,
+          email: collab.userInfo.email,
+          eventsCollaborated: collab.eventsCollaborated,
+          totalInvitesUsed: collab.totalInvitesUsed,
+          accountOrigin: collab.userInfo.accountOrigin
+        })),
+        recentCollaborations: recentCollaborations.map(collab => ({
+          eventId: collab._id,
+          eventName: collab.details.hostName,
+          eventDate: collab.details.eventDate,
+          packageType: collab.packageType,
+          owner: {
+            name: `${collab.eventOwner.firstName} ${collab.eventOwner.lastName}`,
+            email: collab.eventOwner.email
+          },
+          collaborator: {
+            name: `${collab.collaboratorInfo.firstName} ${collab.collaboratorInfo.lastName}`,
+            email: collab.collaboratorInfo.email,
+            allocatedInvites: collab.collaborators.allocatedInvites,
+            usedInvites: collab.collaborators.usedInvites
+          },
+          addedAt: collab.collaborators.addedAt
+        }))
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error fetching collaboration analytics:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في جلب تحليلات التعاون' }
     });
   }
 });

@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { GitCompare, Heart, ShoppingCart, LogOut, Settings, ChevronDown, Shield } from 'lucide-react';
+import { GitCompare, Heart, ShoppingCart, LogOut, Settings, ChevronDown, Shield, Calendar } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppDispatch, useAppSelector } from '@/store';
@@ -166,6 +166,15 @@ export function Header() {
                     <span className='mr-2'>لوحة الإدارة</span>
                   </Link>
                 )}
+                
+                <Link
+                  href="/events"
+                  className="flex items-center space-x-3 px-4 py-3 text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
+                  onClick={() => setIsUserMenuOpen(false)}
+                >
+                  <Calendar className="w-5 h-5 flex-shrink-0" />
+                  <span className='mr-2'>الأحداث</span>
+                </Link>
                 
                 <Link
                   href="/dashboard"

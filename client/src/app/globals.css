@@ -92,3 +92,15 @@ cursor: pointer;
     display: none;
   }
 }
+
+/* Force Gregorian calendar for date inputs */
+input[type="date"] {
+  /* Force locale to use Gregorian calendar */
+  -webkit-locale: "en-US";
+}
+
+input[type="date"][data-calendar="gregorian"] {
+  /* Additional browser-specific rules to force Gregorian calendar */
+  -webkit-locale: "en-US";
+  locale: "en-US";
+}

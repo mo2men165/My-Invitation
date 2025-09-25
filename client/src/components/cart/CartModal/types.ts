@@ -17,6 +17,7 @@ export interface CartModalState {
 }
 
 export interface CartFormData {
+  eventName?: string;
   inviteCount: number;
   eventDate: string;
   startTime: string;
@@ -30,6 +31,9 @@ export interface CartFormData {
   qrCode: boolean;
   fastDelivery: boolean;
   expeditedDelivery: boolean;
+  // Custom design fields
+  isCustomDesign?: boolean;
+  customDesignNotes?: string;
 }
 
 export interface LocationData {

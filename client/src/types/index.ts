@@ -46,9 +46,12 @@ export interface PricingOption {
     name: string;
     category: string;
     image: string;
+    isCustom?: boolean;
+    availableFor?: ('classic' | 'premium' | 'vip')[];
   }
   
   export interface CartForm {
+    eventName?: string;
     inviteCount: number;
     eventDate: string;
     startTime: string;
@@ -62,6 +65,9 @@ export interface PricingOption {
     qrCode?: boolean;
     fastDelivery?: boolean;
     expeditedDelivery?: boolean;
+    // Custom design fields
+    isCustomDesign?: boolean;
+    customDesignNotes?: string;
     // Existing location fields
     locationCoordinates?: {
       lat: number;

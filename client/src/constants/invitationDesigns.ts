@@ -38,5 +38,15 @@ export const invitationDesigns: InvitationDesign[] = [
   { id: "66c7e1bdb8f3c4d5e6f7a8cd", name: 'دعوة حفل زفاف أبيض وأخضر', category: 'حفل زفاف', image: '/wedding invites/دعوة حفل زفاف بلون أبيض و أخضر wedding invitation (2).webp' },
   { id: "66c7e1beb8f3c4d5e6f7a8ce", name: 'دعوة زفاف رمادي وأزرق مع الزهور', category: 'حفل زفاف', image: '/wedding invites/دعوة زفاف باللون الرمادي والازرق مع الزهور (1).webp' },
   { id: "66c7e1bfb8f3c4d5e6f7a8cf", name: 'دعوة زفاف بيج مع زهور', category: 'حفل زفاف', image: '/wedding invites/دعوة زفاف بلون بيج مع زهور مجاني wedding invitation - Copy.webp' },
-  { id: "66c7e1c0b8f3c4d5e6f7a8d0", name: 'كارت دعوة زفاف وردي للطباعة', category: 'حفل زفاف', image: '/wedding invites/كارت دعوة زفاف بسيط للطباعة وردي.webp' }
+  { id: "66c7e1c0b8f3c4d5e6f7a8d0", name: 'كارت دعوة زفاف وردي للطباعة', category: 'حفل زفاف', image: '/wedding invites/كارت دعوة زفاف بسيط للطباعة وردي.webp' },
+  
+  // Custom Design Option (only for Premium and VIP packages)
+  { 
+    id: "custom-design", 
+    name: 'تصميم مخصص', 
+    category: 'custom', 
+    image: '/custom-design.webp',
+    isCustom: true,
+    availableFor: ['premium', 'vip']
+  }
 ];

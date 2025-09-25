@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useMemo, useEffect } from 'react';
 import { Calendar, Clock, User, MessageSquare, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { CartFormData, FormErrors } from '../types';
@@ -25,6 +25,27 @@ const EventDetailsForm = memo<EventDetailsFormProps>(({
 }) => {
   // Use pre-generated time options from constants
   const timeOptions = TIME_OPTIONS;
+
+  // Force Gregorian calendar for date inputs on component mount
+  // This ensures all users see the same calendar type regardless of their browser/system locale
+  // Addresses issue where some users (especially in Islamic countries) see Hijri calendar by default
+  useEffect(() => {
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+    dateInputs.forEach((input) => {
+      // Set attributes to force Gregorian calendar
+      input.setAttribute('lang', 'en-US');
+      input.setAttribute('data-calendar', 'gregorian');
+      
+      // For browsers that support it, try to force locale
+      if ('setAttribute' in input) {
+        try {
+          (input as HTMLInputElement).style.setProperty('-webkit-locale', '"en-US"');
+        } catch (e) {
+          // Ignore errors for browsers that don't support this property
+        }
+      }
+    });
+  }, []);
 
   // Debounced input handlers for better performance
   const { value: hostName, setValue: setHostName } = useDebouncedInput(
@@ -153,6 +174,27 @@ const EventDetailsForm = memo<EventDetailsFormProps>(({
         )}
       </div>
 
+      {/* Event Name */}
+      <div className={`bg-white/[0.02] rounded-2xl border border-white/10 p-5 transition-all duration-300 ${
+        isUpdating ? 'opacity-75' : ''
+      }`}>
+        <label className="text-white font-medium mb-3 flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-[#C09B52]" />
+          اسم المناسبة
+        </label>
+        <Input
+          type="text"
+          value={formData.eventName || ''}
+          onChange={(e) => onInputChange('eventName', e.target.value)}
+          disabled={isUpdating}
+          className="w-full px-4 py-4 bg-gradient-to-r from-white/5 to-white/10 border-2 border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C09B52]/50 focus:border-[#C09B52] transition-all duration-300 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          placeholder="أدخل اسم المناسبة (اختياري)"
+        />
+        <div className="text-gray-400 text-sm mt-2">
+          مثال: حفل زفاف أحمد وفاطمة، تخرج دفعة 2024، عيد ميلاد سارة
+        </div>
+      </div>
+
       {/* Date and Time Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Event Date */}
@@ -170,6 +212,8 @@ const EventDetailsForm = memo<EventDetailsFormProps>(({
               onChange={handleEventDateChange}
               min={getMinDate()}
               disabled={isUpdating}
+              lang="en-US"
+              data-calendar="gregorian"
               className={`w-full pl-4 pr-12 py-4 bg-gradient-to-r from-white/5 to-white/10 border-2 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#C09B52]/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer ${
                 errors.eventDate ? 'border-red-400 focus:border-red-400' : 'border-white/20 focus:border-[#C09B52]'
               }`}

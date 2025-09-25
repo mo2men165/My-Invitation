@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
-import { isValidPhoneNumber, parsePhoneNumber } from 'libphonenumber-js';
+import { formatPhoneForDisplay } from '@/utils/phoneValidation';
 
 interface Guest {
   _id: string;
