@@ -259,43 +259,43 @@ export class PaymobService {
       
       if (!hmacKey) {
         logger.warn('No HMAC key configured, skipping verification');
-        return true; // For testing
+        return true;
       }
   
-      // Paymob's required concatenation format - NOT JSON.stringify
-      const orderedData = {
-        amount_cents: data.obj.amount_cents,
-        created_at: data.obj.created_at,
-        currency: data.obj.currency,
-        error_occured: data.obj.error_occured,
-        has_parent_transaction: data.obj.has_parent_transaction,
-        id: data.obj.id,
-        integration_id: data.obj.integration_id,
-        is_3d_secure: data.obj.is_3d_secure,
-        is_auth: data.obj.is_auth,
-        is_capture: data.obj.is_capture,
-        is_refunded: data.obj.is_refunded,
-        is_standalone_payment: data.obj.is_standalone_payment,
-        is_voided: data.obj.is_voided,
-        order: data.obj.order.id,
-        owner: data.obj.owner,
-        pending: data.obj.pending,
-        source_data_pan: data.obj.source_data_pan,
-        source_data_sub_type: data.obj.source_data_sub_type,
-        source_data_type: data.obj.source_data_type,
-        success: data.obj.success
-      };
+      // Using exact field structure from the sample
+      const orderedData = [
+        data.obj.amount_cents,
+        data.obj.created_at,
+        data.obj.currency,
+        data.obj.error_occured,        // Note: "occured" not "occurred"
+        data.obj.has_parent_transaction,
+        data.obj.id,
+        data.obj.integration_id,
+        data.obj.is_3d_secure,
+        data.obj.is_auth,
+        data.obj.is_capture,
+        data.obj.is_refunded,
+        data.obj.is_standalone_payment,
+        data.obj.is_voided,
+        data.obj.order.id,
+        data.obj.owner,
+        data.obj.pending,
+        data.obj.source_data.pan,
+        data.obj.source_data.sub_type,
+        data.obj.source_data.type,
+        data.obj.success
+      ];
   
-      const concatenatedString = Object.values(orderedData).join('');
+      const concatenatedString = orderedData.join('');
       const calculatedSignature = crypto.createHmac('sha512', hmacKey)
         .update(concatenatedString)
         .digest('hex');
       
-      logger.info('HMAC Verification Details:', {
+      logger.info('HMAC Verification:', {
         receivedSignature: signature,
         calculatedSignature: calculatedSignature,
         match: calculatedSignature === signature,
-        concatenatedString: concatenatedString.substring(0, 100) + '...'
+        sampleString: concatenatedString.substring(0, 50) + '...'
       });
       
       return calculatedSignature === signature;
