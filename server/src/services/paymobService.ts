@@ -255,9 +255,20 @@ export class PaymobService {
    */
   verifyWebhookSignature(data: any, signature: string): boolean {
     try {
-      const hmac = crypto.createHmac('sha512', this.config.secretKey);
+      // Use HMAC key for signature verification, not Secret Key
+      const hmacKey = process.env.PAYMOB_HMAC_KEY || this.config.secretKey;
+      const hmac = crypto.createHmac('sha512', hmacKey);
       hmac.update(JSON.stringify(data));
       const calculatedSignature = hmac.digest('hex');
+      
+      logger.info('Signature verification:', {
+        receivedSignature: signature,
+        calculatedSignature: calculatedSignature,
+        signaturesMatch: calculatedSignature === signature,
+        hmacKeyLength: hmacKey?.length || 0,
+        usingHmacKey: !!(process.env.PAYMOB_HMAC_KEY),
+        dataString: JSON.stringify(data).substring(0, 200) + '...'
+      });
       
       return calculatedSignature === signature;
     } catch (error: any) {
