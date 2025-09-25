@@ -327,9 +327,9 @@ export class PaymentService {
   }
 
   /**
-   * Get payment summary for cart
+   * Get payment summary for cart (all items or selected items)
    */
-  static async getCartPaymentSummary(userId: string) {
+  static async getCartPaymentSummary(userId: string, selectedCartItemIds?: string[]) {
     try {
       const user = await User.findById(userId).select('cart');
       if (!user) {
@@ -343,10 +343,25 @@ export class PaymentService {
         };
       }
 
+      // Filter cart items if specific IDs are provided
+      let cartItems = user.cart;
+      if (selectedCartItemIds && selectedCartItemIds.length > 0) {
+        cartItems = user.cart.filter(item => 
+          selectedCartItemIds.includes(item._id!.toString())
+        );
+        
+        if (cartItems.length === 0) {
+          return {
+            success: false,
+            message: 'العناصر المحددة غير موجودة في السلة'
+          };
+        }
+      }
+
       const summary = {
-        itemCount: user.cart.length,
-        totalAmount: user.cart.reduce((sum, item) => sum + item.totalPrice, 0),
-        items: user.cart.map(item => ({
+        itemCount: cartItems.length,
+        totalAmount: cartItems.reduce((sum, item) => sum + item.totalPrice, 0),
+        items: cartItems.map(item => ({
           id: item._id,
           designId: item.designId,
           packageType: item.packageType,

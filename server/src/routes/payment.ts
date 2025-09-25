@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import cors from 'cors';
 import { PaymentService } from '../services/paymentService';
 import { paymobService } from '../services/paymobService';
+import { OrderService } from '../services/orderService';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { PaymobWebhookData } from '../types/paymob';
@@ -63,7 +64,7 @@ router.get('/summary', async (req: Request, res: Response) => {
 router.post('/create-paymob-order', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { customerInfo } = req.body;
+    const { customerInfo, selectedCartItemIds } = req.body;
 
     // Validate required fields
     if (!customerInfo || !customerInfo.firstName || !customerInfo.lastName || !customerInfo.email || !customerInfo.phone || !customerInfo.city) {
@@ -73,8 +74,15 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       });
     }
 
-    // Get cart summary
-    const cartSummary = await PaymentService.getCartPaymentSummary(userId);
+    if (!selectedCartItemIds || !Array.isArray(selectedCartItemIds) || selectedCartItemIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'يجب تحديد العناصر المراد دفعها' }
+      });
+    }
+
+    // Get cart summary for selected items only
+    const cartSummary = await PaymentService.getCartPaymentSummary(userId, selectedCartItemIds);
     if (!cartSummary.success || !cartSummary.summary) {
       return res.status(400).json({
         success: false,
@@ -83,7 +91,8 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
     }
 
     // Debug logging
-    logger.info(`Cart summary for user ${userId}:`, {
+    logger.info(`Cart summary for user ${userId} (selected items):`, {
+      selectedItemIds: selectedCartItemIds,
       itemCount: cartSummary.summary.itemCount,
       totalAmount: cartSummary.summary.totalAmount,
       items: cartSummary.summary.items.map(item => ({
@@ -113,14 +122,30 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
     // Generate payment key
     const paymentKey = await paymobService.generatePaymentKey(paymobOrder.id, cartSummary.summary.totalAmount, customerInfo);
 
+    // Create our internal order record
+    const merchantOrderId = `ORDER_${userId}_${Date.now()}`;
+    const order = await OrderService.createOrder(
+      userId,
+      selectedCartItemIds,
+      paymobOrder.id,
+      merchantOrderId,
+      cartSummary.summary.totalAmount
+    );
+
     // Get iframe URL
     const iframeUrl = paymobService.getIframeUrl(paymentKey.token);
 
-    logger.info(`Paymob order created for user ${userId}, order ID: ${paymobOrder.id}`);
+    logger.info(`Paymob order created for user ${userId}:`, {
+      paymobOrderId: paymobOrder.id,
+      ourOrderId: order._id,
+      selectedItemsCount: selectedCartItemIds.length,
+      totalAmount: cartSummary.summary.totalAmount
+    });
 
     return res.json({
       success: true,
       orderId: paymobOrder.id,
+      ourOrderId: order._id,
       paymentToken: paymentKey.token,
       iframeUrl,
       amount: cartSummary.summary.totalAmount,
@@ -295,10 +320,10 @@ router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
       });
     }
 
-    // Handle successful payment
+    // Handle payment result
     logger.info('Webhook result analysis:', {
       status: result.status,
-      orderId: result.orderId,
+      paymobOrderId: result.orderId,
       transactionId: result.transactionId,
       amount: result.amount,
       willProcessPayment: result.status === 'success' && result.orderId && result.transactionId
@@ -306,62 +331,58 @@ router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
 
     if (result.status === 'success' && result.orderId && result.transactionId) {
       try {
-        // Extract userId from orderId (format: ORDER_userId_timestamp)
-        const orderIdParts = result.orderId.split('_');
-        logger.info('Order ID analysis:', {
-          orderId: result.orderId,
-          parts: orderIdParts,
-          partsLength: orderIdParts.length,
-          extractedUserId: orderIdParts.length >= 2 ? orderIdParts[1] : 'N/A'
-        });
+        // Process successful payment using OrderService
+        const paymentResult = await OrderService.processSuccessfulPayment(
+          Number(result.orderId), // This is the Paymob order ID
+          result.transactionId
+        );
 
-        if (orderIdParts.length >= 2) {
-          const userId = orderIdParts[1];
-          
-          logger.info(`Starting payment processing for user ${userId}`, {
-            userId,
-            paymentId: result.transactionId,
-            amount: result.amount || 0,
-            paymentMethod: 'paymob',
-            transactionId: result.transactionId
-          });
-
-          const paymentResult = await PaymentService.processSuccessfulPayment(userId, {
-            paymentId: result.transactionId,
-            amount: result.amount || 0,
-            paymentMethod: 'paymob',
-            transactionId: result.transactionId
-          });
-
-          logger.info(`Payment webhook processed successfully for user ${userId}`, {
-            userId,
+        if (paymentResult.success) {
+          logger.info(`Payment webhook processed successfully:`, {
+            paymobOrderId: result.orderId,
+            ourOrderId: paymentResult.orderId,
             transactionId: result.transactionId,
             eventsCreated: paymentResult.eventsCreated,
-            totalAmount: paymentResult.totalAmount,
-            paymentId: paymentResult.paymentId
+            amount: result.amount
           });
         } else {
-          logger.warn('Invalid order ID format in webhook:', {
-            orderId: result.orderId,
-            parts: orderIdParts,
-            expectedFormat: 'ORDER_userId_timestamp'
+          logger.error(`Failed to process payment:`, {
+            paymobOrderId: result.orderId,
+            transactionId: result.transactionId,
+            error: paymentResult.error
           });
         }
       } catch (error: any) {
         logger.error('Error processing successful payment from webhook:', {
           error: error.message,
           stack: error.stack,
-          orderId: result.orderId,
+          paymobOrderId: result.orderId,
           transactionId: result.transactionId
         });
         // Don't return error to Paymob to avoid retries
+      }
+    } else if (result.status === 'failed' && result.orderId) {
+      try {
+        // Mark order as failed
+        const markedAsFailed = await OrderService.markOrderAsFailed(Number(result.orderId));
+        if (markedAsFailed) {
+          logger.info(`Order marked as failed:`, {
+            paymobOrderId: result.orderId,
+            transactionId: result.transactionId
+          });
+        }
+      } catch (error: any) {
+        logger.error('Error marking order as failed:', {
+          error: error.message,
+          paymobOrderId: result.orderId
+        });
       }
     } else {
       logger.info('Payment not processed - conditions not met:', {
         status: result.status,
         hasOrderId: !!result.orderId,
         hasTransactionId: !!result.transactionId,
-        orderId: result.orderId,
+        paymobOrderId: result.orderId,
         transactionId: result.transactionId
       });
     }
@@ -429,6 +450,65 @@ router.post('/paymob/callback', cors(), async (req: Request, res: Response) => {
     // Redirect to error page on any error
     const errorUrl = `${process.env.FRONTEND_URL}/payment/error?message=${encodeURIComponent('خطأ في معالجة الدفع')}`;
     return res.redirect(errorUrl);
+  }
+});
+
+/**
+ * GET /api/payment/pending-orders
+ * Get user's pending orders
+ */
+router.get('/pending-orders', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    
+    const pendingOrders = await OrderService.getUserPendingOrders(userId);
+    
+    return res.json({
+      success: true,
+      orders: pendingOrders.map(order => ({
+        id: order._id,
+        paymobOrderId: order.paymobOrderId,
+        totalAmount: order.totalAmount,
+        selectedItemsCount: order.selectedCartItems.length,
+        createdAt: order.createdAt,
+        selectedItems: order.selectedCartItems.map(item => ({
+          cartItemId: item.cartItemId,
+          hostName: item.cartItemData.details.hostName,
+          packageType: item.cartItemData.packageType,
+          eventDate: item.cartItemData.details.eventDate,
+          price: item.cartItemData.totalPrice
+        }))
+      }))
+    });
+  } catch (error: any) {
+    logger.error('Error getting pending orders:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في جلب الطلبات المعلقة' }
+    });
+  }
+});
+
+/**
+ * GET /api/payment/pending-cart-items
+ * Get cart item IDs that are in pending orders
+ */
+router.get('/pending-cart-items', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    
+    const pendingCartItemIds = await OrderService.getPendingCartItemIds(userId);
+    
+    return res.json({
+      success: true,
+      pendingCartItemIds
+    });
+  } catch (error: any) {
+    logger.error('Error getting pending cart items:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في جلب العناصر المعلقة' }
+    });
   }
 });
 

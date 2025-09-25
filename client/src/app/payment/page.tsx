@@ -19,7 +19,10 @@ import {
   Loader2,
   ArrowLeft,
   Shield,
-  Clock
+  Clock,
+  AlertTriangle,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -38,6 +41,21 @@ interface PaymentSummary {
   }>;
 }
 
+interface PendingOrder {
+  id: string;
+  paymobOrderId: number;
+  totalAmount: number;
+  selectedItemsCount: number;
+  createdAt: string;
+  selectedItems: Array<{
+    cartItemId: string;
+    hostName: string;
+    packageType: string;
+    eventDate: string;
+    price: number;
+  }>;
+}
+
 const PaymentPageContent: React.FC = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -45,20 +63,47 @@ const PaymentPageContent: React.FC = () => {
   const { toast } = useToast();
   
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  const [pendingCartItemIds, setPendingCartItemIds] = useState<string[]>([]);
+  const [selectedCartItemIds, setSelectedCartItemIds] = useState<string[]>([]);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(true);
 
-  // Load payment summary
+  // Load payment summary and pending orders
   useEffect(() => {
-    const loadPaymentSummary = async () => {
+    const loadPaymentData = async () => {
       try {
         setLoadingSummary(true);
         await dispatch(fetchCart()).unwrap();
-        const response = await paymentAPI.getPaymentSummary();
         
-        if (response.success && response.summary) {
-          setPaymentSummary(response.summary);
+        // Load payment summary
+        const summaryResponse = await paymentAPI.getPaymentSummary();
+        
+        // Load pending orders
+        const pendingResponse = await fetch('/api/payment/pending-orders', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const pendingData = await pendingResponse.json();
+        
+        // Load pending cart items
+        const pendingItemsResponse = await fetch('/api/payment/pending-cart-items', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const pendingItemsData = await pendingItemsResponse.json();
+        
+        if (summaryResponse.success && summaryResponse.summary) {
+          setPaymentSummary(summaryResponse.summary);
+          
+          // Initialize selected items (all available items)
+          const availableItems = summaryResponse.summary.items.filter(
+            item => !pendingItemsData.pendingCartItemIds.includes(item.id)
+          );
+          setSelectedCartItemIds(availableItems.map(item => item.id));
         } else {
           toast({
             title: "خطأ",
@@ -66,6 +111,14 @@ const PaymentPageContent: React.FC = () => {
             variant: "destructive"
           });
           router.push('/cart');
+        }
+        
+        if (pendingData.success) {
+          setPendingOrders(pendingData.orders);
+        }
+        
+        if (pendingItemsData.success) {
+          setPendingCartItemIds(pendingItemsData.pendingCartItemIds);
         }
       } catch (error: any) {
         toast({
@@ -79,7 +132,7 @@ const PaymentPageContent: React.FC = () => {
       }
     };
 
-    loadPaymentSummary();
+    loadPaymentData();
   }, [dispatch, router, toast]);
 
   // Show loading while checking authentication
@@ -100,7 +153,14 @@ const PaymentPageContent: React.FC = () => {
   }
 
   const handlePayNow = async () => {
-    if (!paymentSummary) return;
+    if (!paymentSummary || selectedCartItemIds.length === 0) {
+      toast({
+        title: "خطأ",
+        description: "يرجى تحديد العناصر المراد دفعها",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsProcessingPayment(true);
 
@@ -115,7 +175,7 @@ const PaymentPageContent: React.FC = () => {
 
       const user = userResponse.user;
 
-      // Create Paymob order with user profile information
+      // Create Paymob order with selected items
       const orderResult = await paymobAPI.createOrder({
         customerInfo: {
           firstName: user.firstName || '',
@@ -123,7 +183,8 @@ const PaymentPageContent: React.FC = () => {
           email: user.email || '',
           phone: user.phone || '',
           city: user.city || 'الرياض' // Default city if not set
-        }
+        },
+        selectedCartItemIds: selectedCartItemIds
       });
 
       if (orderResult.success) {
@@ -144,6 +205,42 @@ const PaymentPageContent: React.FC = () => {
     }
   };
 
+
+  // Helper functions for event selection
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedCartItemIds(prev => 
+      prev.includes(itemId) 
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  const selectAllAvailable = () => {
+    if (!paymentSummary) return;
+    const availableItems = paymentSummary.items.filter(
+      item => !pendingCartItemIds.includes(item.id)
+    );
+    setSelectedCartItemIds(availableItems.map(item => item.id));
+  };
+
+  const deselectAll = () => {
+    setSelectedCartItemIds([]);
+  };
+
+  const isItemPending = (itemId: string) => {
+    return pendingCartItemIds.includes(itemId);
+  };
+
+  const isItemSelected = (itemId: string) => {
+    return selectedCartItemIds.includes(itemId);
+  };
+
+  const getSelectedTotal = () => {
+    if (!paymentSummary) return 0;
+    return paymentSummary.items
+      .filter(item => selectedCartItemIds.includes(item.id))
+      .reduce((sum, item) => sum + item.price, 0);
+  };
 
   const getPackageDetails = (packageType: string) => {
     switch (packageType) {
@@ -234,58 +331,131 @@ const PaymentPageContent: React.FC = () => {
           {/* Order Details */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
-              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <Package className="w-6 h-6 text-[#C09B52]" />
-                تفاصيل الطلب
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Package className="w-6 h-6 text-[#C09B52]" />
+                  اختيار المناسبات للدفع
+                </h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={selectAllAvailable}
+                    className="px-3 py-1 bg-[#C09B52]/20 text-[#C09B52] text-sm rounded-lg hover:bg-[#C09B52]/30 transition-colors"
+                  >
+                    تحديد الكل
+                  </button>
+                  <button
+                    onClick={deselectAll}
+                    className="px-3 py-1 bg-gray-500/20 text-gray-400 text-sm rounded-lg hover:bg-gray-500/30 transition-colors"
+                  >
+                    إلغاء الكل
+                  </button>
+                </div>
+              </div>
 
               <div className="space-y-4">
                 {paymentSummary.items.map((item, index) => {
                   const packageDetails = getPackageDetails(item.packageType);
                   const eventDate = new Date(item.eventDate);
+                  const isPending = isItemPending(item.id);
+                  const isSelected = isItemSelected(item.id);
                   
                   return (
-                    <div key={item.id} className="bg-white/5 rounded-xl p-5">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className={`px-3 py-1 rounded-full bg-gradient-to-r ${packageDetails.color} text-white text-sm font-medium`}>
-                              {packageDetails.name}
+                    <div 
+                      key={item.id} 
+                      className={`bg-white/5 rounded-xl p-5 border transition-all ${
+                        isPending 
+                          ? 'border-orange-500/30 bg-orange-500/5' 
+                          : isSelected 
+                            ? 'border-[#C09B52]/50 bg-[#C09B52]/5' 
+                            : 'border-white/10'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        {/* Checkbox */}
+                        <div className="flex-shrink-0 mt-1">
+                          {isPending ? (
+                            <div className="w-5 h-5 bg-orange-500/20 border border-orange-500/50 rounded flex items-center justify-center">
+                              <Clock className="w-3 h-3 text-orange-400" />
                             </div>
-                            <span className="text-gray-400 text-sm">#{index + 1}</span>
-                          </div>
-                          <h3 className="text-white font-semibold text-lg">{item.hostName}</h3>
+                          ) : (
+                            <button
+                              onClick={() => toggleItemSelection(item.id)}
+                              className="w-5 h-5 border-2 rounded flex items-center justify-center transition-colors"
+                              style={{
+                                borderColor: isSelected ? '#C09B52' : '#6B7280',
+                                backgroundColor: isSelected ? '#C09B52' : 'transparent'
+                              }}
+                            >
+                              {isSelected && <CheckSquare className="w-3 h-3 text-white" />}
+                            </button>
+                          )}
                         </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-[#C09B52]">
-                            {item.price.toLocaleString('ar-SA')} ر.س
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="grid md:grid-cols-3 gap-4 text-sm">
-                        <div className="flex items-center gap-2 text-gray-300">
-                          <Calendar className="w-4 h-4 text-[#C09B52]" />
-                          {eventDate.toLocaleDateString('ar-SA', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            calendar: 'gregory' // Force Gregorian calendar
-                          })}
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-300">
-                          <MapPin className="w-4 h-4 text-[#C09B52]" />
-                          {item.eventLocation}
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-300">
-                          <Users className="w-4 h-4 text-[#C09B52]" />
-                          {item.inviteCount} دعوة
+                        {/* Content */}
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className={`px-3 py-1 rounded-full bg-gradient-to-r ${packageDetails.color} text-white text-sm font-medium`}>
+                                  {packageDetails.name}
+                                </div>
+                                <span className="text-gray-400 text-sm">#{index + 1}</span>
+                                {isPending && (
+                                  <div className="flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-400 text-xs rounded-full">
+                                    <Clock className="w-3 h-3" />
+                                    معلق
+                                  </div>
+                                )}
+                              </div>
+                              <h3 className="text-white font-semibold text-lg">{item.hostName}</h3>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-[#C09B52]">
+                                {item.price.toLocaleString('ar-SA')} ر.س
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid md:grid-cols-3 gap-4 text-sm">
+                            <div className="flex items-center gap-2 text-gray-300">
+                              <Calendar className="w-4 h-4 text-[#C09B52]" />
+                              {eventDate.toLocaleDateString('ar-SA', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                                calendar: 'gregory' // Force Gregorian calendar
+                              })}
+                            </div>
+                            <div className="flex items-center gap-2 text-gray-300">
+                              <MapPin className="w-4 h-4 text-[#C09B52]" />
+                              {item.eventLocation}
+                            </div>
+                            <div className="flex items-center gap-2 text-gray-300">
+                              <Users className="w-4 h-4 text-[#C09B52]" />
+                              {item.inviteCount} دعوة
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
+
+              {/* Pending Orders Notice */}
+              {pendingOrders.length > 0 && (
+                <div className="mt-6 bg-gradient-to-br from-orange-900/20 to-orange-800/10 border border-orange-500/20 rounded-2xl p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="text-orange-400 font-semibold mb-1">طلبات معلقة</h3>
+                      <p className="text-orange-300/80 text-sm">
+                        لديك {pendingOrders.length} طلب معلق. العناصر المعلقة لا يمكن دفعها مرة أخرى حتى يتم إتمام الطلبات السابقة.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Security Notice */}
@@ -310,21 +480,25 @@ const PaymentPageContent: React.FC = () => {
               
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between items-center text-gray-300">
-                  <span>عدد المناسبات</span>
+                  <span>إجمالي المناسبات</span>
                   <span>{paymentSummary.itemCount}</span>
                 </div>
                 
                 <div className="flex justify-between items-center text-gray-300">
-                  <span>المجموع الفرعي</span>
-                  <span>{paymentSummary.totalAmount.toLocaleString('ar-SA')} ر.س</span>
+                  <span>المناسبات المحددة</span>
+                  <span>{selectedCartItemIds.length}</span>
                 </div>
                 
+                <div className="flex justify-between items-center text-gray-300">
+                  <span>المناسبات المعلقة</span>
+                  <span>{pendingCartItemIds.length}</span>
+                </div>
                 
                 <div className="border-t border-[#C09B52]/30 pt-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-xl font-bold text-white">الإجمالي</span>
+                    <span className="text-xl font-bold text-white">إجمالي المحدد</span>
                     <span className="text-2xl font-bold text-[#C09B52]">
-                      {paymentSummary.totalAmount.toLocaleString('ar-SA')} ر.س
+                      {getSelectedTotal().toLocaleString('ar-SA')} ر.س
                     </span>
                   </div>
                 </div>
@@ -332,7 +506,7 @@ const PaymentPageContent: React.FC = () => {
 
               <button
                 onClick={handlePayNow}
-                disabled={isProcessingPayment}
+                disabled={isProcessingPayment || selectedCartItemIds.length === 0}
                 className="w-full py-4 bg-gradient-to-r from-[#C09B52] to-[#B8935A] text-white font-bold text-lg rounded-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {isProcessingPayment ? (
@@ -340,10 +514,15 @@ const PaymentPageContent: React.FC = () => {
                     <Loader2 className="w-5 h-5 animate-spin" />
                     جاري إنشاء طلب الدفع...
                   </>
+                ) : selectedCartItemIds.length === 0 ? (
+                  <>
+                    <CreditCard className="w-5 h-5" />
+                    حدد المناسبات أولاً
+                  </>
                 ) : (
                   <>
                     <CreditCard className="w-5 h-5" />
-                    ادفع الآن
+                    ادفع الآن ({selectedCartItemIds.length} مناسبة)
                   </>
                 )}
               </button>

@@ -332,7 +332,7 @@ export class PaymobService {
 
       // Extract relevant information
       const transactionId = webhookData.obj.id.toString();
-      const orderId = webhookData.obj.merchant_order_id;
+      const orderId = webhookData.obj.order.merchant_order_id;
       const amount = webhookData.obj.amount_cents / 100; // Convert from cents
       const success = webhookData.obj.success;
       const pending = webhookData.obj.pending;
