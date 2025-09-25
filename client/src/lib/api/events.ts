@@ -17,6 +17,7 @@ export interface EventItem {
   designId: string;
   packageType: 'classic' | 'premium' | 'vip';
   details: {
+    eventName?: string;
     inviteCount: number;
     qrCode: boolean;
     eventDate: string;

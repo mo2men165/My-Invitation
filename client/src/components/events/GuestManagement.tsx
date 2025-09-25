@@ -13,6 +13,9 @@ interface GuestManagementProps {
       confirmedAt?: string;
     };
     invitationCardUrl?: string;
+    details?: {
+      inviteCount: number;
+    };
   };
   guestStats?: {
     totalInvited: number;
