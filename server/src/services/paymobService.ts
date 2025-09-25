@@ -317,11 +317,17 @@ export class PaymobService {
     error?: string;
   }> {
     try {
-      logger.info('Processing Paymob webhook:', {
+      logger.info('Processing Paymob webhook - Full data analysis:', {
         type: webhookData.type,
-        transactionId: webhookData.obj.id,
-        orderId: webhookData.obj.merchant_order_id,
-        amount: webhookData.obj.amount_cents / 100
+        hasObj: !!webhookData.obj,
+        objKeys: webhookData.obj ? Object.keys(webhookData.obj) : [],
+        transactionId: webhookData.obj?.id,
+        orderId: webhookData.obj?.merchant_order_id,
+        amount_cents: webhookData.obj?.amount_cents,
+        amount_sar: webhookData.obj?.amount_cents ? webhookData.obj.amount_cents / 100 : 'N/A',
+        success: webhookData.obj?.success,
+        pending: webhookData.obj?.pending,
+        error_occured: webhookData.obj?.error_occured
       });
 
       // Extract relevant information
@@ -331,6 +337,16 @@ export class PaymobService {
       const success = webhookData.obj.success;
       const pending = webhookData.obj.pending;
 
+      logger.info('Extracted webhook data:', {
+        transactionId,
+        orderId,
+        amount,
+        success,
+        pending,
+        orderIdType: typeof orderId,
+        orderIdLength: orderId?.length
+      });
+
       let status = 'pending';
       if (success && !pending) {
         status = 'success';
@@ -338,15 +354,29 @@ export class PaymobService {
         status = 'failed';
       }
 
-      return {
+      logger.info('Status determination:', {
+        success,
+        pending,
+        calculatedStatus: status
+      });
+
+      const result = {
         success: true,
         orderId,
         transactionId,
         amount,
         status
       };
+
+      logger.info('Returning webhook result:', result);
+
+      return result;
     } catch (error: any) {
-      logger.error('Error processing Paymob webhook:', error.message);
+      logger.error('Error processing Paymob webhook:', {
+        error: error.message,
+        stack: error.stack,
+        webhookData: webhookData
+      });
       return {
         success: false,
         error: error.message

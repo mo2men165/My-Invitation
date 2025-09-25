@@ -22,27 +22,76 @@ export class PaymentService {
     }
   ) {
     try {
+      logger.info('Starting PaymentService.processSuccessfulPayment:', {
+        userId,
+        paymentDetails,
+        timestamp: new Date().toISOString()
+      });
+
       const user = await User.findById(userId);
       if (!user) {
+        logger.error('User not found:', { userId });
         throw new Error('المستخدم غير موجود');
       }
 
+      logger.info('User found:', {
+        userId: user._id,
+        userEmail: user.email,
+        cartLength: user.cart.length,
+        cartItems: user.cart.map(item => ({
+          id: item._id,
+          designId: item.designId,
+          packageType: item.packageType,
+          totalPrice: item.totalPrice,
+          hostName: item.details.hostName
+        }))
+      });
+
       if (user.cart.length === 0) {
+        logger.error('Cart is empty:', { userId });
         throw new Error('السلة فارغة');
       }
 
       // Calculate total amount from cart
       const cartTotal = user.cart.reduce((sum, item) => sum + item.totalPrice, 0);
       
+      logger.info('Cart total calculation:', {
+        cartTotal,
+        paymentAmount: paymentDetails.amount,
+        difference: Math.abs(cartTotal - paymentDetails.amount),
+        isAmountMatch: Math.abs(cartTotal - paymentDetails.amount) <= 0.01
+      });
+      
       if (Math.abs(cartTotal - paymentDetails.amount) > 0.01) {
+        logger.error('Amount mismatch:', {
+          cartTotal,
+          paymentAmount: paymentDetails.amount,
+          difference: Math.abs(cartTotal - paymentDetails.amount)
+        });
         throw new Error('مبلغ الدفع لا يتطابق مع إجمالي السلة');
       }
 
       const createdEvents = [];
       const paymentCompletedAt = new Date();
 
+      logger.info('Starting event creation process:', {
+        cartItemCount: user.cart.length,
+        paymentCompletedAt: paymentCompletedAt.toISOString()
+      });
+
       // Convert each cart item to an event
-      for (const cartItem of user.cart) {
+      for (let i = 0; i < user.cart.length; i++) {
+        const cartItem = user.cart[i];
+        
+        logger.info(`Processing cart item ${i + 1}/${user.cart.length}:`, {
+          cartItemId: cartItem._id,
+          designId: cartItem.designId,
+          packageType: cartItem.packageType,
+          totalPrice: cartItem.totalPrice,
+          hostName: cartItem.details.hostName,
+          eventDate: cartItem.details.eventDate
+        });
+
         const eventData = {
           userId: new Types.ObjectId(userId),
           designId: cartItem.designId,
@@ -57,30 +106,75 @@ export class PaymentService {
           guests: [], // Empty initially
           paymentCompletedAt
         };
+
+        logger.info(`Creating event with data:`, {
+          userId: eventData.userId,
+          designId: eventData.designId,
+          packageType: eventData.packageType,
+          totalPrice: eventData.totalPrice,
+          status: eventData.status,
+          approvalStatus: eventData.approvalStatus
+        });
       
         const newEvent = new Event(eventData);
         const savedEvent = await newEvent.save();
         createdEvents.push(savedEvent);
+
+        logger.info(`Event created successfully:`, {
+          eventId: savedEvent._id,
+          cartItemId: cartItem._id,
+          hostName: savedEvent.details.hostName,
+          eventDate: savedEvent.details.eventDate
+        });
       
-        await NotificationService.notifyNewEventPending(
-          (savedEvent._id as Types.ObjectId).toString(),
-          userId,
-          {
-            hostName: savedEvent.details.hostName,
-            eventDate: savedEvent.details.eventDate.toLocaleDateString('ar-SA')
-          }
-        );
-        
-        logger.info(`Event created from cart item: ${cartItem._id} -> Event: ${savedEvent._id}`);
-              }
+        try {
+          await NotificationService.notifyNewEventPending(
+            (savedEvent._id as Types.ObjectId).toString(),
+            userId,
+            {
+              hostName: savedEvent.details.hostName,
+              eventDate: savedEvent.details.eventDate.toLocaleDateString('ar-SA')
+            }
+          );
+          logger.info(`Notification sent for event: ${savedEvent._id}`);
+        } catch (notificationError: any) {
+          logger.error(`Failed to send notification for event ${savedEvent._id}:`, notificationError.message);
+          // Don't throw error - notification failure shouldn't stop event creation
+        }
+      }
+
+      logger.info(`All events created successfully. Total events: ${createdEvents.length}`);
       
 
       // Clear the cart after successful conversion
+      logger.info('Clearing user cart:', {
+        userId,
+        cartLengthBefore: user.cart.length,
+        cartItemsBefore: user.cart.map(item => ({
+          id: item._id,
+          hostName: item.details.hostName
+        }))
+      });
+
       user.cart = [];
       await user.save();
 
+      logger.info('Cart cleared successfully:', {
+        userId,
+        cartLengthAfter: user.cart.length
+      });
+
       // Update cache
-      await CacheService.cacheUserCart(userId, user.cart);
+      try {
+        await CacheService.cacheUserCart(userId, user.cart);
+        logger.info('Cache updated successfully for user:', userId);
+      } catch (cacheError: any) {
+        logger.error('Failed to update cache:', {
+          userId,
+          error: cacheError.message
+        });
+        // Don't throw error - cache failure shouldn't stop the process
+      }
 
       // Send emails after successful payment
       try {
@@ -180,15 +274,23 @@ export class PaymentService {
         // Don't throw error - emails are not critical for payment success
       }
 
-      logger.info(`Payment processed successfully for user ${userId}. ${createdEvents.length} events created.`);
-
-      return {
+      const finalResult = {
         success: true,
         eventsCreated: createdEvents.length,
         events: createdEvents,
         paymentId: paymentDetails.paymentId,
         totalAmount: paymentDetails.amount
       };
+
+      logger.info(`Payment processed successfully for user ${userId}:`, {
+        userId,
+        eventsCreated: finalResult.eventsCreated,
+        paymentId: finalResult.paymentId,
+        totalAmount: finalResult.totalAmount,
+        eventIds: createdEvents.map(event => event._id)
+      });
+
+      return finalResult;
 
     } catch (error) {
       logger.error('Error processing successful payment:', error);

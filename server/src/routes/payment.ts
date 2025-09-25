@@ -296,28 +296,74 @@ router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
     }
 
     // Handle successful payment
+    logger.info('Webhook result analysis:', {
+      status: result.status,
+      orderId: result.orderId,
+      transactionId: result.transactionId,
+      amount: result.amount,
+      willProcessPayment: result.status === 'success' && result.orderId && result.transactionId
+    });
+
     if (result.status === 'success' && result.orderId && result.transactionId) {
       try {
         // Extract userId from orderId (format: ORDER_userId_timestamp)
         const orderIdParts = result.orderId.split('_');
+        logger.info('Order ID analysis:', {
+          orderId: result.orderId,
+          parts: orderIdParts,
+          partsLength: orderIdParts.length,
+          extractedUserId: orderIdParts.length >= 2 ? orderIdParts[1] : 'N/A'
+        });
+
         if (orderIdParts.length >= 2) {
           const userId = orderIdParts[1];
           
-          await PaymentService.processSuccessfulPayment(userId, {
+          logger.info(`Starting payment processing for user ${userId}`, {
+            userId,
             paymentId: result.transactionId,
             amount: result.amount || 0,
             paymentMethod: 'paymob',
             transactionId: result.transactionId
           });
 
-          logger.info(`Payment webhook processed successfully for user ${userId}, transaction ${result.transactionId}`);
+          const paymentResult = await PaymentService.processSuccessfulPayment(userId, {
+            paymentId: result.transactionId,
+            amount: result.amount || 0,
+            paymentMethod: 'paymob',
+            transactionId: result.transactionId
+          });
+
+          logger.info(`Payment webhook processed successfully for user ${userId}`, {
+            userId,
+            transactionId: result.transactionId,
+            eventsCreated: paymentResult.eventsCreated,
+            totalAmount: paymentResult.totalAmount,
+            paymentId: paymentResult.paymentId
+          });
         } else {
-          logger.warn('Invalid order ID format in webhook:', result.orderId);
+          logger.warn('Invalid order ID format in webhook:', {
+            orderId: result.orderId,
+            parts: orderIdParts,
+            expectedFormat: 'ORDER_userId_timestamp'
+          });
         }
       } catch (error: any) {
-        logger.error('Error processing successful payment from webhook:', error);
+        logger.error('Error processing successful payment from webhook:', {
+          error: error.message,
+          stack: error.stack,
+          orderId: result.orderId,
+          transactionId: result.transactionId
+        });
         // Don't return error to Paymob to avoid retries
       }
+    } else {
+      logger.info('Payment not processed - conditions not met:', {
+        status: result.status,
+        hasOrderId: !!result.orderId,
+        hasTransactionId: !!result.transactionId,
+        orderId: result.orderId,
+        transactionId: result.transactionId
+      });
     }
 
     return res.json({
@@ -331,6 +377,58 @@ router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
       success: false,
       error: { message: 'خطأ في معالجة إشعار الدفع' }
     });
+  }
+});
+
+/**
+ * POST /api/payment/paymob/callback
+ * Unified callback endpoint for Paymob success/failure redirects
+ * This endpoint receives POST data from Paymob and redirects user accordingly
+ */
+router.post('/paymob/callback', cors(), async (req: Request, res: Response) => {
+  try {
+    const webhookData: PaymobWebhookData = req.body;
+    
+    logger.info('Paymob callback received:', {
+      type: webhookData.type,
+      transactionId: webhookData.obj?.id,
+      success: webhookData.obj?.success,
+      pending: webhookData.obj?.pending,
+      orderId: webhookData.obj?.merchant_order_id
+    });
+
+    // Extract transaction details
+    const transactionId = webhookData.obj?.id?.toString();
+    const orderId = webhookData.obj?.merchant_order_id;
+    const amount = webhookData.obj?.amount_cents ? webhookData.obj.amount_cents / 100 : 0;
+    const success = webhookData.obj?.success;
+    const pending = webhookData.obj?.pending;
+
+    // Determine redirect URL based on payment status
+    let redirectUrl: string;
+    
+    if (success && !pending) {
+      // Payment successful - redirect to success page
+      redirectUrl = `${process.env.FRONTEND_URL}/payment/success?transaction_id=${transactionId}&order_id=${orderId}&amount=${amount}&status=success`;
+    } else if (!success) {
+      // Payment failed - redirect to failure page
+      redirectUrl = `${process.env.FRONTEND_URL}/payment/failure?transaction_id=${transactionId}&order_id=${orderId}&amount=${amount}&status=failed`;
+    } else {
+      // Payment pending - redirect to pending page
+      redirectUrl = `${process.env.FRONTEND_URL}/payment/pending?transaction_id=${transactionId}&order_id=${orderId}&amount=${amount}&status=pending`;
+    }
+
+    logger.info(`Redirecting user to: ${redirectUrl}`);
+
+    // Redirect user to appropriate page
+    return res.redirect(redirectUrl);
+
+  } catch (error: any) {
+    logger.error('Error processing Paymob callback:', error);
+    
+    // Redirect to error page on any error
+    const errorUrl = `${process.env.FRONTEND_URL}/payment/error?message=${encodeURIComponent('خطأ في معالجة الدفع')}`;
+    return res.redirect(errorUrl);
   }
 });
 
