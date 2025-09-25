@@ -11,7 +11,8 @@ import {
   Crown,
   Gem,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  Link
 } from 'lucide-react';
 import { collaborationAPI } from '@/lib/api/collaboration';
 import { useToast } from '@/hooks/useToast';
@@ -171,13 +172,13 @@ export const CollaborationDashboard: React.FC = () => {
       {/* Quick Actions */}
       {(stats.eventsWithCollaborators > 0 || stats.eventsCollaboratedIn > 0) && (
         <div className="mt-6 flex justify-center">
-          <a
+          <Link
             href="/events"
             className="inline-flex items-center gap-2 px-4 py-2 bg-[#C09B52]/20 hover:bg-[#C09B52]/30 text-[#C09B52] rounded-lg transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
             عرض جميع المناسبات
-          </a>
+          </Link>
         </div>
       )}
     </div>
