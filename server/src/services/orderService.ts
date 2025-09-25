@@ -151,7 +151,7 @@ export class OrderService {
         // Send notification
         try {
           await NotificationService.notifyNewEventPending(
-            savedEvent._id.toString(),
+            (savedEvent._id as Types.ObjectId).toString(),
             order.userId.toString(),
             {
               hostName: savedEvent.details.hostName,
@@ -167,7 +167,7 @@ export class OrderService {
       order.status = 'completed';
       order.completedAt = paymentCompletedAt;
       order.paymobTransactionId = transactionId;
-      order.eventsCreated = createdEvents.map(event => event._id);
+      order.eventsCreated = createdEvents.map(event => event._id as Types.ObjectId);
       await order.save();
 
       // Remove paid cart items from user's cart
@@ -191,7 +191,7 @@ export class OrderService {
 
       return {
         success: true,
-        orderId: order._id.toString(),
+        orderId: (order._id as Types.ObjectId).toString(),
         eventsCreated: createdEvents.length,
         events: createdEvents
       };

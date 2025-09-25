@@ -75,6 +75,7 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
     }
 
     // If no selectedCartItemIds provided, use all cart items (backward compatibility)
+    let finalSelectedCartItemIds = selectedCartItemIds;
     if (!selectedCartItemIds || !Array.isArray(selectedCartItemIds) || selectedCartItemIds.length === 0) {
       // For backward compatibility, if no specific items selected, use all cart items
       const allCartSummary = await PaymentService.getCartPaymentSummary(userId);
@@ -84,11 +85,11 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
           error: { message: 'السلة فارغة أو غير صحيحة' }
         });
       }
-      selectedCartItemIds = allCartSummary.summary.items.map(item => item.id);
+      finalSelectedCartItemIds = allCartSummary.summary.items.map(item => item.id);
     }
 
     // Get cart summary for selected items only
-    const cartSummary = await PaymentService.getCartPaymentSummary(userId, selectedCartItemIds);
+    const cartSummary = await PaymentService.getCartPaymentSummary(userId, finalSelectedCartItemIds);
     if (!cartSummary.success || !cartSummary.summary) {
       return res.status(400).json({
         success: false,
@@ -98,7 +99,7 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
 
     // Debug logging
     logger.info(`Cart summary for user ${userId} (selected items):`, {
-      selectedItemIds: selectedCartItemIds,
+      selectedItemIds: finalSelectedCartItemIds,
       itemCount: cartSummary.summary.itemCount,
       totalAmount: cartSummary.summary.totalAmount,
       items: cartSummary.summary.items.map(item => ({
@@ -132,7 +133,7 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
     const merchantOrderId = `ORDER_${userId}_${Date.now()}`;
     const order = await OrderService.createOrder(
       userId,
-      selectedCartItemIds,
+      finalSelectedCartItemIds,
       paymobOrder.id,
       merchantOrderId,
       cartSummary.summary.totalAmount
@@ -144,7 +145,7 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
     logger.info(`Paymob order created for user ${userId}:`, {
       paymobOrderId: paymobOrder.id,
       ourOrderId: order._id,
-      selectedItemsCount: selectedCartItemIds.length,
+      selectedItemsCount: finalSelectedCartItemIds.length,
       totalAmount: cartSummary.summary.totalAmount
     });
 
