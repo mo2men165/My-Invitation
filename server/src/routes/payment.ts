@@ -74,11 +74,17 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       });
     }
 
+    // If no selectedCartItemIds provided, use all cart items (backward compatibility)
     if (!selectedCartItemIds || !Array.isArray(selectedCartItemIds) || selectedCartItemIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'يجب تحديد العناصر المراد دفعها' }
-      });
+      // For backward compatibility, if no specific items selected, use all cart items
+      const allCartSummary = await PaymentService.getCartPaymentSummary(userId);
+      if (!allCartSummary.success || !allCartSummary.summary) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'السلة فارغة أو غير صحيحة' }
+        });
+      }
+      selectedCartItemIds = allCartSummary.summary.items.map(item => item.id);
     }
 
     // Get cart summary for selected items only

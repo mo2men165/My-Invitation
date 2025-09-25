@@ -9,7 +9,7 @@ export interface PaymobOrderRequest {
     phone: string;
     city: string;
   };
-  selectedCartItemIds: string[];
+  selectedCartItemIds?: string[]; // Optional for backward compatibility
 }
 
 export interface PaymobOrderResponse {
