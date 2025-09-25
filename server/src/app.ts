@@ -27,7 +27,27 @@ const app = express();
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow your frontend
+    if (origin === process.env.FRONTEND_URL) {
+      return callback(null, true);
+    }
+    
+    // Allow Paymob webhook origins
+    if (origin && (
+      origin.includes('paymob.com') ||
+      origin.includes('accept.paymob.com') ||
+      origin.includes('ksa.paymob.com')
+    )) {
+      return callback(null, true);
+    }
+    
+    // Block other origins
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 

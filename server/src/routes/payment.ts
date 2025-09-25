@@ -1,5 +1,6 @@
 // routes/payment.ts
 import { Router, Request, Response } from 'express';
+import cors from 'cors';
 import { PaymentService } from '../services/paymentService';
 import { paymobService } from '../services/paymobService';
 import { logger } from '../config/logger';
@@ -245,7 +246,7 @@ router.get('/paymob/config', async (req: Request, res: Response) => {
  * Handle Paymob webhook notifications
  * This route should NOT require authentication as it's called by Paymob
  */
-router.post('/paymob/webhook', async (req: Request, res: Response) => {
+router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
   try {
     const webhookData: PaymobWebhookData = req.body;
     const signature = req.headers['x-paymob-signature'] as string;
