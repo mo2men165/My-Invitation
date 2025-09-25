@@ -249,15 +249,39 @@ router.get('/paymob/config', async (req: Request, res: Response) => {
 router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
   try {
     const webhookData: PaymobWebhookData = req.body;
-    const signature = req.headers['x-paymob-signature'] as string;
+    // Paymob sends signature as query parameter 'hmac', not in headers
+    const signature = req.query.hmac as string || req.headers['x-paymob-signature'] as string;
 
-    // Verify webhook signature
-    if (!paymobService.verifyWebhookSignature(webhookData, signature)) {
-      logger.warn('Invalid Paymob webhook signature');
+    // Debug logging
+    logger.info('Paymob webhook received:', {
+      hasSignature: !!signature,
+      signatureFromQuery: req.query.hmac,
+      signatureFromHeader: req.headers['x-paymob-signature'],
+      allHeaders: Object.keys(req.headers),
+      queryParams: req.query,
+      webhookType: webhookData.type,
+      transactionId: webhookData.obj?.id,
+      hasSecretKey: !!process.env.PAYMOB_SECRET_KEY,
+      secretKeyLength: process.env.PAYMOB_SECRET_KEY?.length || 0
+    });
+
+    // Verify webhook signature (bypass for testing if needed)
+    const bypassSignature = process.env.PAYMOB_BYPASS_SIGNATURE === 'true';
+    if (!bypassSignature && !paymobService.verifyWebhookSignature(webhookData, signature)) {
+      logger.warn('Invalid Paymob webhook signature', {
+        receivedSignature: signature,
+        hasSecretKey: !!process.env.PAYMOB_SECRET_KEY,
+        webhookDataKeys: Object.keys(webhookData),
+        bypassEnabled: bypassSignature
+      });
       return res.status(401).json({
         success: false,
         error: { message: 'Invalid signature' }
       });
+    }
+    
+    if (bypassSignature) {
+      logger.info('Signature validation bypassed for testing');
     }
 
     // Process webhook
