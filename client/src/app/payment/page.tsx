@@ -80,21 +80,11 @@ const PaymentPageContent: React.FC = () => {
         // Load payment summary
         const summaryResponse = await paymentAPI.getPaymentSummary();
         
-        // Load pending orders
-        const pendingResponse = await fetch('/api/payment/pending-orders', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        const pendingData = await pendingResponse.json();
-        
-        // Load pending cart items
-        const pendingItemsResponse = await fetch('/api/payment/pending-cart-items', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        const pendingItemsData = await pendingItemsResponse.json();
+        // Load pending orders and cart items using the API service
+        const [pendingData, pendingItemsData] = await Promise.all([
+          paymentAPI.getPendingOrders(),
+          paymentAPI.getPendingCartItems()
+        ]);
         
         if (summaryResponse.success && summaryResponse.summary) {
           setPaymentSummary(summaryResponse.summary);

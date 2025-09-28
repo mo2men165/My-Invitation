@@ -92,6 +92,57 @@ class PaymentAPI {
 
     return result;
   }
+
+  async getPendingOrders(): Promise<{
+    success: boolean;
+    orders: Array<{
+      id: string;
+      paymobOrderId: number;
+      totalAmount: number;
+      selectedItemsCount: number;
+      createdAt: string;
+      selectedItems: Array<{
+        cartItemId: string;
+        hostName: string;
+        packageType: string;
+        eventDate: string;
+        price: number;
+      }>;
+    }>;
+    error?: { message: string };
+  }> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/pending-orders`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في جلب الطلبات المعلقة');
+    }
+
+    return result;
+  }
+
+  async getPendingCartItems(): Promise<{
+    success: boolean;
+    pendingCartItemIds: string[];
+    error?: { message: string };
+  }> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/pending-cart-items`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في جلب العناصر المعلقة');
+    }
+
+    return result;
+  }
 }
 
 export const paymentAPI = new PaymentAPI();
