@@ -11,6 +11,7 @@
     "forceConsistentCasingInFileNames": false,
     "resolveJsonModule": true,
     "removeComments": true,
+    "noEmitOnError": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
     "strictFunctionTypes": false,
