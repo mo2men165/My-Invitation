@@ -116,6 +116,8 @@ router.post('/', async (req: Request, res: Response) => {
     // Create new cart item with data sanitization
     const sanitizedDetails = {
       ...cartItemData.details,
+      // Ensure eventDate is always a Date object
+      eventDate: cartItemData.details.eventDate,
       // Ensure gateSupervisors is always a number
       gateSupervisors: typeof cartItemData.details.gateSupervisors === 'string' 
         ? parseInt(cartItemData.details.gateSupervisors, 10) || 0

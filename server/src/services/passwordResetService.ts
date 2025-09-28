@@ -48,7 +48,7 @@ class PasswordResetService {
         return null;
       }
       
-      return JSON.parse(data) as PasswordResetData;
+      return JSON.parse(data.toString()) as PasswordResetData;
     } catch (error) {
       logger.error('Error retrieving reset data:', error);
       return null;
@@ -74,7 +74,7 @@ class PasswordResetService {
     const attempts = await redis.incr(key);
     await redis.expire(key, this.LOCKOUT_DURATION);
     
-    if (attempts > this.MAX_RESET_ATTEMPTS) {
+    if (Number(attempts) > this.MAX_RESET_ATTEMPTS) {
       throw new Error('تم تجاوز عدد محاولات إعادة تعيين كلمة المرور. حاول مرة أخرى خلال 30 دقيقة');
     }
   }

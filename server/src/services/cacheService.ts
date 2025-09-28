@@ -39,7 +39,7 @@ export class CacheService {
       const cached = await redis.get(key);
       if (!cached) return null;
       
-      const cart = JSON.parse(cached) as ICartItem[];
+      const cart = JSON.parse(cached.toString()) as ICartItem[];
       logger.debug(`Retrieved cached cart for user ${userId}`);
       return cart;
     } catch (error) {
@@ -74,7 +74,7 @@ export class CacheService {
       const cached = await redis.get(key);
       if (!cached) return null;
       
-      const wishlist = JSON.parse(cached) as IWishlistItem[];
+      const wishlist = JSON.parse(cached.toString()) as IWishlistItem[];
       logger.debug(`Retrieved cached wishlist for user ${userId}`);
       return wishlist;
     } catch (error) {
@@ -109,7 +109,7 @@ export class CacheService {
       const cached = await redis.get(key);
       if (!cached) return null;
       
-      const compareList = JSON.parse(cached) as ICompareItem[];
+      const compareList = JSON.parse(cached.toString()) as ICompareItem[];
       logger.debug(`Retrieved cached compare list for user ${userId}`);
       return compareList;
     } catch (error) {
