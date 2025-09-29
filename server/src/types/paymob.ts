@@ -179,7 +179,6 @@ export interface PaymobWebhookData {
     pending: boolean;
     amount_cents: number;
     currency: string;
-    merchant_order_id: string;
     order: {
       id: number;
       created_at: string;
