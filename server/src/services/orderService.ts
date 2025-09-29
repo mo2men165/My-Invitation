@@ -287,8 +287,8 @@ export class OrderService {
       // Remove paid cart items from user's cart
       const user = await User.findById(order.userId);
       if (user) {
-        const cartItemIdsToRemove = order.selectedCartItems.map(item => item.cartItemId);
-        user.cart = user.cart.filter(item => !cartItemIdsToRemove.includes(item._id!));
+        const cartItemIdsToRemove = order.selectedCartItems.map(item => item.cartItemId.toString());
+        user.cart = user.cart.filter(item => !cartItemIdsToRemove.includes(item._id!.toString()));
         await user.save();
 
         logger.info(`Cart items removed for user ${order.userId}:`, {
