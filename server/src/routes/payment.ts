@@ -848,46 +848,20 @@ router.post('/paymob/callback', cors(), async (req: Request, res: Response) => {
     let redirectUrl: string;
     let redirectReason: string;
     
-    if (success && !pending) {
-      // Payment successful - redirect to success page
-      redirectUrl = `${process.env.FRONTEND_URL}/payment/success?transaction_id=${transactionId}&order_id=${orderId}&amount=${amount}&status=success`;
-      redirectReason = 'PAYMENT_SUCCESS';
-      
-      logger.info(`✅ PAYMENT SUCCESS - REDIRECTING TO SUCCESS PAGE [${callbackId}]`, {
-        callbackId,
-        transactionId,
-        orderId,
-        amount,
-        redirectUrl,
-        redirectReason
-      });
-    } else if (!success) {
-      // Payment failed - redirect to failure page
-      redirectUrl = `${process.env.FRONTEND_URL}/payment/failure?transaction_id=${transactionId}&order_id=${orderId}&amount=${amount}&status=failed`;
-      redirectReason = 'PAYMENT_FAILED';
-      
-      logger.info(`❌ PAYMENT FAILED - REDIRECTING TO FAILURE PAGE [${callbackId}]`, {
-        callbackId,
-        transactionId,
-        orderId,
-        amount,
-        redirectUrl,
-        redirectReason
-      });
-    } else {
-      // Payment pending - redirect to pending page
-      redirectUrl = `${process.env.FRONTEND_URL}/payment/pending?transaction_id=${transactionId}&order_id=${orderId}&amount=${amount}&status=pending`;
-      redirectReason = 'PAYMENT_PENDING';
-      
-      logger.info(`⏳ PAYMENT PENDING - REDIRECTING TO PENDING PAGE [${callbackId}]`, {
-        callbackId,
-        transactionId,
-        orderId,
-        amount,
-        redirectUrl,
-        redirectReason
-      });
-    }
+    // Always redirect to the unified result page with merchant order ID
+    redirectUrl = `${process.env.FRONTEND_URL}/payment/result?order_id=${orderId}`;
+    redirectReason = success && !pending ? 'PAYMENT_SUCCESS' : !success ? 'PAYMENT_FAILED' : 'PAYMENT_PENDING';
+    
+    logger.info(`🔄 REDIRECTING TO RESULT PAGE [${callbackId}]`, {
+      callbackId,
+      transactionId,
+      orderId,
+      amount,
+      success,
+      pending,
+      redirectUrl,
+      redirectReason
+    });
 
     logger.info(`🚀 REDIRECTING USER [${callbackId}]`, {
       callbackId,
@@ -982,6 +956,108 @@ router.get('/pending-cart-items', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { message: error.message || 'خطأ في جلب العناصر المعلقة' }
+    });
+  }
+});
+
+/**
+ * GET /api/payment/order/:merchantOrderId
+ * Get order data by merchant order ID for payment result page
+ */
+router.get('/order/:merchantOrderId', async (req: Request, res: Response) => {
+  try {
+    const { merchantOrderId } = req.params;
+    const userId = req.user!.id;
+    
+    if (!merchantOrderId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف الطلب مطلوب' }
+      });
+    }
+
+    logger.info(`🔍 FETCHING ORDER DATA [${merchantOrderId}]`, {
+      merchantOrderId,
+      userId,
+      timestamp: new Date().toISOString()
+    });
+
+    const order = await Order.findOne({ 
+      merchantOrderId,
+      userId: new Types.ObjectId(userId) // Security check - ensure user owns the order
+    });
+
+    if (!order) {
+      logger.warn(`❌ ORDER NOT FOUND [${merchantOrderId}]`, {
+        merchantOrderId,
+        userId,
+        action: 'ORDER_NOT_FOUND_OR_NOT_OWNED'
+      });
+      return res.status(404).json({
+        success: false,
+        error: { message: 'الطلب غير موجود أو غير مملوك لك' }
+      });
+    }
+
+    logger.info(`✅ ORDER FOUND [${merchantOrderId}]`, {
+      merchantOrderId,
+      userId,
+      orderId: order._id,
+      status: order.status,
+      totalAmount: order.totalAmount,
+      eventsCreated: order.eventsCreated.length,
+      createdAt: order.createdAt,
+      completedAt: order.completedAt,
+      failedAt: order.failedAt
+    });
+
+    // Get events data if order is completed
+    let events = [];
+    if (order.status === 'completed' && order.eventsCreated.length > 0) {
+      events = await Event.find({
+        _id: { $in: order.eventsCreated }
+      }).select('_id details.hostName details.eventDate details.eventLocation packageType');
+    }
+
+    const orderData = {
+      id: order._id,
+      merchantOrderId: order.merchantOrderId,
+      paymobOrderId: order.paymobOrderId,
+      paymobTransactionId: order.paymobTransactionId,
+      status: order.status,
+      totalAmount: order.totalAmount,
+      paymentMethod: order.paymentMethod,
+      eventsCreated: order.eventsCreated.length,
+      events: events,
+      selectedItems: order.selectedCartItems.map(item => ({
+        cartItemId: item.cartItemId,
+        hostName: item.cartItemData.details.hostName,
+        packageType: item.cartItemData.packageType,
+        eventDate: item.cartItemData.details.eventDate,
+        eventLocation: item.cartItemData.details.eventLocation,
+        price: item.cartItemData.totalPrice
+      })),
+      createdAt: order.createdAt,
+      completedAt: order.completedAt,
+      failedAt: order.failedAt
+    };
+
+    return res.json({
+      success: true,
+      order: orderData
+    });
+
+  } catch (error: any) {
+    logger.error(`💥 ERROR FETCHING ORDER [${req.params.merchantOrderId}]`, {
+      merchantOrderId: req.params.merchantOrderId,
+      userId: req.user?.id,
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في جلب بيانات الطلب' }
     });
   }
 });

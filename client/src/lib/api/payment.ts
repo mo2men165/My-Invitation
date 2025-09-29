@@ -143,6 +143,25 @@ class PaymentAPI {
 
     return result;
   }
+
+  async getOrderByMerchantId(merchantOrderId: string): Promise<{
+    success: boolean;
+    order?: any;
+    error?: { message: string };
+  }> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/order/${merchantOrderId}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في جلب بيانات الطلب');
+    }
+
+    return result;
+  }
 }
 
 export const paymentAPI = new PaymentAPI();
