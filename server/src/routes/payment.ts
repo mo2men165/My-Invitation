@@ -828,7 +828,7 @@ router.post('/paymob/callback', cors(), async (req: Request, res: Response) => {
 
     // Extract transaction details
     const transactionId = webhookData.obj?.id?.toString();
-    const orderId = webhookData.obj?.merchant_order_id;
+    const orderId = webhookData.obj?.order?.merchant_order_id;
     const amount = webhookData.obj?.amount_cents ? webhookData.obj.amount_cents / 100 : 0;
     const success = webhookData.obj?.success;
     const pending = webhookData.obj?.pending;

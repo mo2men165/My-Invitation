@@ -324,7 +324,7 @@ export class PaymobService {
         hasObj: !!webhookData.obj,
         objKeys: webhookData.obj ? Object.keys(webhookData.obj) : [],
         transactionId: webhookData.obj?.id,
-        orderId: webhookData.obj?.merchant_order_id,
+        orderId: webhookData.obj?.order?.merchant_order_id,
         amount_cents: webhookData.obj?.amount_cents,
         amount_sar: webhookData.obj?.amount_cents ? webhookData.obj.amount_cents / 100 : 'N/A',
         success: webhookData.obj?.success,
@@ -334,7 +334,7 @@ export class PaymobService {
 
       // Extract relevant information
       const transactionId = webhookData.obj.id.toString();
-      const orderId = webhookData.obj.merchant_order_id;
+      const orderId = webhookData.obj?.order?.merchant_order_id;
       const amount = webhookData.obj.amount_cents / 100; // Convert from cents
       const success = webhookData.obj.success;
       const pending = webhookData.obj.pending;
