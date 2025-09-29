@@ -17,6 +17,8 @@ interface GuestManagementProps {
       inviteCount: number;
     };
   };
+  guests: Guest[]; // Add filtered guests prop
+  userRole: 'owner' | 'collaborator'; // Add user role prop
   guestStats?: {
     totalInvited: number;
   } | null;
@@ -37,6 +39,8 @@ interface GuestManagementProps {
 
 export const GuestManagement: React.FC<GuestManagementProps> = ({
   event,
+  guests,
+  userRole,
   guestStats,
   newGuest,
   setNewGuest,
@@ -106,7 +110,8 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
 
       {/* Guests List */}
       <GuestList
-        guests={event.guests}
+        guests={guests}
+        userRole={userRole}
         packageType={event.packageType}
         invitationCardUrl={event.invitationCardUrl}
         isVipConfirmed={isVipConfirmed}
@@ -117,8 +122,8 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
         onCountryChange={onCountryChange}
       />
 
-      {/* VIP Package - Confirm Final Guest List Button */}
-      {event.packageType === 'vip' && event.guests.length > 0 && !event.guestListConfirmed.isConfirmed && (
+      {/* VIP Package - Confirm Final Guest List Button - Only for owners */}
+      {userRole === 'owner' && event.packageType === 'vip' && guests.length > 0 && !event.guestListConfirmed.isConfirmed && (
         <div className="mt-6 pt-6 border-t border-white/10">
           <div className="bg-gradient-to-r from-yellow-900/20 to-yellow-800/10 border border-yellow-700/30 rounded-xl p-4">
             <div className="flex items-center justify-between">

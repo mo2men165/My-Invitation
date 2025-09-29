@@ -405,8 +405,6 @@ router.post('/invalidate-cache', async (req: Request, res: Response) => {
 
     await CacheService.invalidateUserCartCache(userId);
 
-    logger.info(`Cart cache manually invalidated for user ${userId}`);
-
     return res.json({
       success: true,
       message: 'تم مسح ذاكرة التخزين المؤقت للسلة'

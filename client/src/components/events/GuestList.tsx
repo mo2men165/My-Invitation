@@ -5,6 +5,7 @@ import { EditableGuest } from './EditableGuest';
 
 interface GuestListProps {
   guests: Guest[];
+  userRole: 'owner' | 'collaborator';
   packageType: string;
   invitationCardUrl?: string;
   isVipConfirmed: boolean;
@@ -17,6 +18,7 @@ interface GuestListProps {
 
 export const GuestList: React.FC<GuestListProps> = ({
   guests,
+  userRole,
   packageType,
   invitationCardUrl,
   isVipConfirmed,
@@ -41,6 +43,7 @@ export const GuestList: React.FC<GuestListProps> = ({
         <EditableGuest
           key={guest._id || index}
           guest={guest}
+          userRole={userRole}
           packageType={packageType}
           invitationCardUrl={invitationCardUrl}
           isVipConfirmed={isVipConfirmed}

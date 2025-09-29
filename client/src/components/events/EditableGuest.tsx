@@ -7,6 +7,7 @@ import { ALLOWED_COUNTRY_CODES, validatePhoneNumber, isCountryAllowed } from '@/
 
 interface EditableGuestProps {
   guest: Guest;
+  userRole: 'owner' | 'collaborator';
   packageType: string;
   invitationCardUrl?: string;
   isVipConfirmed: boolean;
@@ -19,6 +20,7 @@ interface EditableGuestProps {
 
 export const EditableGuest: React.FC<EditableGuestProps> = ({
   guest,
+  userRole,
   packageType,
   invitationCardUrl,
   isVipConfirmed,
@@ -207,6 +209,24 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
                   ({getCountryFromPhone(guest.phone)})
                 </span>
               </div>
+              
+              {/* Guest Attribution - Only show for owners */}
+              {userRole === 'owner' && guest.addedBy && (
+                <div className="mt-2">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    guest.addedBy.type === 'owner' 
+                      ? 'bg-blue-500/20 text-blue-400' 
+                      : 'bg-purple-500/20 text-purple-400'
+                  }`}>
+                    {guest.addedBy.type === 'owner' ? 'أضفته أنت' : 'أضافه متعاون'}
+                    {guest.addedBy.type === 'collaborator' && (
+                      <span className="ml-1 text-xs opacity-75">
+                        ({(guest.addedBy.collaboratorName && guest.addedBy.collaboratorName.trim()) || guest.addedBy.collaboratorEmail || 'متعاون'})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>

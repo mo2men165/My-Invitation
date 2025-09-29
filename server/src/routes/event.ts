@@ -91,6 +91,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     let userRole: 'owner' | 'collaborator' = 'owner';
     let collaboratorPermissions: any = null;
+    let collaboratorAllocatedInvites = 0;
 
     // If not owner, check if user is a collaborator
     if (!event) {
@@ -105,6 +106,16 @@ router.get('/:id', async (req: Request, res: Response) => {
           collab => collab.userId.toString() === userId
         );
         collaboratorPermissions = collaboration?.permissions;
+        collaboratorAllocatedInvites = collaboration?.allocatedInvites || 0;
+        
+        // Get collaborator's name from the collaboration record or user data
+        if (collaboration) {
+          // Try to get the collaborator's name from the user record
+          const collaboratorUser = await User.findById(collaboration.userId).select('name email');
+          if (collaboratorUser) {
+            req.user!.name = collaboratorUser.name || collaboratorUser.email;
+          }
+        }
       }
     }
 
@@ -115,21 +126,61 @@ router.get('/:id', async (req: Request, res: Response) => {
       });
     }
 
-    // Calculate guest statistics
-    const totalInvited = event.guests.reduce((sum, guest) => sum + guest.numberOfAccompanyingGuests, 0);
-    const whatsappSent = event.guests.filter(guest => guest.whatsappMessageSent).length;
+    // Filter data based on user role
+    let filteredEvent = event.toObject();
+    let filteredGuests = event.guests;
+
+    if (userRole === 'collaborator') {
+      // Filter out sensitive information for collaborators
+      delete filteredEvent.totalPrice;
+      delete filteredEvent.paymentCompletedAt;
+      delete filteredEvent.invitationCardUrl;
+      delete filteredEvent.qrCodeUrl;
+      delete filteredEvent.adminNotes;
+      delete filteredEvent.approvedBy;
+      delete filteredEvent.approvedAt;
+      delete filteredEvent.rejectedAt;
+      
+      // Get collaborator's allocated invites - default to 0 if not set
+      // collaboratorAllocatedInvites is already set above
+      
+      // If collaborator has no allocated invites, this might be a data issue
+      if (collaboratorAllocatedInvites === 0) {
+        logger.warn(`Collaborator ${userId} has no allocated invites for event ${id}`);
+      }
+      
+      // Filter guests based on permissions
+      if (!collaboratorPermissions?.canViewFullEvent) {
+        // Only show guests added by this collaborator
+        filteredGuests = event.guests.filter(guest => 
+          guest.addedBy?.type === 'collaborator' && 
+          guest.addedBy?.userId?.toString() === userId
+        );
+      }
+    }
+
+    // Calculate guest statistics based on filtered guests
+    const totalInvited = filteredGuests.reduce((sum, guest) => sum + guest.numberOfAccompanyingGuests, 0);
+    const whatsappSent = filteredGuests.filter(guest => guest.whatsappMessageSent).length;
 
     return res.json({
       success: true,
-      event,
+      event: filteredEvent,
+      guests: filteredGuests, // Include filtered guests in response
       userRole,
       permissions: collaboratorPermissions,
       guestStats: {
-        totalGuests: event.guests.length,
-        totalInvited,
+        totalGuests: filteredGuests.length,
+        totalInvited: totalInvited,
         whatsappMessagesSent: whatsappSent,
-        remainingInvites: event.details.inviteCount - totalInvited
-      }
+        remainingInvites: userRole === 'owner' ? 
+          event.details.inviteCount - totalInvited : 
+          collaboratorAllocatedInvites - totalInvited
+      },
+      // For collaborators, show allocated invites as the total
+      totalInvitesForView: userRole === 'owner' ? 
+        event.details.inviteCount : 
+        collaboratorAllocatedInvites
     });
 
   } catch (error) {
@@ -203,6 +254,12 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
       collaboratorPermissions = collaboration.permissions;
       allocatedInvites = collaboration.allocatedInvites;
       usedInvites = collaboration.usedInvites;
+      
+      // Get collaborator's name from the collaboration record or user data
+      const collaboratorUser = await User.findById(collaboration.userId).select('name email');
+      if (collaboratorUser) {
+        req.user!.name = collaboratorUser.name || collaboratorUser.email;
+      }
 
       // Check if collaborator has permission to add guests
       if (!collaboratorPermissions.canAddGuests) {
@@ -260,7 +317,10 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
       addedBy: {
         type: userRole,
         userId: new Types.ObjectId(userId),
-        ...(userRole === 'collaborator' && { collaboratorEmail: req.user!.email })
+        ...(userRole === 'collaborator' && { 
+          collaboratorName: (req.user!.name && req.user!.name.trim()) || req.user!.email || 'متعاون',
+          collaboratorEmail: req.user!.email 
+        })
       }
     };
 

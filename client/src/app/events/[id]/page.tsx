@@ -34,7 +34,11 @@ const EventDetailPage: React.FC = () => {
   const { toast } = useToast();
   
   const [event, setEvent] = useState<EventItem | null>(null);
+  const [guests, setGuests] = useState<Guest[]>([]);
   const [guestStats, setGuestStats] = useState<GuestStats | null>(null);
+  const [userRole, setUserRole] = useState<'owner' | 'collaborator'>('owner');
+  const [permissions, setPermissions] = useState<any>(null);
+  const [totalInvitesForView, setTotalInvitesForView] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [addingGuest, setAddingGuest] = useState(false);
   const [confirmingGuestList, setConfirmingGuestList] = useState(false);
@@ -55,7 +59,25 @@ const EventDetailPage: React.FC = () => {
       
       if (response.success) {
         setEvent(response.event!);
+        setGuests(response.guests || []);
         setGuestStats(response.guestStats!);
+        setUserRole(response.userRole || 'owner');
+        setPermissions(response.permissions || null);
+        
+        // For collaborators, ensure we use their allocated invites
+        if (response.userRole === 'collaborator') {
+          const allocatedInvites = response.totalInvitesForView || 0;
+          if (allocatedInvites === 0) {
+            toast({
+              title: "تحذير",
+              description: "لم يتم تخصيص دعوات لك. يرجى التواصل مع مالك المناسبة.",
+              variant: "destructive"
+            });
+          }
+          setTotalInvitesForView(allocatedInvites);
+        } else {
+          setTotalInvitesForView(response.event?.details?.inviteCount || 0);
+        }
       }
     } catch (error: any) {
       toast({
@@ -353,11 +375,12 @@ ${event.details.invitationText}
             <EventDetails
               event={event}
               guestStats={guestStats}
+              totalInvitesForView={totalInvitesForView}
               formatEventDate={formatEventDate}
             />
 
-            {/* Collaboration Management */}
-            {(event.packageType === 'premium' || event.packageType === 'vip') && (
+            {/* Collaboration Management - Only for owners */}
+            {userRole === 'owner' && (event.packageType === 'premium' || event.packageType === 'vip') && (
               <CollaborationManagement
                 eventId={eventId}
                 packageType={event.packageType}
@@ -368,6 +391,8 @@ ${event.details.invitationText}
             {/* Guest Management */}
             <GuestManagement
               event={event}
+              guests={guests}
+              userRole={userRole}
               guestStats={guestStats}
               newGuest={newGuest}
               setNewGuest={setNewGuest}
@@ -389,6 +414,7 @@ ${event.details.invitationText}
           <EventSidebar
             guestStats={guestStats}
             event={event}
+            totalInvitesForView={totalInvitesForView}
             approvalStatusDetails={approvalStatusDetails}
             formatEventDate={formatEventDate}
           />

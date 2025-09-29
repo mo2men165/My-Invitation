@@ -71,12 +71,22 @@ export interface EventsApiResponse<T = any> {
   message?: string;
   events?: T;
   event?: EventItem;
+  guests?: Guest[]; // Add guests field for filtered guest data
   stats?: EventStats;
   guestStats?: GuestStats;
   guest?: Guest;
   count?: number;
   remainingInvites?: number;
   remainingGuests?: number;
+  userRole?: 'owner' | 'collaborator';
+  permissions?: {
+    canAddGuests: boolean;
+    canEditGuests: boolean;
+    canDeleteGuests: boolean;
+    canViewFullEvent: boolean;
+    canManageCollaborators?: boolean;
+  };
+  totalInvitesForView?: number; // Total invites to show in UI (allocated for collaborators)
   pagination?: {
     page: number;
     limit: number;

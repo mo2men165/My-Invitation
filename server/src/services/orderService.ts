@@ -295,9 +295,7 @@ export class OrderService {
         // Invalidate cart cache to prevent stale data
         try {
           await CacheService.invalidateUserCartCache((order.userId as Types.ObjectId).toString());
-          logger.info(`Cart cache invalidated for user ${order.userId}`);
         } catch (cacheError: any) {
-          logger.error(`Failed to invalidate cart cache for user ${order.userId}:`, cacheError.message);
           // Don't throw error - cache failure shouldn't stop the process
         }
 

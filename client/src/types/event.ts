@@ -4,6 +4,14 @@ export interface Guest {
   phone: string;
   numberOfAccompanyingGuests: number;
   whatsappMessageSent: boolean;
+  addedBy?: {
+    type: 'owner' | 'collaborator';
+    userId: string;
+    collaboratorName?: string;
+    collaboratorEmail?: string;
+  };
+  addedAt?: string;
+  updatedAt?: string;
 }
 
 export interface PackageDetails {

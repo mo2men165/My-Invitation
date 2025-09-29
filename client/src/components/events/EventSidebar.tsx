@@ -24,8 +24,9 @@ interface EventSidebarProps {
     approvalStatus: string;
     invitationCardUrl?: string;
     qrCodeUrl?: string;
-    paymentCompletedAt: string;
+    paymentCompletedAt?: string; // Make optional since it's filtered for collaborators
   };
+  totalInvitesForView: number; // Total invites to show (allocated for collaborators)
   approvalStatusDetails: {
     name: string;
     color: string;
@@ -38,6 +39,7 @@ interface EventSidebarProps {
 export const EventSidebar: React.FC<EventSidebarProps> = ({
   guestStats,
   event,
+  totalInvitesForView,
   approvalStatusDetails,
   formatEventDate
 }) => {
@@ -75,13 +77,13 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
         <div className="mt-4">
           <div className="flex justify-between text-sm text-gray-400 mb-2">
             <span>التقدم</span>
-            <span>{Math.round(((guestStats?.totalInvited || 0) / event.details.inviteCount) * 100)}%</span>
+            <span>{Math.round(((guestStats?.totalInvited || 0) / totalInvitesForView) * 100)}%</span>
           </div>
           <div className="w-full bg-white/10 rounded-full h-2">
             <div 
               className="bg-gradient-to-r from-[#C09B52] to-[#B8935A] h-2 rounded-full transition-all duration-300"
               style={{ 
-                width: `${Math.min(((guestStats?.totalInvited || 0) / event.details.inviteCount) * 100, 100)}%` 
+                width: `${Math.min(((guestStats?.totalInvited || 0) / totalInvitesForView) * 100, 100)}%` 
               }}
             />
           </div>
@@ -130,9 +132,12 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
             <div>
               <div className="text-white font-medium">تم إتمام الدفع</div>
               <div className="text-gray-400">
-                {new Date(event.paymentCompletedAt).toLocaleDateString('ar-SA', {
-                  calendar: 'gregory'
-                })}
+                {event.paymentCompletedAt ? 
+                  new Date(event.paymentCompletedAt).toLocaleDateString('ar-SA', {
+                    calendar: 'gregory'
+                  }) : 
+                  'غير متاح'
+                }
               </div>
             </div>
           </div>

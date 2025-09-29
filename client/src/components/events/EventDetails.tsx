@@ -22,7 +22,7 @@ interface EventDetailsProps {
       invitationText: string;
       qrCode: boolean;
     };
-    totalPrice: number;
+    totalPrice?: number; // Make optional since it's filtered for collaborators
     adminNotes?: string;
     invitationCardUrl?: string;
     qrCodeUrl?: string;
@@ -30,12 +30,14 @@ interface EventDetailsProps {
   guestStats?: {
     totalInvited: number;
   } | null;
+  totalInvitesForView: number; // Total invites to show (allocated for collaborators)
   formatEventDate: (dateString: string) => string;
 }
 
 export const EventDetails: React.FC<EventDetailsProps> = ({
   event,
   guestStats,
+  totalInvitesForView,
   formatEventDate
 }) => {
   return (
@@ -93,7 +95,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               <div>
                 <div className="text-white font-medium">عدد الدعوات</div>
                 <div className="text-gray-300 text-sm">
-                  {guestStats?.totalInvited || 0} من {event.details.inviteCount} دعوة
+                  {guestStats?.totalInvited || 0} من {totalInvitesForView} دعوة
                 </div>
               </div>
             </div>
@@ -113,7 +115,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               <div>
                 <div className="text-white font-medium">السعر الإجمالي</div>
                 <div className="text-[#C09B52] text-lg font-bold">
-                  {event.totalPrice.toLocaleString('ar-SA')} ر.س
+                  {event.totalPrice ? `${event.totalPrice.toLocaleString('ar-SA')} ر.س` : 'غير متاح'}
                 </div>
               </div>
             </div>

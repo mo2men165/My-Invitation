@@ -14,6 +14,7 @@ export interface IGuest {
   addedBy?: {
     type: 'owner' | 'collaborator';
     userId?: Types.ObjectId;
+    collaboratorName?: string;
     collaboratorEmail?: string;
   };
 }
@@ -120,6 +121,9 @@ const guestSchema = new Schema<IGuest>({
     userId: {
       type: Schema.Types.ObjectId,
       ref: 'User'
+    },
+    collaboratorName: {
+      type: String
     },
     collaboratorEmail: {
       type: String
