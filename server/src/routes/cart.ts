@@ -396,6 +396,32 @@ router.get('/count', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/cart/invalidate-cache
+ * Manually invalidate cart cache for current user
+ */
+router.post('/invalidate-cache', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    await CacheService.invalidateUserCartCache(userId);
+
+    logger.info(`Cart cache manually invalidated for user ${userId}`);
+
+    return res.json({
+      success: true,
+      message: 'تم مسح ذاكرة التخزين المؤقت للسلة'
+    });
+
+  } catch (error) {
+    logger.error('Error invalidating cart cache:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في مسح ذاكرة التخزين المؤقت' }
+    });
+  }
+});
+
+/**
  * PATCH /api/cart/:id/field
  * Update specific field in cart item
  */

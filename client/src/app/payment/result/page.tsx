@@ -338,7 +338,7 @@ const PaymentResultContent: React.FC = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center py-3 border-b border-white/10">
                 <span className="text-gray-300">رقم الطلب</span>
-                <span className="text-white font-mono">{orderData.merchantOrderId}</span>
+                <span className="text-white font-mono">{orderData.merchantOrderId.substring(0, 20)}...</span>
               </div>
               
               {orderData.paymobTransactionId && (

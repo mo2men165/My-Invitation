@@ -4,6 +4,7 @@ import { User, ICartItem } from '../models/User';
 import { Event } from '../models/Event';
 import { logger } from '../config/logger';
 import { Types } from 'mongoose';
+import { CacheService } from './cacheService';
 import { NotificationService } from './notificationService';
 
 export class OrderService {
@@ -290,6 +291,15 @@ export class OrderService {
         const cartItemIdsToRemove = order.selectedCartItems.map(item => item.cartItemId.toString());
         user.cart = user.cart.filter(item => !cartItemIdsToRemove.includes(item._id!.toString()));
         await user.save();
+
+        // Invalidate cart cache to prevent stale data
+        try {
+          await CacheService.invalidateUserCartCache((order.userId as Types.ObjectId).toString());
+          logger.info(`Cart cache invalidated for user ${order.userId}`);
+        } catch (cacheError: any) {
+          logger.error(`Failed to invalidate cart cache for user ${order.userId}:`, cacheError.message);
+          // Don't throw error - cache failure shouldn't stop the process
+        }
 
         logger.info(`Cart items removed for user ${order.userId}:`, {
           removedItemsCount: cartItemIdsToRemove.length,
