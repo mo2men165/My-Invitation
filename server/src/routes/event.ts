@@ -83,10 +83,30 @@ router.get('/:id', async (req: Request, res: Response) => {
     const userId = req.user!.id;
     const { id } = req.params;
 
-    const event = await Event.findOne({
+    // First check if user owns the event
+    let event = await Event.findOne({
       _id: new Types.ObjectId(id),
       userId: new Types.ObjectId(userId)
     }).populate('designId', 'title images');
+
+    let userRole: 'owner' | 'collaborator' = 'owner';
+    let collaboratorPermissions: any = null;
+
+    // If not owner, check if user is a collaborator
+    if (!event) {
+      event = await Event.findOne({
+        _id: new Types.ObjectId(id),
+        'collaborators.userId': new Types.ObjectId(userId)
+      }).populate('designId', 'title images');
+
+      if (event) {
+        userRole = 'collaborator';
+        const collaboration = event.collaborators?.find(
+          collab => collab.userId.toString() === userId
+        );
+        collaboratorPermissions = collaboration?.permissions;
+      }
+    }
 
     if (!event) {
       return res.status(404).json({
@@ -102,6 +122,8 @@ router.get('/:id', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       event,
+      userRole,
+      permissions: collaboratorPermissions,
       guestStats: {
         totalGuests: event.guests.length,
         totalInvited,
@@ -309,15 +331,43 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
 
     const updateData = validationResult.data;
 
-    const event = await Event.findOne({
+    // Check if user owns the event
+    let event = await Event.findOne({
       _id: new Types.ObjectId(id),
       userId: new Types.ObjectId(userId)
     });
 
+    let userRole: 'owner' | 'collaborator' = 'owner';
+    let collaboratorPermissions: any = null;
+
+    // If not owner, check if user is a collaborator
+    if (!event) {
+      event = await Event.findOne({
+        _id: new Types.ObjectId(id),
+        'collaborators.userId': new Types.ObjectId(userId)
+      });
+
+      if (event) {
+        userRole = 'collaborator';
+        const collaboration = event.collaborators?.find(
+          collab => collab.userId.toString() === userId
+        );
+        collaboratorPermissions = collaboration?.permissions;
+      }
+    }
+
     if (!event) {
       return res.status(404).json({
         success: false,
-        error: { message: 'المناسبة غير موجودة' }
+        error: { message: 'المناسبة غير موجودة أو ليس لديك صلاحية للوصول إليها' }
+      });
+    }
+
+    // Check if collaborator has permission to edit guests
+    if (userRole === 'collaborator' && !collaboratorPermissions?.canEditGuests) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'ليس لديك صلاحية لتعديل الضيوف' }
       });
     }
 
@@ -461,15 +511,43 @@ router.delete('/:id/guests/:guestId', async (req: Request, res: Response) => {
     const userId = req.user!.id;
     const { id, guestId } = req.params;
 
-    const event = await Event.findOne({
+    // Check if user owns the event
+    let event = await Event.findOne({
       _id: new Types.ObjectId(id),
       userId: new Types.ObjectId(userId)
     });
 
+    let userRole: 'owner' | 'collaborator' = 'owner';
+    let collaboratorPermissions: any = null;
+
+    // If not owner, check if user is a collaborator
+    if (!event) {
+      event = await Event.findOne({
+        _id: new Types.ObjectId(id),
+        'collaborators.userId': new Types.ObjectId(userId)
+      });
+
+      if (event) {
+        userRole = 'collaborator';
+        const collaboration = event.collaborators?.find(
+          collab => collab.userId.toString() === userId
+        );
+        collaboratorPermissions = collaboration?.permissions;
+      }
+    }
+
     if (!event) {
       return res.status(404).json({
         success: false,
-        error: { message: 'المناسبة غير موجودة' }
+        error: { message: 'المناسبة غير موجودة أو ليس لديك صلاحية للوصول إليها' }
+      });
+    }
+
+    // Check if collaborator has permission to delete guests
+    if (userRole === 'collaborator' && !collaboratorPermissions?.canDeleteGuests) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'ليس لديك صلاحية لحذف الضيوف' }
       });
     }
 
@@ -517,15 +595,35 @@ router.post('/:id/guests/:guestId/whatsapp', async (req: Request, res: Response)
     const userId = req.user!.id;
     const { id, guestId } = req.params;
 
-    const event = await Event.findOne({
+    // Check if user owns the event
+    let event = await Event.findOne({
       _id: new Types.ObjectId(id),
       userId: new Types.ObjectId(userId)
     });
 
+    let userRole: 'owner' | 'collaborator' = 'owner';
+    let collaboratorPermissions: any = null;
+
+    // If not owner, check if user is a collaborator
+    if (!event) {
+      event = await Event.findOne({
+        _id: new Types.ObjectId(id),
+        'collaborators.userId': new Types.ObjectId(userId)
+      });
+
+      if (event) {
+        userRole = 'collaborator';
+        const collaboration = event.collaborators?.find(
+          collab => collab.userId.toString() === userId
+        );
+        collaboratorPermissions = collaboration?.permissions;
+      }
+    }
+
     if (!event) {
       return res.status(404).json({
         success: false,
-        error: { message: 'المناسبة غير موجودة' }
+        error: { message: 'المناسبة غير موجودة أو ليس لديك صلاحية للوصول إليها' }
       });
     }
 

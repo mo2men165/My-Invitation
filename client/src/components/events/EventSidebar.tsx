@@ -23,6 +23,7 @@ interface EventSidebarProps {
     };
     approvalStatus: string;
     invitationCardUrl?: string;
+    qrCodeUrl?: string;
     paymentCompletedAt: string;
   };
   approvalStatusDetails: {

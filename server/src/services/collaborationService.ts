@@ -34,9 +34,9 @@ export class CollaborationService {
    * Generate a secure random password
    */
   static generateSecurePassword(): string {
-    // Generate a readable but secure password
-    const adjectives = ['سعيد', 'جميل', 'قوي', 'ذكي', 'سريع', 'نشيط', 'مميز', 'رائع'];
-    const nouns = ['نجم', 'بحر', 'جبل', 'ورد', 'قمر', 'شمس', 'نور', 'أمل'];
+    // Generate a readable but secure password using English words
+    const adjectives = ['Happy', 'Bright', 'Swift', 'Strong', 'Calm', 'Wise', 'Bold', 'Kind'];
+    const nouns = ['Star', 'Ocean', 'Mountain', 'Flower', 'Moon', 'Sun', 'Light', 'Hope'];
     const numbers = Math.floor(Math.random() * 99) + 10;
     
     const adj = adjectives[Math.floor(Math.random() * adjectives.length)];

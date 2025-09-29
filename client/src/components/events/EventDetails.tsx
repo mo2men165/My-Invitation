@@ -25,6 +25,7 @@ interface EventDetailsProps {
     totalPrice: number;
     adminNotes?: string;
     invitationCardUrl?: string;
+    qrCodeUrl?: string;
   };
   guestStats?: {
     totalInvited: number;
@@ -171,6 +172,42 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               >
                 <ExternalLink className="w-4 h-4" />
                 عرض البطاقة
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code URL */}
+      {event.qrCodeUrl && (
+        <div className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 rounded-2xl border border-cyan-700/30 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <QrCode className="w-5 h-5 text-cyan-400" />
+            <h3 className="text-lg font-bold text-white">QR Code</h3>
+          </div>
+          <div className="bg-cyan-900/20 border border-cyan-700/30 rounded-xl p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0 max-w-xs">
+                <p className="text-cyan-100 text-sm mb-2">رابط QR Code:</p>
+                <a
+                  href={event.qrCodeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-cyan-300 hover:text-cyan-200 text-sm block truncate text-left"
+                  title={event.qrCodeUrl}
+                  dir="ltr"
+                >
+                  {event.qrCodeUrl}
+                </a>
+              </div>
+              <a
+                href={event.qrCodeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-4 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                عرض QR Code
               </a>
             </div>
           </div>

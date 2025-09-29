@@ -367,7 +367,7 @@ router.get('/events/all', async (req: Request, res: Response) => {
 router.post('/events/:eventId/approve', async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
-    const { notes, invitationCardUrl } = req.body;
+    const { notes, invitationCardUrl, qrCodeUrl } = req.body;
     const adminId = req.user!.id;
 
     // Validate Google Drive URL if provided
@@ -375,6 +375,14 @@ router.post('/events/:eventId/approve', async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         error: { message: 'يجب أن يكون رابط البطاقة من Google Drive' }
+      });
+    }
+
+    // Validate QR Code URL if provided
+    if (qrCodeUrl && !qrCodeUrl.includes('drive.google.com') && !qrCodeUrl.includes('docs.google.com')) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'يجب أن يكون رابط QR Code من Google Drive' }
       });
     }
 
@@ -399,6 +407,7 @@ router.post('/events/:eventId/approve', async (req: Request, res: Response) => {
     event.approvedAt = new Date();
     if (notes) event.adminNotes = notes;
     if (invitationCardUrl) event.invitationCardUrl = invitationCardUrl;
+    if (qrCodeUrl) event.qrCodeUrl = qrCodeUrl;
 
     await event.save();
 
@@ -410,7 +419,8 @@ router.post('/events/:eventId/approve', async (req: Request, res: Response) => {
         email: user.email,
         eventName: event.details.hostName,
         eventDate: event.details.eventDate.toLocaleDateString('ar-SA'),
-        invitationCardUrl: event.invitationCardUrl
+        invitationCardUrl: event.invitationCardUrl,
+        qrCodeUrl: event.qrCodeUrl
       });
       
       logger.info(`Approval email sent to user ${user.email} for event ${eventId}`);
