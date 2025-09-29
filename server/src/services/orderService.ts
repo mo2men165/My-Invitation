@@ -17,30 +17,97 @@ export class OrderService {
     merchantOrderId: string,
     totalAmount: number
   ): Promise<IOrder> {
+    const orderCreationId = `order_create_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     try {
+      logger.info(`📝 ORDER CREATION STARTED [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        paymobOrderId,
+        merchantOrderId,
+        selectedCartItemIds,
+        totalAmount,
+        timestamp: new Date().toISOString()
+      });
+
       // Get user and validate cart items
       const user = await User.findById(userId);
       if (!user) {
+        logger.error(`❌ USER NOT FOUND [${orderCreationId}]`, {
+          orderCreationId,
+          userId,
+          action: 'ABORTING_ORDER_CREATION'
+        });
         throw new Error('المستخدم غير موجود');
       }
+
+      logger.info(`✅ USER FOUND [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        userCartLength: user.cart.length
+      });
 
       // Find selected cart items
       const selectedCartItems = user.cart.filter(item => 
         selectedCartItemIds.includes(item._id!.toString())
       );
 
+      logger.info(`🔍 CART ITEMS VALIDATION [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        requestedItemIds: selectedCartItemIds,
+        foundItemsCount: selectedCartItems.length,
+        foundItemIds: selectedCartItems.map(item => item._id!.toString()),
+        missingItemIds: selectedCartItemIds.filter(id => 
+          !selectedCartItems.some(item => item._id!.toString() === id)
+        )
+      });
+
       if (selectedCartItems.length !== selectedCartItemIds.length) {
+        logger.error(`❌ CART ITEMS VALIDATION FAILED [${orderCreationId}]`, {
+          orderCreationId,
+          userId,
+          requestedCount: selectedCartItemIds.length,
+          foundCount: selectedCartItems.length,
+          missingItems: selectedCartItemIds.filter(id => 
+            !selectedCartItems.some(item => item._id!.toString() === id)
+          )
+        });
         throw new Error('بعض العناصر المحددة غير موجودة في السلة');
       }
 
       // Check if any selected items are already in pending orders
+      logger.info(`🔍 CHECKING FOR EXISTING PENDING ORDERS [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        selectedItemIds: selectedCartItemIds
+      });
+
       const pendingOrders = await Order.find({
         userId: new Types.ObjectId(userId),
         status: 'pending',
         'selectedCartItems.cartItemId': { $in: selectedCartItemIds.map(id => new Types.ObjectId(id)) }
       });
 
+      logger.info(`📋 PENDING ORDERS CHECK RESULT [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        pendingOrdersFound: pendingOrders.length,
+        pendingOrderIds: pendingOrders.map(order => order._id),
+        conflictingItems: pendingOrders.flatMap(order => 
+          order.selectedCartItems.map(item => item.cartItemId.toString())
+        )
+      });
+
       if (pendingOrders.length > 0) {
+        logger.error(`❌ CONFLICTING PENDING ORDERS FOUND [${orderCreationId}]`, {
+          orderCreationId,
+          userId,
+          conflictingOrderIds: pendingOrders.map(order => order._id),
+          conflictingItems: pendingOrders.flatMap(order => 
+            order.selectedCartItems.map(item => item.cartItemId.toString())
+          )
+        });
         throw new Error('بعض العناصر المحددة في طلبات معلقة بالفعل');
       }
 
@@ -58,20 +125,67 @@ export class OrderService {
         paymentMethod: 'paymob'
       };
 
+      logger.info(`📝 CREATING ORDER RECORD [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        paymobOrderId,
+        merchantOrderId,
+        selectedItemsCount: orderData.selectedCartItems.length,
+        totalAmount: orderData.totalAmount,
+        orderData: {
+          userId: orderData.userId.toString(),
+          paymobOrderId: orderData.paymobOrderId,
+          merchantOrderId: orderData.merchantOrderId,
+          totalAmount: orderData.totalAmount,
+          status: orderData.status,
+          paymentMethod: orderData.paymentMethod,
+          selectedItems: orderData.selectedCartItems.map(item => ({
+            cartItemId: item.cartItemId.toString(),
+            hostName: item.cartItemData.details.hostName,
+            packageType: item.cartItemData.packageType,
+            price: item.cartItemData.totalPrice
+          }))
+        }
+      });
+
       const order = new Order(orderData);
       const savedOrder = await order.save();
 
-      logger.info(`Order created successfully:`, {
-        orderId: savedOrder._id,
+      logger.info(`✅ ORDER CREATED SUCCESSFULLY [${orderCreationId}]`, {
+        orderCreationId,
         userId,
         paymobOrderId,
-        selectedItemsCount: selectedCartItems.length,
-        totalAmount
+        merchantOrderId,
+        ourOrderId: savedOrder._id,
+        selectedItemsCount: savedOrder.selectedCartItems.length,
+        totalAmount: savedOrder.totalAmount,
+        status: savedOrder.status,
+        createdAt: savedOrder.createdAt,
+        orderSnapshot: {
+          selectedItems: savedOrder.selectedCartItems.map(item => ({
+            cartItemId: item.cartItemId.toString(),
+            hostName: item.cartItemData.details.hostName,
+            packageType: item.cartItemData.packageType,
+            eventDate: item.cartItemData.details.eventDate,
+            price: item.cartItemData.totalPrice
+          }))
+        }
       });
 
       return savedOrder;
+
     } catch (error: any) {
-      logger.error('Error creating order:', error);
+      logger.error(`💥 ORDER CREATION FAILED [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        paymobOrderId,
+        merchantOrderId,
+        selectedCartItemIds,
+        totalAmount,
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      });
       throw error;
     }
   }

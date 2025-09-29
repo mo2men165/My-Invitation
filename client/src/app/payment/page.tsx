@@ -73,28 +73,111 @@ const PaymentPageContent: React.FC = () => {
   // Load payment summary and pending orders
   useEffect(() => {
     const loadPaymentData = async () => {
+      const loadId = `load_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       try {
+        console.log(`🚀 PAYMENT PAGE DATA LOADING STARTED [${loadId}]`, {
+          loadId,
+          userId: 'authenticated_user',
+          timestamp: new Date().toISOString(),
+          isAuthenticated,
+          authLoading
+        });
+
         setLoadingSummary(true);
+        
+        console.log(`🛒 FETCHING CART DATA [${loadId}]`, {
+          loadId,
+          action: 'DISPATCHING_FETCH_CART'
+        });
+        
         await dispatch(fetchCart()).unwrap();
         
+        console.log(`✅ CART DATA FETCHED [${loadId}]`, {
+          loadId,
+          action: 'CART_FETCH_COMPLETED'
+        });
+        
         // Load payment summary
+        console.log(`💰 LOADING PAYMENT SUMMARY [${loadId}]`, {
+          loadId,
+          action: 'CALLING_PAYMENT_API_GET_SUMMARY'
+        });
+        
         const summaryResponse = await paymentAPI.getPaymentSummary();
         
+        console.log(`📊 PAYMENT SUMMARY RECEIVED [${loadId}]`, {
+          loadId,
+          summarySuccess: summaryResponse.success,
+          summaryData: summaryResponse.summary ? {
+            itemCount: summaryResponse.summary.itemCount,
+            totalAmount: summaryResponse.summary.totalAmount,
+            items: summaryResponse.summary.items.map(item => ({
+              id: item.id,
+              hostName: item.hostName,
+              packageType: item.packageType,
+              price: item.price
+            }))
+          } : 'NO_SUMMARY_DATA'
+        });
+        
         // Load pending orders and cart items using the API service
+        console.log(`⏳ LOADING PENDING ORDERS AND CART ITEMS [${loadId}]`, {
+          loadId,
+          action: 'CALLING_PENDING_APIS_IN_PARALLEL'
+        });
+        
         const [pendingData, pendingItemsData] = await Promise.all([
           paymentAPI.getPendingOrders(),
           paymentAPI.getPendingCartItems()
         ]);
         
+        console.log(`📋 PENDING DATA RECEIVED [${loadId}]`, {
+          loadId,
+          pendingOrdersSuccess: pendingData.success,
+          pendingOrdersCount: pendingData.orders?.length || 0,
+          pendingOrders: pendingData.orders?.map(order => ({
+            id: order.id,
+            paymobOrderId: order.paymobOrderId,
+            totalAmount: order.totalAmount,
+            selectedItemsCount: order.selectedItemsCount,
+            createdAt: order.createdAt
+          })) || [],
+          pendingCartItemsSuccess: pendingItemsData.success,
+          pendingCartItemIds: pendingItemsData.pendingCartItemIds || []
+        });
+        
         if (summaryResponse.success && summaryResponse.summary) {
+          console.log(`✅ SETTING PAYMENT SUMMARY [${loadId}]`, {
+            loadId,
+            summaryItemCount: summaryResponse.summary.itemCount,
+            summaryTotalAmount: summaryResponse.summary.totalAmount
+          });
+          
           setPaymentSummary(summaryResponse.summary);
           
           // Initialize selected items (all available items)
           const availableItems = summaryResponse.summary.items.filter(
             item => !pendingItemsData.pendingCartItemIds.includes(item.id)
           );
+          
+          console.log(`🎯 INITIALIZING SELECTED ITEMS [${loadId}]`, {
+            loadId,
+            totalItems: summaryResponse.summary.items.length,
+            pendingItemsCount: pendingItemsData.pendingCartItemIds.length,
+            availableItemsCount: availableItems.length,
+            availableItemIds: availableItems.map(item => item.id),
+            pendingItemIds: pendingItemsData.pendingCartItemIds
+          });
+          
           setSelectedCartItemIds(availableItems.map(item => item.id));
         } else {
+          console.error(`❌ PAYMENT SUMMARY FAILED [${loadId}]`, {
+            loadId,
+            summaryResponse,
+            action: 'REDIRECTING_TO_CART'
+          });
+          
           toast({
             title: "خطأ",
             description: "لا توجد عناصر في السلة للدفع",
@@ -104,13 +187,41 @@ const PaymentPageContent: React.FC = () => {
         }
         
         if (pendingData.success) {
+          console.log(`✅ SETTING PENDING ORDERS [${loadId}]`, {
+            loadId,
+            pendingOrdersCount: pendingData.orders.length
+          });
           setPendingOrders(pendingData.orders);
         }
         
         if (pendingItemsData.success) {
+          console.log(`✅ SETTING PENDING CART ITEMS [${loadId}]`, {
+            loadId,
+            pendingCartItemIdsCount: pendingItemsData.pendingCartItemIds.length
+          });
           setPendingCartItemIds(pendingItemsData.pendingCartItemIds);
         }
+        
+        console.log(`🎉 PAYMENT PAGE DATA LOADING COMPLETED [${loadId}]`, {
+          loadId,
+          finalState: {
+            hasPaymentSummary: !!summaryResponse.summary,
+            selectedItemsCount: summaryResponse.summary ? summaryResponse.summary.items.filter(
+              item => !pendingItemsData.pendingCartItemIds.includes(item.id)
+            ).length : 0,
+            pendingOrdersCount: pendingData.orders?.length || 0,
+            pendingCartItemsCount: pendingItemsData.pendingCartItemIds?.length || 0
+          }
+        });
+        
       } catch (error: any) {
+        console.error(`💥 PAYMENT PAGE DATA LOADING FAILED [${loadId}]`, {
+          loadId,
+          error: error.message,
+          stack: error.stack,
+          timestamp: new Date().toISOString()
+        });
+        
         toast({
           title: "خطأ في تحميل بيانات الدفع",
           description: error.message || "حدث خطأ غير متوقع",
@@ -119,11 +230,24 @@ const PaymentPageContent: React.FC = () => {
         router.push('/cart');
       } finally {
         setLoadingSummary(false);
+        console.log(`🏁 PAYMENT PAGE LOADING FINISHED [${loadId}]`, {
+          loadId,
+          loadingSummary: false,
+          timestamp: new Date().toISOString()
+        });
       }
     };
 
-    loadPaymentData();
-  }, [dispatch, router, toast]);
+    if (isAuthenticated && !authLoading) {
+      loadPaymentData();
+    } else {
+      console.log(`⏸️ PAYMENT PAGE LOADING SKIPPED`, {
+        isAuthenticated,
+        authLoading,
+        reason: isAuthenticated ? 'AUTH_LOADING' : 'NOT_AUTHENTICATED'
+      });
+    }
+  }, [dispatch, router, toast, isAuthenticated, authLoading]);
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -143,7 +267,33 @@ const PaymentPageContent: React.FC = () => {
   }
 
   const handlePayNow = async () => {
+    const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`🚀 PAYMENT INITIATION STARTED [${paymentId}]`, {
+      paymentId,
+      timestamp: new Date().toISOString(),
+      paymentSummary: paymentSummary ? {
+        itemCount: paymentSummary.itemCount,
+        totalAmount: paymentSummary.totalAmount,
+        items: paymentSummary.items.map(item => ({
+          id: item.id,
+          hostName: item.hostName,
+          packageType: item.packageType,
+          price: item.price
+        }))
+      } : 'NO_PAYMENT_SUMMARY',
+      selectedCartItemIds,
+      selectedItemsCount: selectedCartItemIds.length
+    });
+
     if (!paymentSummary || selectedCartItemIds.length === 0) {
+      console.error(`❌ PAYMENT VALIDATION FAILED [${paymentId}]`, {
+        paymentId,
+        hasPaymentSummary: !!paymentSummary,
+        selectedItemsCount: selectedCartItemIds.length,
+        reason: !paymentSummary ? 'NO_PAYMENT_SUMMARY' : 'NO_SELECTED_ITEMS'
+      });
+      
       toast({
         title: "خطأ",
         description: "يرجى تحديد العناصر المراد دفعها",
@@ -152,20 +302,66 @@ const PaymentPageContent: React.FC = () => {
       return;
     }
 
+    console.log(`✅ PAYMENT VALIDATION PASSED [${paymentId}]`, {
+      paymentId,
+      selectedItemsCount: selectedCartItemIds.length,
+      totalAmount: paymentSummary.totalAmount
+    });
+
     setIsProcessingPayment(true);
+    console.log(`⏳ PAYMENT PROCESSING STARTED [${paymentId}]`, {
+      paymentId,
+      isProcessingPayment: true
+    });
 
     try {
       // Get user profile information
+      console.log(`👤 FETCHING USER PROFILE [${paymentId}]`, {
+        paymentId,
+        action: 'CALLING_AUTH_API_GET_CURRENT_USER'
+      });
+      
       const authAPI = await import('@/lib/api/auth');
       const userResponse = await authAPI.authAPI.getCurrentUser();
       
+      console.log(`📋 USER PROFILE RECEIVED [${paymentId}]`, {
+        paymentId,
+        userResponseSuccess: userResponse.success,
+        hasUser: !!userResponse.user,
+        userData: userResponse.user ? {
+          firstName: userResponse.user.firstName,
+          lastName: userResponse.user.lastName,
+          email: userResponse.user.email,
+          phone: userResponse.user.phone,
+          city: userResponse.user.city
+        } : 'NO_USER_DATA'
+      });
+      
       if (!userResponse.success || !userResponse.user) {
+        console.error(`❌ USER PROFILE FETCH FAILED [${paymentId}]`, {
+          paymentId,
+          userResponse,
+          action: 'THROWING_ERROR'
+        });
         throw new Error('فشل في جلب بيانات المستخدم');
       }
 
       const user = userResponse.user;
 
       // Create Paymob order with selected items
+      console.log(`💳 CREATING PAYMOB ORDER [${paymentId}]`, {
+        paymentId,
+        customerInfo: {
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          city: user.city || 'الرياض'
+        },
+        selectedCartItemIds,
+        action: 'CALLING_PAYMOB_API_CREATE_ORDER'
+      });
+
       const orderResult = await paymobAPI.createOrder({
         customerInfo: {
           firstName: user.firstName || '',
@@ -177,13 +373,51 @@ const PaymentPageContent: React.FC = () => {
         selectedCartItemIds: selectedCartItemIds
       });
 
+      console.log(`📊 PAYMOB ORDER RESULT [${paymentId}]`, {
+        paymentId,
+        orderSuccess: orderResult.success,
+        orderData: orderResult.success ? {
+          orderId: orderResult.orderId,
+          ourOrderId: orderResult.ourOrderId,
+          paymentTokenLength: orderResult.paymentToken?.length || 0,
+          hasIframeUrl: !!orderResult.iframeUrl,
+          iframeUrl: orderResult.iframeUrl,
+          amount: orderResult.amount,
+          currency: orderResult.currency,
+          orderCreationId: orderResult.orderCreationId,
+          processingTime: orderResult.processingTime
+        } : 'ORDER_FAILED'
+      });
+
       if (orderResult.success) {
+        console.log(`🌐 REDIRECTING TO PAYMOB IFRAME [${paymentId}]`, {
+          paymentId,
+          iframeUrl: orderResult.iframeUrl,
+          orderId: orderResult.orderId,
+          ourOrderId: orderResult.ourOrderId,
+          amount: orderResult.amount,
+          action: 'WINDOW_LOCATION_HREF_REDIRECT'
+        });
+        
         // Redirect to Paymob iframe
         window.location.href = orderResult.iframeUrl;
       } else {
+        console.error(`❌ PAYMOB ORDER CREATION FAILED [${paymentId}]`, {
+          paymentId,
+          orderResult,
+          action: 'THROWING_ERROR'
+        });
         throw new Error('فشل في إنشاء طلب الدفع');
       }
     } catch (error: any) {
+      console.error(`💥 PAYMENT PROCESSING FAILED [${paymentId}]`, {
+        paymentId,
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+        action: 'SHOWING_ERROR_TOAST'
+      });
+      
       toast({
         title: "فشل في إنشاء طلب الدفع",
         description: error.message || "حدث خطأ أثناء إنشاء طلب الدفع",
@@ -192,6 +426,11 @@ const PaymentPageContent: React.FC = () => {
       });
     } finally {
       setIsProcessingPayment(false);
+      console.log(`🏁 PAYMENT PROCESSING FINISHED [${paymentId}]`, {
+        paymentId,
+        isProcessingPayment: false,
+        timestamp: new Date().toISOString()
+      });
     }
   };
 

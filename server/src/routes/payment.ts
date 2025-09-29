@@ -62,52 +62,135 @@ router.get('/summary', async (req: Request, res: Response) => {
  * Create Paymob order and get payment URL
  */
 router.post('/create-paymob-order', async (req: Request, res: Response) => {
+  const orderCreationStartTime = Date.now();
+  const orderCreationId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
+    // ===== COMPREHENSIVE ORDER CREATION LOGGING =====
+    logger.info(`🚀 PAYMENT ORDER CREATION STARTED [${orderCreationId}]`, {
+      timestamp: new Date().toISOString(),
+      orderCreationId,
+      userId: req.user!.id,
+      requestBody: {
+        hasCustomerInfo: !!req.body.customerInfo,
+        customerInfoKeys: req.body.customerInfo ? Object.keys(req.body.customerInfo) : [],
+        hasSelectedCartItemIds: !!req.body.selectedCartItemIds,
+        selectedCartItemIdsCount: req.body.selectedCartItemIds?.length || 0,
+        selectedCartItemIds: req.body.selectedCartItemIds
+      }
+    });
+
     const userId = req.user!.id;
     const { customerInfo, selectedCartItemIds } = req.body;
 
     // Validate required fields
     if (!customerInfo || !customerInfo.firstName || !customerInfo.lastName || !customerInfo.email || !customerInfo.phone || !customerInfo.city) {
+      logger.error(`❌ VALIDATION FAILED - MISSING CUSTOMER INFO [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        customerInfoProvided: !!customerInfo,
+        missingFields: {
+          firstName: !customerInfo?.firstName,
+          lastName: !customerInfo?.lastName,
+          email: !customerInfo?.email,
+          phone: !customerInfo?.phone,
+          city: !customerInfo?.city
+        }
+      });
+      
       return res.status(400).json({
         success: false,
         error: { message: 'معلومات العميل مطلوبة' }
       });
     }
 
+    logger.info(`✅ CUSTOMER INFO VALIDATED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      customerInfo: {
+        firstName: customerInfo.firstName,
+        lastName: customerInfo.lastName,
+        email: customerInfo.email,
+        phone: customerInfo.phone,
+        city: customerInfo.city
+      }
+    });
+
     // If no selectedCartItemIds provided, use all cart items (backward compatibility)
     let finalSelectedCartItemIds = selectedCartItemIds;
     if (!selectedCartItemIds || !Array.isArray(selectedCartItemIds) || selectedCartItemIds.length === 0) {
+      logger.info(`📋 NO SPECIFIC ITEMS SELECTED - USING ALL CART ITEMS [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        reason: 'BACKWARD_COMPATIBILITY'
+      });
+      
       // For backward compatibility, if no specific items selected, use all cart items
       const allCartSummary = await PaymentService.getCartPaymentSummary(userId);
       if (!allCartSummary.success || !allCartSummary.summary) {
+        logger.error(`❌ CART SUMMARY FAILED - NO ITEMS AVAILABLE [${orderCreationId}]`, {
+          orderCreationId,
+          userId,
+          cartSummaryResult: allCartSummary
+        });
+        
         return res.status(400).json({
           success: false,
           error: { message: 'السلة فارغة أو غير صحيحة' }
         });
       }
       finalSelectedCartItemIds = allCartSummary.summary.items.map(item => item.id);
+      
+      logger.info(`📋 ALL CART ITEMS SELECTED [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        selectedItemsCount: finalSelectedCartItemIds.length,
+        selectedItemIds: finalSelectedCartItemIds
+      });
+    } else {
+      logger.info(`📋 SPECIFIC ITEMS SELECTED [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        selectedItemsCount: finalSelectedCartItemIds.length,
+        selectedItemIds: finalSelectedCartItemIds
+      });
     }
 
     // Get cart summary for selected items only
+    logger.info(`🛒 GETTING CART SUMMARY FOR SELECTED ITEMS [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      selectedItemIds: finalSelectedCartItemIds
+    });
+
     const cartSummary = await PaymentService.getCartPaymentSummary(userId, finalSelectedCartItemIds);
     if (!cartSummary.success || !cartSummary.summary) {
+      logger.error(`❌ CART SUMMARY FAILED FOR SELECTED ITEMS [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        selectedItemIds: finalSelectedCartItemIds,
+        cartSummaryResult: cartSummary
+      });
+      
       return res.status(400).json({
         success: false,
         error: { message: 'السلة فارغة أو غير صحيحة' }
       });
     }
 
-    // Debug logging
-    logger.info(`Cart summary for user ${userId} (selected items):`, {
-      selectedItemIds: finalSelectedCartItemIds,
-      itemCount: cartSummary.summary.itemCount,
-      totalAmount: cartSummary.summary.totalAmount,
-      items: cartSummary.summary.items.map(item => ({
-        id: item.id,
-        hostName: item.hostName,
-        price: item.price,
-        packageType: item.packageType
-      }))
+    logger.info(`✅ CART SUMMARY RETRIEVED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      cartSummary: {
+        itemCount: cartSummary.summary.itemCount,
+        totalAmount: cartSummary.summary.totalAmount,
+        items: cartSummary.summary.items.map(item => ({
+          id: item.id,
+          hostName: item.hostName,
+          packageType: item.packageType,
+          price: item.price
+        }))
+      }
     });
 
     // Prepare items for Paymob
@@ -118,7 +201,27 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       price: item.price
     }));
 
+    logger.info(`🛍️ ITEMS PREPARED FOR PAYMOB [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      itemsCount: items.length,
+      items: items.map(item => ({
+        name: item.name,
+        description: item.description,
+        quantity: item.quantity,
+        price: item.price
+      }))
+    });
+
     // Create Paymob order
+    logger.info(`💳 CREATING PAYMOB ORDER [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      amount: cartSummary.summary.totalAmount,
+      itemsCount: items.length,
+      startingPaymobOrderCreation: new Date().toISOString()
+    });
+
     const paymobOrder = await paymobService.createOrder({
       userId,
       amount: cartSummary.summary.totalAmount,
@@ -126,11 +229,44 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       customerInfo
     });
 
+    logger.info(`✅ PAYMOB ORDER CREATED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      paymobOrderId: paymobOrder.id,
+      amount: cartSummary.summary.totalAmount,
+      paymobOrderCreationTime: Date.now() - orderCreationStartTime
+    });
+
     // Generate payment key
+    logger.info(`🔑 GENERATING PAYMENT KEY [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      paymobOrderId: paymobOrder.id,
+      amount: cartSummary.summary.totalAmount
+    });
+
     const paymentKey = await paymobService.generatePaymentKey(paymobOrder.id, cartSummary.summary.totalAmount, customerInfo);
+
+    logger.info(`✅ PAYMENT KEY GENERATED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      paymobOrderId: paymobOrder.id,
+      paymentTokenLength: paymentKey.token?.length || 0,
+      hasPaymentToken: !!paymentKey.token
+    });
 
     // Create our internal order record
     const merchantOrderId = `ORDER_${userId}_${Date.now()}`;
+    
+    logger.info(`📝 CREATING INTERNAL ORDER RECORD [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      paymobOrderId: paymobOrder.id,
+      merchantOrderId,
+      selectedItemsCount: finalSelectedCartItemIds.length,
+      totalAmount: cartSummary.summary.totalAmount
+    });
+
     const order = await OrderService.createOrder(
       userId,
       finalSelectedCartItemIds,
@@ -139,14 +275,40 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       cartSummary.summary.totalAmount
     );
 
+    logger.info(`✅ INTERNAL ORDER RECORD CREATED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      paymobOrderId: paymobOrder.id,
+      ourOrderId: order._id,
+      merchantOrderId,
+      selectedItemsCount: finalSelectedCartItemIds.length,
+      totalAmount: cartSummary.summary.totalAmount
+    });
+
     // Get iframe URL
     const iframeUrl = paymobService.getIframeUrl(paymentKey.token);
 
-    logger.info(`Paymob order created for user ${userId}:`, {
+    logger.info(`🌐 IFRAME URL GENERATED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      paymobOrderId: paymobOrder.id,
+      ourOrderId: order._id,
+      iframeUrl,
+      hasIframeUrl: !!iframeUrl
+    });
+
+    const totalProcessingTime = Date.now() - orderCreationStartTime;
+    
+    logger.info(`🎉 PAYMENT ORDER CREATION COMPLETED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
       paymobOrderId: paymobOrder.id,
       ourOrderId: order._id,
       selectedItemsCount: finalSelectedCartItemIds.length,
-      totalAmount: cartSummary.summary.totalAmount
+      totalAmount: cartSummary.summary.totalAmount,
+      iframeUrl,
+      totalProcessingTime,
+      completedAt: new Date().toISOString()
     });
 
     return res.json({
@@ -156,14 +318,27 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       paymentToken: paymentKey.token,
       iframeUrl,
       amount: cartSummary.summary.totalAmount,
-      currency: 'SAR'
+      currency: 'SAR',
+      orderCreationId: orderCreationId,
+      processingTime: totalProcessingTime
     });
 
   } catch (error: any) {
-    logger.error('Error creating Paymob order:', error);
+    const totalProcessingTime = Date.now() - orderCreationStartTime;
+    logger.error(`💥 PAYMENT ORDER CREATION FAILED [${orderCreationId}]`, {
+      orderCreationId,
+      userId: req.user?.id,
+      error: error.message,
+      stack: error.stack,
+      processingTime: totalProcessingTime,
+      errorAt: new Date().toISOString()
+    });
+    
     return res.status(500).json({
       success: false,
-      error: { message: error.message || 'خطأ في إنشاء طلب الدفع' }
+      error: { message: error.message || 'خطأ في إنشاء طلب الدفع' },
+      orderCreationId: orderCreationId,
+      processingTime: totalProcessingTime
     });
   }
 });
@@ -279,32 +454,105 @@ router.get('/paymob/config', async (req: Request, res: Response) => {
  * This route should NOT require authentication as it's called by Paymob
  */
 router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
+  const webhookStartTime = Date.now();
+  const webhookId = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
-    const webhookData: PaymobWebhookData = req.body;
-    // Paymob sends signature as query parameter 'hmac', not in headers
-    const signature = req.query.hmac as string || req.headers['x-paymob-signature'] as string;
+    // ===== COMPREHENSIVE WEBHOOK LOGGING =====
+    logger.info(`🔔 WEBHOOK RECEIVED [${webhookId}]`, {
+      timestamp: new Date().toISOString(),
+      webhookId,
+      method: req.method,
+      url: req.url,
+      headers: {
+        'content-type': req.headers['content-type'],
+        'user-agent': req.headers['user-agent'],
+        'x-forwarded-for': req.headers['x-forwarded-for'],
+        'x-real-ip': req.headers['x-real-ip'],
+        'host': req.headers['host'],
+        'x-paymob-signature': req.headers['x-paymob-signature'] ? 'PRESENT' : 'MISSING'
+      },
+      queryParams: req.query,
+      bodySize: JSON.stringify(req.body).length,
+      bodyKeys: Object.keys(req.body || {}),
+      rawBody: req.body
+    });
 
-    // Debug logging
-    logger.info('Paymob webhook received:', {
-      hasSignature: !!signature,
+    const webhookData: PaymobWebhookData = req.body;
+    
+    // ===== DETAILED PAYMOB DATA ANALYSIS =====
+    logger.info(`📊 PAYMOB DATA ANALYSIS [${webhookId}]`, {
+      webhookId,
+      webhookType: webhookData.type,
+      hasObj: !!webhookData.obj,
+      objStructure: webhookData.obj ? {
+        keys: Object.keys(webhookData.obj),
+        id: webhookData.obj.id,
+        order: webhookData.obj.order ? {
+          keys: Object.keys(webhookData.obj.order),
+          id: webhookData.obj.order.id,
+          merchant_order_id: webhookData.obj.order.merchant_order_id
+        } : 'NO_ORDER',
+        amount_cents: webhookData.obj?.amount_cents,
+        amount_sar: webhookData.obj?.amount_cents ? webhookData.obj.amount_cents / 100 : 'N/A',
+        success: webhookData.obj?.success,
+        pending: webhookData.obj?.pending,
+        error_occured: webhookData.obj?.error_occured,
+        data: webhookData.obj?.data,
+        created_at: webhookData.obj?.created_at,
+        is_3d_secure: webhookData.obj?.is_3d_secure,
+        is_auth: webhookData.obj?.is_auth,
+        is_capture: webhookData.obj?.is_capture,
+        is_refunded: (webhookData.obj as any)?.is_refunded,
+        is_void: (webhookData.obj as any)?.is_void,
+        is_voided: (webhookData.obj as any)?.is_voided,
+        integration_id: webhookData.obj?.integration_id,
+        profile_id: (webhookData.obj as any)?.profile_id,
+        source_data: webhookData.obj?.source_data,
+        hmac: webhookData.obj?.hmac
+      } : 'NO_OBJ',
+      fullWebhookData: webhookData
+    });
+
+    // Extract signature for verification
+    const signature = req.query.hmac as string || req.headers['x-paymob-signature'] as string;
+    
+    logger.info(`🔐 SIGNATURE VERIFICATION [${webhookId}]`, {
+      webhookId,
       signatureFromQuery: req.query.hmac,
       signatureFromHeader: req.headers['x-paymob-signature'],
-      allHeaders: Object.keys(req.headers),
-      queryParams: req.query,
-      webhookType: webhookData.type,
-      transactionId: webhookData.obj?.id,
+      hasSignature: !!signature,
+      signatureLength: signature?.length || 0,
       hasSecretKey: !!process.env.PAYMOB_SECRET_KEY,
-      secretKeyLength: process.env.PAYMOB_SECRET_KEY?.length || 0
+      secretKeyLength: process.env.PAYMOB_SECRET_KEY?.length || 0,
+      bypassEnabled: process.env.PAYMOB_BYPASS_SIGNATURE === 'true'
     });
 
     // Verify webhook signature (bypass for testing if needed)
     const bypassSignature = process.env.PAYMOB_BYPASS_SIGNATURE === 'true';
-    if (!bypassSignature && !paymobService.verifyWebhookSignature(webhookData, signature)) {
-      logger.warn('Invalid Paymob webhook signature', {
+    let signatureValid = false;
+    
+    if (bypassSignature) {
+      signatureValid = true;
+      logger.info(`⚠️ SIGNATURE BYPASSED FOR TESTING [${webhookId}]`);
+    } else {
+      signatureValid = paymobService.verifyWebhookSignature(webhookData, signature);
+      logger.info(`🔍 SIGNATURE VERIFICATION RESULT [${webhookId}]`, {
+        webhookId,
+        isValid: signatureValid,
+        signatureProvided: !!signature,
+        secretKeyConfigured: !!process.env.PAYMOB_SECRET_KEY
+      });
+    }
+
+    if (!signatureValid) {
+      logger.error(`❌ INVALID WEBHOOK SIGNATURE [${webhookId}]`, {
+        webhookId,
         receivedSignature: signature,
         hasSecretKey: !!process.env.PAYMOB_SECRET_KEY,
         webhookDataKeys: Object.keys(webhookData),
-        bypassEnabled: bypassSignature
+        bypassEnabled: bypassSignature,
+        action: 'REJECTING_WEBHOOK'
       });
       return res.status(401).json({
         success: false,
@@ -312,98 +560,208 @@ router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
       });
     }
     
-    if (bypassSignature) {
-      logger.info('Signature validation bypassed for testing');
-    }
+    logger.info(`✅ SIGNATURE VALIDATED [${webhookId}]`);
 
-    // Process webhook
+    // ===== PROCESS WEBHOOK DATA =====
+    logger.info(`🔄 PROCESSING WEBHOOK DATA [${webhookId}]`, {
+      webhookId,
+      startingProcessing: new Date().toISOString()
+    });
+
     const result = await paymobService.processWebhook(webhookData);
     
+    logger.info(`📋 WEBHOOK PROCESSING RESULT [${webhookId}]`, {
+      webhookId,
+      processingSuccess: result.success,
+      resultData: result,
+      processingTime: Date.now() - webhookStartTime
+    });
+    
     if (!result.success) {
-      logger.error('Failed to process Paymob webhook:', result.error);
+      logger.error(`❌ WEBHOOK PROCESSING FAILED [${webhookId}]`, {
+        webhookId,
+        error: result.error,
+        webhookData: webhookData,
+        processingTime: Date.now() - webhookStartTime
+      });
       return res.status(500).json({
         success: false,
         error: { message: result.error }
       });
     }
 
-    // Handle payment result
-    logger.info('Webhook result analysis:', {
+    // ===== PAYMENT RESULT ANALYSIS =====
+    logger.info(`🎯 PAYMENT RESULT ANALYSIS [${webhookId}]`, {
+      webhookId,
       status: result.status,
       paymobOrderId: result.orderId,
       transactionId: result.transactionId,
       amount: result.amount,
-      willProcessPayment: result.status === 'success' && result.orderId && result.transactionId
+      willProcessPayment: result.status === 'success' && result.orderId && result.transactionId,
+      willMarkAsFailed: result.status === 'failed' && result.orderId,
+      conditionsMet: {
+        isSuccess: result.status === 'success',
+        hasOrderId: !!result.orderId,
+        hasTransactionId: !!result.transactionId,
+        isFailed: result.status === 'failed'
+      }
     });
 
+    // ===== HANDLE SUCCESSFUL PAYMENT =====
     if (result.status === 'success' && result.orderId && result.transactionId) {
+      logger.info(`💰 PROCESSING SUCCESSFUL PAYMENT [${webhookId}]`, {
+        webhookId,
+        paymobOrderId: result.orderId,
+        transactionId: result.transactionId,
+        amount: result.amount,
+        startingPaymentProcessing: new Date().toISOString()
+      });
+
       try {
-        // Process successful payment using OrderService
         const paymentResult = await OrderService.processSuccessfulPayment(
           Number(result.orderId), // This is the Paymob order ID
           result.transactionId
         );
 
+        logger.info(`✅ PAYMENT PROCESSED SUCCESSFULLY [${webhookId}]`, {
+          webhookId,
+          paymobOrderId: result.orderId,
+          ourOrderId: paymentResult.orderId,
+          transactionId: result.transactionId,
+          eventsCreated: paymentResult.eventsCreated,
+          amount: result.amount,
+          processingTime: Date.now() - webhookStartTime,
+          paymentResult: paymentResult
+        });
+
         if (paymentResult.success) {
-          logger.info(`Payment webhook processed successfully:`, {
+          logger.info(`🎉 PAYMENT COMPLETED SUCCESSFULLY [${webhookId}]`, {
+            webhookId,
             paymobOrderId: result.orderId,
             ourOrderId: paymentResult.orderId,
             transactionId: result.transactionId,
             eventsCreated: paymentResult.eventsCreated,
-            amount: result.amount
+            amount: result.amount,
+            totalProcessingTime: Date.now() - webhookStartTime
           });
         } else {
-          logger.error(`Failed to process payment:`, {
+          logger.error(`❌ PAYMENT PROCESSING FAILED [${webhookId}]`, {
+            webhookId,
             paymobOrderId: result.orderId,
             transactionId: result.transactionId,
-            error: paymentResult.error
+            error: paymentResult.error,
+            processingTime: Date.now() - webhookStartTime
           });
         }
       } catch (error: any) {
-        logger.error('Error processing successful payment from webhook:', {
+        logger.error(`💥 ERROR PROCESSING SUCCESSFUL PAYMENT [${webhookId}]`, {
+          webhookId,
           error: error.message,
           stack: error.stack,
           paymobOrderId: result.orderId,
-          transactionId: result.transactionId
+          transactionId: result.transactionId,
+          processingTime: Date.now() - webhookStartTime,
+          action: 'NOT_RETURNING_ERROR_TO_PAYMOB_TO_AVOID_RETRIES'
         });
         // Don't return error to Paymob to avoid retries
       }
-    } else if (result.status === 'failed' && result.orderId) {
+    } 
+    // ===== HANDLE FAILED PAYMENT =====
+    else if (result.status === 'failed' && result.orderId) {
+      logger.info(`❌ PROCESSING FAILED PAYMENT [${webhookId}]`, {
+        webhookId,
+        paymobOrderId: result.orderId,
+        transactionId: result.transactionId,
+        amount: result.amount,
+        startingFailureProcessing: new Date().toISOString()
+      });
+
       try {
-        // Mark order as failed
         const markedAsFailed = await OrderService.markOrderAsFailed(Number(result.orderId));
+        
+        logger.info(`📝 ORDER FAILURE PROCESSING RESULT [${webhookId}]`, {
+          webhookId,
+          paymobOrderId: result.orderId,
+          transactionId: result.transactionId,
+          markedAsFailed: markedAsFailed,
+          processingTime: Date.now() - webhookStartTime
+        });
+
         if (markedAsFailed) {
-          logger.info(`Order marked as failed:`, {
+          logger.info(`✅ ORDER MARKED AS FAILED [${webhookId}]`, {
+            webhookId,
             paymobOrderId: result.orderId,
-            transactionId: result.transactionId
+            transactionId: result.transactionId,
+            processingTime: Date.now() - webhookStartTime
+          });
+        } else {
+          logger.warn(`⚠️ FAILED TO MARK ORDER AS FAILED [${webhookId}]`, {
+            webhookId,
+            paymobOrderId: result.orderId,
+            transactionId: result.transactionId,
+            processingTime: Date.now() - webhookStartTime
           });
         }
       } catch (error: any) {
-        logger.error('Error marking order as failed:', {
+        logger.error(`💥 ERROR MARKING ORDER AS FAILED [${webhookId}]`, {
+          webhookId,
           error: error.message,
-          paymobOrderId: result.orderId
+          stack: error.stack,
+          paymobOrderId: result.orderId,
+          processingTime: Date.now() - webhookStartTime
         });
       }
-    } else {
-      logger.info('Payment not processed - conditions not met:', {
+    } 
+    // ===== HANDLE OTHER CASES =====
+    else {
+      logger.info(`ℹ️ PAYMENT NOT PROCESSED - CONDITIONS NOT MET [${webhookId}]`, {
+        webhookId,
         status: result.status,
         hasOrderId: !!result.orderId,
         hasTransactionId: !!result.transactionId,
         paymobOrderId: result.orderId,
-        transactionId: result.transactionId
+        transactionId: result.transactionId,
+        amount: result.amount,
+        processingTime: Date.now() - webhookStartTime,
+        reason: 'CONDITIONS_NOT_MET_FOR_PROCESSING'
       });
     }
 
+    // ===== WEBHOOK COMPLETION =====
+    const totalProcessingTime = Date.now() - webhookStartTime;
+    logger.info(`🏁 WEBHOOK PROCESSING COMPLETED [${webhookId}]`, {
+      webhookId,
+      totalProcessingTime,
+      finalStatus: result.status,
+      paymobOrderId: result.orderId,
+      transactionId: result.transactionId,
+      completedAt: new Date().toISOString(),
+      responseToPaymob: 'SUCCESS'
+    });
+
     return res.json({
       success: true,
-      message: 'Webhook processed successfully'
+      message: 'Webhook processed successfully',
+      webhookId: webhookId,
+      processingTime: totalProcessingTime
     });
 
   } catch (error: any) {
-    logger.error('Error processing Paymob webhook:', error);
+    const totalProcessingTime = Date.now() - webhookStartTime;
+    logger.error(`💥 WEBHOOK PROCESSING ERROR [${webhookId}]`, {
+      webhookId,
+      error: error.message,
+      stack: error.stack,
+      processingTime: totalProcessingTime,
+      errorAt: new Date().toISOString(),
+      action: 'RETURNING_ERROR_TO_PAYMOB'
+    });
+    
     return res.status(500).json({
       success: false,
-      error: { message: 'خطأ في معالجة إشعار الدفع' }
+      error: { message: 'خطأ في معالجة إشعار الدفع' },
+      webhookId: webhookId,
+      processingTime: totalProcessingTime
     });
   }
 });
@@ -414,15 +772,53 @@ router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
  * This endpoint receives POST data from Paymob and redirects user accordingly
  */
 router.post('/paymob/callback', cors(), async (req: Request, res: Response) => {
+  const callbackStartTime = Date.now();
+  const callbackId = `callback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
+    // ===== COMPREHENSIVE CALLBACK LOGGING =====
+    logger.info(`🔄 CALLBACK RECEIVED [${callbackId}]`, {
+      timestamp: new Date().toISOString(),
+      callbackId,
+      method: req.method,
+      url: req.url,
+      headers: {
+        'content-type': req.headers['content-type'],
+        'user-agent': req.headers['user-agent'],
+        'referer': req.headers['referer'],
+        'x-forwarded-for': req.headers['x-forwarded-for'],
+        'x-real-ip': req.headers['x-real-ip'],
+        'host': req.headers['host']
+      },
+      queryParams: req.query,
+      bodySize: JSON.stringify(req.body).length,
+      bodyKeys: Object.keys(req.body || {}),
+      rawBody: req.body
+    });
+
     const webhookData: PaymobWebhookData = req.body;
     
-    logger.info('Paymob callback received:', {
-      type: webhookData.type,
-      transactionId: webhookData.obj?.id,
-      success: webhookData.obj?.success,
-      pending: webhookData.obj?.pending,
-      orderId: webhookData.obj?.merchant_order_id
+    // ===== DETAILED CALLBACK DATA ANALYSIS =====
+    logger.info(`📊 CALLBACK DATA ANALYSIS [${callbackId}]`, {
+      callbackId,
+      webhookType: webhookData.type,
+      hasObj: !!webhookData.obj,
+      objStructure: webhookData.obj ? {
+        keys: Object.keys(webhookData.obj),
+        id: webhookData.obj.id,
+        order: webhookData.obj.order ? {
+          keys: Object.keys(webhookData.obj.order),
+          id: webhookData.obj.order.id,
+          merchant_order_id: webhookData.obj.order.merchant_order_id
+        } : 'NO_ORDER',
+        amount_cents: webhookData.obj?.amount_cents,
+        amount_sar: webhookData.obj?.amount_cents ? webhookData.obj.amount_cents / 100 : 'N/A',
+        success: webhookData.obj?.success,
+        pending: webhookData.obj?.pending,
+        error_occured: webhookData.obj?.error_occured,
+        created_at: webhookData.obj?.created_at
+      } : 'NO_OBJ',
+      fullCallbackData: webhookData
     });
 
     // Extract transaction details
@@ -432,30 +828,99 @@ router.post('/paymob/callback', cors(), async (req: Request, res: Response) => {
     const success = webhookData.obj?.success;
     const pending = webhookData.obj?.pending;
 
+    logger.info(`🎯 CALLBACK TRANSACTION ANALYSIS [${callbackId}]`, {
+      callbackId,
+      transactionId,
+      orderId,
+      amount,
+      success,
+      pending,
+      paymentStatus: {
+        isSuccess: success && !pending,
+        isFailed: !success,
+        isPending: pending
+      }
+    });
+
     // Determine redirect URL based on payment status
     let redirectUrl: string;
+    let redirectReason: string;
     
     if (success && !pending) {
       // Payment successful - redirect to success page
       redirectUrl = `${process.env.FRONTEND_URL}/payment/success?transaction_id=${transactionId}&order_id=${orderId}&amount=${amount}&status=success`;
+      redirectReason = 'PAYMENT_SUCCESS';
+      
+      logger.info(`✅ PAYMENT SUCCESS - REDIRECTING TO SUCCESS PAGE [${callbackId}]`, {
+        callbackId,
+        transactionId,
+        orderId,
+        amount,
+        redirectUrl,
+        redirectReason
+      });
     } else if (!success) {
       // Payment failed - redirect to failure page
       redirectUrl = `${process.env.FRONTEND_URL}/payment/failure?transaction_id=${transactionId}&order_id=${orderId}&amount=${amount}&status=failed`;
+      redirectReason = 'PAYMENT_FAILED';
+      
+      logger.info(`❌ PAYMENT FAILED - REDIRECTING TO FAILURE PAGE [${callbackId}]`, {
+        callbackId,
+        transactionId,
+        orderId,
+        amount,
+        redirectUrl,
+        redirectReason
+      });
     } else {
       // Payment pending - redirect to pending page
       redirectUrl = `${process.env.FRONTEND_URL}/payment/pending?transaction_id=${transactionId}&order_id=${orderId}&amount=${amount}&status=pending`;
+      redirectReason = 'PAYMENT_PENDING';
+      
+      logger.info(`⏳ PAYMENT PENDING - REDIRECTING TO PENDING PAGE [${callbackId}]`, {
+        callbackId,
+        transactionId,
+        orderId,
+        amount,
+        redirectUrl,
+        redirectReason
+      });
     }
 
-    logger.info(`Redirecting user to: ${redirectUrl}`);
+    logger.info(`🚀 REDIRECTING USER [${callbackId}]`, {
+      callbackId,
+      redirectUrl,
+      redirectReason,
+      transactionId,
+      orderId,
+      amount,
+      processingTime: Date.now() - callbackStartTime,
+      frontendUrl: process.env.FRONTEND_URL
+    });
 
     // Redirect user to appropriate page
     return res.redirect(redirectUrl);
 
   } catch (error: any) {
-    logger.error('Error processing Paymob callback:', error);
+    const totalProcessingTime = Date.now() - callbackStartTime;
+    logger.error(`💥 CALLBACK PROCESSING ERROR [${callbackId}]`, {
+      callbackId,
+      error: error.message,
+      stack: error.stack,
+      processingTime: totalProcessingTime,
+      errorAt: new Date().toISOString(),
+      action: 'REDIRECTING_TO_ERROR_PAGE'
+    });
     
     // Redirect to error page on any error
-    const errorUrl = `${process.env.FRONTEND_URL}/payment/error?message=${encodeURIComponent('خطأ في معالجة الدفع')}`;
+    const errorUrl = `${process.env.FRONTEND_URL}/payment/error?message=${encodeURIComponent('خطأ في معالجة الدفع')}&callback_id=${callbackId}`;
+    
+    logger.info(`🔄 REDIRECTING TO ERROR PAGE [${callbackId}]`, {
+      callbackId,
+      errorUrl,
+      processingTime: totalProcessingTime
+    });
+    
     return res.redirect(errorUrl);
   }
 });
