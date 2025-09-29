@@ -252,7 +252,7 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       amount: cartSummary.summary.totalAmount
     });
 
-    const paymentKey = await paymobService.generatePaymentKey(paymobOrder.id, cartSummary.summary.totalAmount, customerInfo);
+    const paymentKey = await paymobService.generatePaymentKey(paymobOrder.id, cartSummary.summary.totalAmount, customerInfo, merchantOrderId);
 
     logger.info(`✅ PAYMENT KEY GENERATED [${orderCreationId}]`, {
       orderCreationId,
@@ -291,7 +291,7 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
     });
 
     // Get iframe URL
-    const iframeUrl = paymobService.getIframeUrl(paymentKey.token);
+    const iframeUrl = paymobService.getIframeUrl(paymentKey.token, merchantOrderId);
 
     logger.info(`🌐 IFRAME URL GENERATED [${orderCreationId}]`, {
       orderCreationId,

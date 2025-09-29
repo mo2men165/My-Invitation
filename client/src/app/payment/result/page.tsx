@@ -69,7 +69,7 @@ const PaymentResultContent: React.FC = () => {
         setError(null);
         
         // Get parameters from URL
-        const merchantOrderId = searchParams.get('order_id');
+        const merchantOrderId = searchParams.get('order_id') || searchParams.get('merchant_order_id');
         const reason = searchParams.get('reason');
         const message = searchParams.get('message');
         const callbackId = searchParams.get('callback_id');

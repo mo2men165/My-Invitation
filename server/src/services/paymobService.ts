@@ -198,14 +198,15 @@ export class PaymobService {
     email: string;
     phone: string;
     city: string;
-  }): Promise<PaymobPaymentKeyResponse> {
+  }, merchantOrderId: string): Promise<PaymobPaymentKeyResponse> {
     try {
       const authToken = await this.authenticate();
 
       // Debug logging
       logger.info(`Generating payment key for order ${orderId} with amount:`, {
         amount: amount,
-        amount_cents: Math.round(amount * 100)
+        amount_cents: Math.round(amount * 100),
+        merchantOrderId
       });
 
       const paymentKeyRequest: PaymobPaymentKeyRequest = {
@@ -386,10 +387,28 @@ export class PaymobService {
   }
 
   /**
+   * Get dynamic return URL with merchant order ID
+   */
+  getReturnUrl(merchantOrderId: string): string {
+    const baseUrl = this.config.returnUrl;
+    return `${baseUrl}?order_id=${merchantOrderId}`;
+  }
+
+  /**
+   * Get dynamic cancel URL with merchant order ID
+   */
+  getCancelUrl(merchantOrderId: string): string {
+    const baseUrl = this.config.cancelUrl;
+    return `${baseUrl}&order_id=${merchantOrderId}`;
+  }
+
+  /**
    * Get iframe URL for payment
    */
-  getIframeUrl(paymentKey: string): string {
-    return `${this.config.baseUrl}/acceptance/iframes/${this.config.iframeId}?payment_token=${paymentKey}`;
+  getIframeUrl(paymentKey: string, merchantOrderId: string): string {
+    const baseUrl = `${this.config.baseUrl}/acceptance/iframes/${this.config.iframeId}?payment_token=${paymentKey}`;
+    // Add merchant_order_id as a parameter that will be passed to the return URL
+    return `${baseUrl}&merchant_order_id=${merchantOrderId}`;
   }
 
   /**
