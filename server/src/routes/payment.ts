@@ -619,7 +619,7 @@ router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
 
       try {
         const paymentResult = await OrderService.processSuccessfulPayment(
-          Number(result.orderId), // This is the Paymob order ID
+          result.orderId, // This is the merchant order ID (string)
           result.transactionId
         );
 
@@ -677,7 +677,7 @@ router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
       });
 
       try {
-        const markedAsFailed = await OrderService.markOrderAsFailed(Number(result.orderId));
+        const markedAsFailed = await OrderService.markOrderAsFailed(result.orderId);
         
         logger.info(`📝 ORDER FAILURE PROCESSING RESULT [${webhookId}]`, {
           webhookId,

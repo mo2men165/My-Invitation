@@ -194,7 +194,7 @@ export class OrderService {
    * Process successful payment and create events
    */
   static async processSuccessfulPayment(
-    paymobOrderId: number,
+    merchantOrderId: string,
     transactionId: string
   ): Promise<{
     success: boolean;
@@ -204,10 +204,10 @@ export class OrderService {
     error?: string;
   }> {
     try {
-      // Find order by Paymob order ID
-      const order = await Order.findOne({ paymobOrderId });
+      // Find order by merchant order ID
+      const order = await Order.findOne({ merchantOrderId });
       if (!order) {
-        logger.error(`Order not found for Paymob order ID: ${paymobOrderId}`);
+        logger.error(`Order not found for merchant order ID: ${merchantOrderId}`);
         return {
           success: false,
           error: 'Order not found'
@@ -225,7 +225,7 @@ export class OrderService {
       logger.info(`Processing successful payment for order:`, {
         orderId: order._id,
         userId: order.userId,
-        paymobOrderId,
+        merchantOrderId,
         selectedItemsCount: order.selectedCartItems.length
       });
 
@@ -321,11 +321,11 @@ export class OrderService {
   /**
    * Mark order as failed
    */
-  static async markOrderAsFailed(paymobOrderId: number): Promise<boolean> {
+  static async markOrderAsFailed(merchantOrderId: string): Promise<boolean> {
     try {
-      const order = await Order.findOne({ paymobOrderId });
+      const order = await Order.findOne({ merchantOrderId });
       if (!order) {
-        logger.error(`Order not found for Paymob order ID: ${paymobOrderId}`);
+        logger.error(`Order not found for merchant order ID: ${merchantOrderId}`);
         return false;
       }
 
@@ -336,7 +336,7 @@ export class OrderService {
 
         logger.info(`Order marked as failed:`, {
           orderId: order._id,
-          paymobOrderId
+          merchantOrderId
         });
       }
 
