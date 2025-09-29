@@ -213,12 +213,15 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       }))
     });
 
-    // Create Paymob order
+    // Generate merchant order ID once for consistency
+    const merchantOrderId = `ORDER_${userId}_${Date.now()}`;
+    
     logger.info(`💳 CREATING PAYMOB ORDER [${orderCreationId}]`, {
       orderCreationId,
       userId,
       amount: cartSummary.summary.totalAmount,
       itemsCount: items.length,
+      merchantOrderId,
       startingPaymobOrderCreation: new Date().toISOString()
     });
 
@@ -226,7 +229,8 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       userId,
       amount: cartSummary.summary.totalAmount,
       items,
-      customerInfo
+      customerInfo,
+      merchantOrderId
     });
 
     logger.info(`✅ PAYMOB ORDER CREATED [${orderCreationId}]`, {
@@ -256,8 +260,6 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
     });
 
     // Create our internal order record
-    const merchantOrderId = `ORDER_${userId}_${Date.now()}`;
-    
     logger.info(`📝 CREATING INTERNAL ORDER RECORD [${orderCreationId}]`, {
       orderCreationId,
       userId,

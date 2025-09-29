@@ -130,6 +130,7 @@ export class PaymobService {
       phone: string;
       city: string;
     };
+    merchantOrderId: string;
   }): Promise<PaymobOrderResponse> {
     try {
       const authToken = await this.authenticate();
@@ -152,7 +153,7 @@ export class PaymobService {
         delivery_needed: false,
         amount_cents: Math.round(orderData.amount * 100), // Convert to cents
         currency: this.config.currency,
-        merchant_order_id: `ORDER_${orderData.userId}_${Date.now()}`,
+        merchant_order_id: orderData.merchantOrderId,
         items: orderData.items.map(item => ({
           name: item.name,
           amount_cents: Math.round(item.price * 100),
