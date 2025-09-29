@@ -1,9 +1,12 @@
 // routes/payment.ts
 import { Router, Request, Response } from 'express';
 import cors from 'cors';
+import { Types } from 'mongoose';
 import { PaymentService } from '../services/paymentService';
 import { paymobService } from '../services/paymobService';
 import { OrderService } from '../services/orderService';
+import { Order } from '../models/Order';
+import { Event } from '../models/Event';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { PaymobWebhookData } from '../types/paymob';

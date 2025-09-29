@@ -378,14 +378,11 @@ const PaymentPageContent: React.FC = () => {
         orderSuccess: orderResult.success,
         orderData: orderResult.success ? {
           orderId: orderResult.orderId,
-          ourOrderId: orderResult.ourOrderId,
           paymentTokenLength: orderResult.paymentToken?.length || 0,
           hasIframeUrl: !!orderResult.iframeUrl,
           iframeUrl: orderResult.iframeUrl,
           amount: orderResult.amount,
-          currency: orderResult.currency,
-          orderCreationId: orderResult.orderCreationId,
-          processingTime: orderResult.processingTime
+          currency: orderResult.currency
         } : 'ORDER_FAILED'
       });
 
