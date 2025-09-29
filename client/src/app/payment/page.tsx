@@ -391,7 +391,6 @@ const PaymentPageContent: React.FC = () => {
           paymentId,
           iframeUrl: orderResult.iframeUrl,
           orderId: orderResult.orderId,
-          ourOrderId: orderResult.ourOrderId,
           amount: orderResult.amount,
           action: 'WINDOW_LOCATION_HREF_REDIRECT'
         });

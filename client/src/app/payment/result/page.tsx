@@ -68,8 +68,62 @@ const PaymentResultContent: React.FC = () => {
         setIsLoading(true);
         setError(null);
         
-        // Get merchant order ID from URL parameters
+        // Get parameters from URL
         const merchantOrderId = searchParams.get('order_id');
+        const reason = searchParams.get('reason');
+        const message = searchParams.get('message');
+        const callbackId = searchParams.get('callback_id');
+        
+        // Handle different scenarios
+        if (reason === 'cancelled' || reason === 'user_cancelled') {
+          // User cancelled payment
+          console.log(`🚫 PAYMENT CANCELLED [${merchantOrderId}]`, { reason, callbackId });
+          setOrderData({
+            id: merchantOrderId || 'unknown',
+            merchantOrderId: merchantOrderId || 'unknown',
+            paymobOrderId: 0,
+            status: 'cancelled',
+            totalAmount: 0,
+            paymentMethod: 'unknown',
+            eventsCreated: 0,
+            events: [],
+            selectedItems: [],
+            createdAt: new Date().toISOString()
+          });
+          
+          toast({
+            title: "تم إلغاء الدفع",
+            description: "لم يتم إتمام عملية الدفع. يمكنك المحاولة مرة أخرى",
+            variant: "destructive",
+            duration: 5000
+          });
+          return;
+        }
+        
+        if (message || callbackId) {
+          // Payment error occurred
+          console.log(`💥 PAYMENT ERROR [${merchantOrderId}]`, { message, callbackId });
+          setOrderData({
+            id: merchantOrderId || 'unknown',
+            merchantOrderId: merchantOrderId || 'unknown',
+            paymobOrderId: 0,
+            status: 'failed',
+            totalAmount: 0,
+            paymentMethod: 'unknown',
+            eventsCreated: 0,
+            events: [],
+            selectedItems: [],
+            createdAt: new Date().toISOString()
+          });
+          
+          toast({
+            title: "خطأ في الدفع",
+            description: message || "حدث خطأ أثناء معالجة عملية الدفع",
+            variant: "destructive",
+            duration: 5000
+          });
+          return;
+        }
         
         if (!merchantOrderId) {
           console.error('❌ NO MERCHANT ORDER ID PROVIDED');

@@ -891,10 +891,10 @@ router.post('/paymob/callback', cors(), async (req: Request, res: Response) => {
       action: 'REDIRECTING_TO_ERROR_PAGE'
     });
     
-    // Redirect to error page on any error
-    const errorUrl = `${process.env.FRONTEND_URL}/payment/error?message=${encodeURIComponent('خطأ في معالجة الدفع')}&callback_id=${callbackId}`;
+    // Redirect to result page with error details
+    const errorUrl = `${process.env.FRONTEND_URL}/payment/result?message=${encodeURIComponent('خطأ في معالجة الدفع')}&callback_id=${callbackId}`;
     
-    logger.info(`🔄 REDIRECTING TO ERROR PAGE [${callbackId}]`, {
+    logger.info(`🔄 REDIRECTING TO RESULT PAGE WITH ERROR [${callbackId}]`, {
       callbackId,
       errorUrl,
       processingTime: totalProcessingTime

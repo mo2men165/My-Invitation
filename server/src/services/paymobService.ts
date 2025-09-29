@@ -30,8 +30,8 @@ export class PaymobService {
       language: process.env.PAYMOB_LANGUAGE || 'ar',
       debugMode: process.env.PAYMOB_DEBUG_MODE === 'true',
       webhookUrl: process.env.PAYMOB_WEBHOOK_URL || 'http://localhost:5000/api/payment/paymob/webhook',
-      returnUrl: process.env.PAYMOB_RETURN_URL || 'http://localhost:3000/payment/success',
-      cancelUrl: process.env.PAYMOB_CANCEL_URL || 'http://localhost:3000/payment/cancel'
+      returnUrl: process.env.PAYMOB_RETURN_URL || 'http://localhost:3000/payment/result',
+      cancelUrl: process.env.PAYMOB_CANCEL_URL || 'http://localhost:3000/payment/result?reason=cancelled'
     };
 
     // Debug logging for configuration (without exposing sensitive data)
