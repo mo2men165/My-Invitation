@@ -50,6 +50,7 @@ const CartModal = memo<CartModalProps>(({
     updateFormField,
     updateLocation,
     toggleMap,
+    updateMapSearchQuery,
     setEditMode,
     resetForm,
     validateForm,
@@ -374,7 +375,7 @@ const CartModal = memo<CartModalProps>(({
                       onLocationSelect={updateLocation}
                       errors={errors}
                       searchQuery={state.mapSearchQuery}
-                      onSearchQueryChange={(query) => updateFormField('mapSearchQuery', query)}
+                      onSearchQueryChange={updateMapSearchQuery}
                     />
                   </div>
                 }

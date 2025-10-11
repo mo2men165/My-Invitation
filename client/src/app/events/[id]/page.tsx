@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { eventsAPI, EventItem, GuestStats } from '@/lib/api/events';
+import { whatsappAPI } from '@/lib/api/whatsapp';
 import { useToast } from '@/hooks/useToast';
 import { Guest } from '@/types/event';
 import { 
@@ -43,6 +44,8 @@ const EventDetailPage: React.FC = () => {
   const [addingGuest, setAddingGuest] = useState(false);
   const [confirmingGuestList, setConfirmingGuestList] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
+  const [sendingWhatsapp, setSendingWhatsapp] = useState<string | null>(null);
+  const [sendingBulkWhatsapp, setSendingBulkWhatsapp] = useState(false);
   
   // New guest form
   const [newGuest, setNewGuest] = useState<Guest>({
@@ -230,6 +233,99 @@ ${event.details.invitationText}
     }
   };
 
+  // New WhatsApp API integration for Premium/VIP packages
+  const handleSendWhatsappAPI = async (guest: Guest) => {
+    if (!guest._id || !event) return;
+
+    // Check if package supports WhatsApp integration
+    if (event.packageType === 'classic') {
+      toast({
+        title: "غير متاح",
+        description: "إرسال الدعوات عبر الواتساب متاح فقط لحزم Premium و VIP",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setSendingWhatsapp(guest._id);
+      
+      const result = await whatsappAPI.sendInvitation(eventId, guest._id);
+      
+      if (result.success) {
+        toast({
+          title: "تم إرسال الدعوة",
+          description: "تم إرسال الدعوة عبر الواتساب بنجاح",
+          variant: "default"
+        });
+        
+        // Reload to update UI
+        await loadEventDetails();
+      }
+    } catch (error: any) {
+      toast({
+        title: "خطأ في إرسال الدعوة",
+        description: error.message || "فشل في إرسال الدعوة",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingWhatsapp(null);
+    }
+  };
+
+  // Send bulk invitations via WhatsApp API
+  const handleSendBulkWhatsapp = async () => {
+    if (!event) return;
+
+    // Check if package supports WhatsApp integration
+    if (event.packageType === 'classic') {
+      toast({
+        title: "غير متاح",
+        description: "إرسال الدعوات عبر الواتساب متاح فقط لحزم Premium و VIP",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get guests who haven't received WhatsApp messages yet
+    const unsentGuests = guests.filter(guest => !guest.whatsappMessageSent);
+    
+    if (unsentGuests.length === 0) {
+      toast({
+        title: "لا توجد دعوات للإرسال",
+        description: "جميع الضيوف تم إرسال الدعوات لهم",
+        variant: "default"
+      });
+      return;
+    }
+
+    try {
+      setSendingBulkWhatsapp(true);
+      
+      const guestIds = unsentGuests.map(guest => guest._id!);
+      const result = await whatsappAPI.sendBulkInvitations(eventId, guestIds);
+      
+      if (result.success) {
+        toast({
+          title: "تم بدء إرسال الدعوات",
+          description: `يتم إرسال ${unsentGuests.length} دعوة عبر الواتساب`,
+          variant: "default"
+        });
+        
+        // Reload to update UI
+        await loadEventDetails();
+      }
+    } catch (error: any) {
+      toast({
+        title: "خطأ في إرسال الدعوات",
+        description: error.message || "فشل في إرسال الدعوات",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingBulkWhatsapp(false);
+    }
+  };
+
   const handleRemoveGuest = async (guestId: string) => {
     try {
       await eventsAPI.removeGuest(eventId, guestId);
@@ -401,9 +497,13 @@ ${event.details.invitationText}
               confirmingGuestList={confirmingGuestList}
               onAddGuest={handleAddGuest}
               onSendWhatsapp={handleSendWhatsapp}
+              onSendWhatsappAPI={handleSendWhatsappAPI}
+              onSendBulkWhatsapp={handleSendBulkWhatsapp}
               onRemoveGuest={handleRemoveGuest}
               onUpdateGuest={handleUpdateGuest}
               onConfirmGuestList={handleConfirmGuestList}
+              sendingWhatsapp={sendingWhatsapp}
+              sendingBulkWhatsapp={sendingBulkWhatsapp}
               getCountryFromPhone={getCountryFromPhone}
               onCountryChange={handleCountryChange}
               remainingInvites={guestStats?.remainingInvites || 0}

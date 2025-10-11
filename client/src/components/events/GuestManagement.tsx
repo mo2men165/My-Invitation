@@ -29,9 +29,13 @@ interface GuestManagementProps {
   confirmingGuestList: boolean;
   onAddGuest: () => Promise<void>;
   onSendWhatsapp: (guest: Guest) => Promise<void>;
+  onSendWhatsappAPI?: (guest: Guest) => Promise<void>;
+  onSendBulkWhatsapp?: () => Promise<void>;
   onRemoveGuest: (guestId: string) => Promise<void>;
   onUpdateGuest: (guestId: string, updates: Partial<Guest>) => Promise<void>;
   onConfirmGuestList: () => Promise<void>;
+  sendingWhatsapp?: string | null;
+  sendingBulkWhatsapp?: boolean;
   getCountryFromPhone: (phone: string) => string;
   onCountryChange?: (country: string) => void;
   remainingInvites: number;
@@ -49,9 +53,13 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
   confirmingGuestList,
   onAddGuest,
   onSendWhatsapp,
+  onSendWhatsappAPI,
+  onSendBulkWhatsapp,
   onRemoveGuest,
   onUpdateGuest,
   onConfirmGuestList,
+  sendingWhatsapp,
+  sendingBulkWhatsapp,
   getCountryFromPhone,
   onCountryChange,
   remainingInvites
@@ -66,6 +74,32 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
           {event.guests.length} ضيف مضاف • {guestStats?.totalInvited || 0} من {event.details?.inviteCount || 0} دعوة
         </div>
       </div>
+
+      {/* WhatsApp Bulk Send Button for Premium/VIP */}
+      {(event.packageType === 'premium' || event.packageType === 'vip') && guests.length > 0 && (
+        <div className="mb-6">
+          <button
+            onClick={onSendBulkWhatsapp}
+            disabled={sendingBulkWhatsapp || !onSendBulkWhatsapp}
+            className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+          >
+            {sendingBulkWhatsapp ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                جاري الإرسال...
+              </>
+            ) : (
+              <>
+                <Send className="w-5 h-5" />
+                إرسال جميع الدعوات عبر الواتساب ({guests.filter(g => !g.whatsappMessageSent).length} دعوة)
+              </>
+            )}
+          </button>
+          <p className="text-sm text-gray-400 mt-2 text-center">
+            سيتم إرسال دعوات تفاعلية مع أزرار القبول/الاعتذار
+          </p>
+        </div>
+      )}
 
       {/* VIP Package Notice */}
       {event.packageType === 'vip' && (
@@ -116,10 +150,12 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
         invitationCardUrl={event.invitationCardUrl}
         isVipConfirmed={isVipConfirmed}
         onSendWhatsapp={onSendWhatsapp}
+        onSendWhatsappAPI={onSendWhatsappAPI}
         onRemoveGuest={onRemoveGuest}
         onUpdateGuest={onUpdateGuest}
         getCountryFromPhone={getCountryFromPhone}
         onCountryChange={onCountryChange}
+        sendingWhatsapp={sendingWhatsapp}
       />
 
       {/* VIP Package - Confirm Final Guest List Button - Only for owners */}

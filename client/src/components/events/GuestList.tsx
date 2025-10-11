@@ -10,8 +10,10 @@ interface GuestListProps {
   invitationCardUrl?: string;
   isVipConfirmed: boolean;
   onSendWhatsapp: (guest: Guest) => Promise<void>;
+  onSendWhatsappAPI?: (guest: Guest) => Promise<void>;
   onRemoveGuest: (guestId: string) => Promise<void>;
   onUpdateGuest: (guestId: string, updates: Partial<Guest>) => Promise<void>;
+  sendingWhatsapp?: string | null;
   getCountryFromPhone: (phone: string) => string;
   onCountryChange?: (country: string) => void;
 }
@@ -23,8 +25,10 @@ export const GuestList: React.FC<GuestListProps> = ({
   invitationCardUrl,
   isVipConfirmed,
   onSendWhatsapp,
+  onSendWhatsappAPI,
   onRemoveGuest,
   onUpdateGuest,
+  sendingWhatsapp,
   getCountryFromPhone,
   onCountryChange
 }) => {
@@ -48,8 +52,10 @@ export const GuestList: React.FC<GuestListProps> = ({
           invitationCardUrl={invitationCardUrl}
           isVipConfirmed={isVipConfirmed}
           onSendWhatsapp={onSendWhatsapp}
+          onSendWhatsappAPI={onSendWhatsappAPI}
           onRemoveGuest={onRemoveGuest}
           onUpdateGuest={onUpdateGuest}
+          sendingWhatsapp={sendingWhatsapp}
           getCountryFromPhone={getCountryFromPhone}
           onCountryChange={onCountryChange}
         />

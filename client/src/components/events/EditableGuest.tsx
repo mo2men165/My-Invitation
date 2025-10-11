@@ -12,8 +12,10 @@ interface EditableGuestProps {
   invitationCardUrl?: string;
   isVipConfirmed: boolean;
   onSendWhatsapp: (guest: Guest) => Promise<void>;
+  onSendWhatsappAPI?: (guest: Guest) => Promise<void>;
   onRemoveGuest: (guestId: string) => Promise<void>;
   onUpdateGuest: (guestId: string, updates: Partial<Guest>) => Promise<void>;
+  sendingWhatsapp?: string | null;
   getCountryFromPhone: (phone: string) => string;
   onCountryChange?: (country: string) => void;
 }
@@ -25,8 +27,10 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
   invitationCardUrl,
   isVipConfirmed,
   onSendWhatsapp,
+  onSendWhatsappAPI,
   onRemoveGuest,
   onUpdateGuest,
+  sendingWhatsapp,
   getCountryFromPhone,
   onCountryChange
 }) => {
@@ -232,8 +236,8 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
         </div>
         
         <div className="flex items-center gap-2">
-          {/* WhatsApp button for classic/premium packages */}
-          {(packageType === 'classic' || packageType === 'premium') && !isEditing && (
+          {/* WhatsApp buttons for different packages */}
+          {packageType === 'classic' && !isEditing && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onSendWhatsapp(guest)}
@@ -245,8 +249,51 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
                 title={invitationCardUrl ? 'إرسال دعوة مع رابط الدعوة' : 'إرسال دعوة (رابط الدعوة سيتم إضافته لاحقاً)'}
               >
                 <Send className="w-4 h-4" />
-                {invitationCardUrl ? 'إرسال دعوة' : 'إرسال دعوة'}
+                إرسال دعوة
               </button>
+              
+              {guest.whatsappMessageSent && (
+                <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                  <Check className="w-3 h-3" />
+                  تم الإرسال
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Premium/VIP packages - show both manual and API options */}
+          {(packageType === 'premium' || packageType === 'vip') && !isEditing && (
+            <div className="flex items-center gap-2">
+              {/* Manual WhatsApp button */}
+              <button
+                onClick={() => onSendWhatsapp(guest)}
+                className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+                title="إرسال دعوة يدوياً عبر الواتساب"
+              >
+                <Send className="w-3 h-3" />
+                يدوياً
+              </button>
+
+              {/* WhatsApp API button */}
+              {onSendWhatsappAPI && (
+                <button
+                  onClick={() => onSendWhatsappAPI(guest)}
+                  disabled={sendingWhatsapp === guest._id}
+                  className={`flex items-center gap-1 px-2 py-1 text-white text-xs rounded transition-colors ${
+                    sendingWhatsapp === guest._id
+                      ? 'bg-gray-600 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700'
+                  }`}
+                  title="إرسال دعوة تفاعلية عبر الواتساب"
+                >
+                  {sendingWhatsapp === guest._id ? (
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="w-3 h-3" />
+                  )}
+                  تلقائياً
+                </button>
+              )}
               
               {guest.whatsappMessageSent && (
                 <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">

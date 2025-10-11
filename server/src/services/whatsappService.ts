@@ -105,9 +105,12 @@ export class WhatsappService {
         }
       }
 
+      // Convert WhatsApp phone format to our stored format
+      const normalizedGuestPhone = this.normalizeWhatsAppPhone(guestPhone);
+
       // Find event by guest phone number
       const event = await Event.findOne({
-        'guests.phone': guestPhone,
+        'guests.phone': normalizedGuestPhone,
         status: 'upcoming'
       });
 
@@ -116,7 +119,7 @@ export class WhatsappService {
         return;
       }
 
-      const guest = event.guests.find(g => g.phone === guestPhone);
+      const guest = event.guests.find(g => g.phone === normalizedGuestPhone);
       if (!guest) {
         logger.warn('Guest not found in event:', { guestPhone, eventId: event._id });
         return;
@@ -146,8 +149,8 @@ export class WhatsappService {
       const normalizedResponse = response.toLowerCase().trim();
 
       // Check for positive responses
-      const positiveResponses = ['نعم', 'yes', 'أوافق', 'موافق', 'سأحضر', 'حاضر'];
-      const negativeResponses = ['لا', 'no', 'معذرة', 'اعتذار', 'لن أحضر'];
+      const positiveResponses = ['نعم', 'yes', 'أوافق', 'موافق', 'سأحضر', 'حاضر', 'تأكيد الحضور'];
+      const negativeResponses = ['لا', 'no', 'معذرة', 'اعتذار', 'لن أحضر', 'إعتذار عن الحضور'];
 
       let rsvpStatus = null;
       if (positiveResponses.some(pos => normalizedResponse.includes(pos))) {
@@ -178,10 +181,11 @@ export class WhatsappService {
           rsvpStatus
         });
 
-        // If accepted, send invitation card and location
+        // If accepted, send confirmation with links
         if (rsvpStatus === 'accepted') {
-          await this.sendInvitationCard(event, guest);
+          await this.sendConfirmationWithLinks(event, guest);
         }
+        // If declined, do nothing (as per requirements)
       }
 
     } catch (error: any) {
@@ -190,16 +194,21 @@ export class WhatsappService {
   }
 
   /**
-   * Send invitation card and location to guest who accepted
+   * Send confirmation message with invitation card and location links
    */
-  private static async sendInvitationCard(event: any, guest: any): Promise<void> {
+  private static async sendConfirmationWithLinks(event: any, guest: any): Promise<void> {
     try {
+      // Generate Google Maps link
+      const mapsLink = event.details.locationCoordinates 
+        ? `https://maps.google.com/?q=${event.details.locationCoordinates.lat},${event.details.locationCoordinates.lng}`
+        : `https://maps.google.com/?q=${encodeURIComponent(event.details.eventLocation)}`;
+
       const messageData = {
         messaging_product: 'whatsapp',
         to: guest.phone,
         type: 'template',
         template: {
-          name: 'invitation_confirmation', // You'll need to create this template
+          name: 'invitation_message',
           language: {
             code: 'ar'
           },
@@ -223,10 +232,6 @@ export class WhatsappService {
                 {
                   type: 'text',
                   text: new Date(event.details.eventDate).toLocaleDateString('ar-SA')
-                },
-                {
-                  type: 'text',
-                  text: event.details.eventLocation
                 }
               ]
             },
@@ -240,6 +245,17 @@ export class WhatsappService {
                   text: event.invitationCardUrl || ''
                 }
               ]
+            },
+            {
+              type: 'button',
+              sub_type: 'url',
+              index: 1,
+              parameters: [
+                {
+                  type: 'text',
+                  text: mapsLink
+                }
+              ]
             }
           ]
         }
@@ -247,13 +263,14 @@ export class WhatsappService {
 
       await this.sendMessage(messageData);
 
-      // Send location if available
-      if (event.details.locationCoordinates) {
-        await this.sendLocation(guest.phone, event.details.locationCoordinates, event.details.eventLocation);
-      }
+      logger.info('Confirmation with links sent:', {
+        eventId: event._id,
+        guestName: guest.name,
+        guestPhone: guest.phone
+      });
 
     } catch (error: any) {
-      logger.error('Error sending invitation card:', error);
+      logger.error('Error sending confirmation with links:', error);
     }
   }
 
@@ -415,6 +432,28 @@ export class WhatsappService {
   }
 
   /**
+   * Normalize WhatsApp phone number format to our stored format
+   */
+  private static normalizeWhatsAppPhone(whatsappPhone: string): string {
+    // WhatsApp sends phone numbers without country code (e.g., "966501234567")
+    // Our system stores them with country code (e.g., "+966501234567")
+    
+    if (!whatsappPhone) return whatsappPhone;
+    
+    // If it already has +, return as is
+    if (whatsappPhone.startsWith('+')) {
+      return whatsappPhone;
+    }
+    
+    // Add + if it's a valid international format
+    if (whatsappPhone.length >= 10) {
+      return '+' + whatsappPhone;
+    }
+    
+    return whatsappPhone;
+  }
+
+  /**
    * Send message via WhatsApp API
    */
   private static async sendMessage(messageData: any): Promise<any> {
@@ -442,6 +481,171 @@ export class WhatsappService {
         messageData
       });
       throw error;
+    }
+  }
+
+  /**
+   * Send reminder message for VIP packages
+   */
+  static async sendReminderMessage(eventId: string, guestId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const event = await Event.findById(eventId);
+      if (!event || event.packageType !== 'vip') {
+        return { success: false, error: 'Event not found or not VIP package' };
+      }
+
+      const guest = event.guests.find(g => g._id?.toString() === guestId);
+      if (!guest) {
+        return { success: false, error: 'Guest not found' };
+      }
+
+      const messageData = {
+        messaging_product: 'whatsapp',
+        to: guest.phone,
+        type: 'template',
+        template: {
+          name: 'event_reminder',
+          language: {
+            code: 'ar'
+          },
+          components: [
+            {
+              type: 'header',
+              parameters: [
+                {
+                  type: 'text',
+                  text: guest.name
+                }
+              ]
+            },
+            {
+              type: 'body',
+              parameters: [
+                {
+                  type: 'text',
+                  text: event.details.eventName || 'مناسبة خاصة'
+                },
+                {
+                  type: 'text',
+                  text: new Date(event.details.eventDate).toLocaleDateString('ar-SA')
+                },
+                {
+                  type: 'text',
+                  text: `${event.details.startTime} - ${event.details.endTime}`
+                },
+                {
+                  type: 'text',
+                  text: event.details.eventLocation
+                }
+              ]
+            },
+            {
+              type: 'button',
+              sub_type: 'url',
+              index: 0,
+              parameters: [
+                {
+                  type: 'text',
+                  text: event.invitationCardUrl || ''
+                }
+              ]
+            }
+          ]
+        }
+      };
+
+      const response = await this.sendMessage(messageData);
+
+      logger.info('Reminder message sent:', {
+        eventId,
+        guestName: guest.name,
+        guestPhone: guest.phone
+      });
+
+      return { 
+        success: true, 
+        data: { 
+          messageId: response.messages?.[0]?.id,
+          sentAt: new Date()
+        }
+      };
+
+    } catch (error: any) {
+      logger.error('Error sending reminder message:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send thank you message after event
+   */
+  static async sendThankYouMessage(eventId: string, guestId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const event = await Event.findById(eventId);
+      if (!event) {
+        return { success: false, error: 'Event not found' };
+      }
+
+      const guest = event.guests.find(g => g._id?.toString() === guestId);
+      if (!guest) {
+        return { success: false, error: 'Guest not found' };
+      }
+
+      const messageData = {
+        messaging_product: 'whatsapp',
+        to: guest.phone,
+        type: 'template',
+        template: {
+          name: 'thank_you_message',
+          language: {
+            code: 'ar'
+          },
+          components: [
+            {
+              type: 'header',
+              parameters: [
+                {
+                  type: 'text',
+                  text: guest.name
+                }
+              ]
+            },
+            {
+              type: 'body',
+              parameters: [
+                {
+                  type: 'text',
+                  text: event.details.eventName || 'مناسبة خاصة'
+                },
+                {
+                  type: 'text',
+                  text: event.details.hostName
+                }
+              ]
+            }
+          ]
+        }
+      };
+
+      const response = await this.sendMessage(messageData);
+
+      logger.info('Thank you message sent:', {
+        eventId,
+        guestName: guest.name,
+        guestPhone: guest.phone
+      });
+
+      return { 
+        success: true, 
+        data: { 
+          messageId: response.messages?.[0]?.id,
+          sentAt: new Date()
+        }
+      };
+
+    } catch (error: any) {
+      logger.error('Error sending thank you message:', error);
+      return { success: false, error: error.message };
     }
   }
 

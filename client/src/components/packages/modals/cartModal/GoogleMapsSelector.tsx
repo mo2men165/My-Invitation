@@ -249,9 +249,18 @@ const GoogleMapsSelector: React.FC<GoogleMapsSelectorProps> = memo(({
     if (!isMapInitialized || !searchInputRef.current || typeof google === 'undefined' || !google?.maps?.places) return;
 
     try {
+      // Create autocomplete with specific options to prevent input blocking
       const autocomplete = new google.maps.places.Autocomplete(searchInputRef.current, {
         componentRestrictions: MAP_CONFIG.componentRestrictions,
-        fields: MAP_CONFIG.fields
+        fields: MAP_CONFIG.fields,
+        strictBounds: false,
+      });
+
+      // Prevent the autocomplete from blocking the Enter key
+      google.maps.event.addDomListener(searchInputRef.current, 'keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+        }
       });
 
       autocompleteRef.current = autocomplete;
@@ -272,6 +281,7 @@ const GoogleMapsSelector: React.FC<GoogleMapsSelectorProps> = memo(({
       });
 
     } catch (error) {
+      console.error('Error initializing autocomplete:', error);
     }
   }, [isMapInitialized, handleLocationSelect]);
 
@@ -316,7 +326,7 @@ const GoogleMapsSelector: React.FC<GoogleMapsSelectorProps> = memo(({
       
       {/* Map Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
         <Input
           ref={searchInputRef}
           type="text"
@@ -324,6 +334,10 @@ const GoogleMapsSelector: React.FC<GoogleMapsSelectorProps> = memo(({
           onChange={handleSearchChange}
           placeholder="ابحث عن مكان..."
           className="bg-white/10 border-white/20 text-white pl-10"
+          autoComplete="off"
+          onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         />
       </div>
 

@@ -113,6 +113,10 @@ export const useCartModalState = (editItem?: any) => {
     setState(prev => ({ ...prev, showMap: !prev.showMap }));
   }, []);
 
+  const updateMapSearchQuery = useCallback((query: string) => {
+    setState(prev => ({ ...prev, mapSearchQuery: query }));
+  }, []);
+
   const toggleConfirmation = useCallback(() => {
     setState(prev => ({ ...prev, showConfirmation: !prev.showConfirmation }));
   }, []);
@@ -186,6 +190,7 @@ export const useCartModalState = (editItem?: any) => {
     updateFormField,
     updateLocation,
     toggleMap,
+    updateMapSearchQuery,
     toggleConfirmation,
     setEditMode,
     setUpdating,
@@ -193,7 +198,7 @@ export const useCartModalState = (editItem?: any) => {
     validateForm,
     clearErrors,
     getErrorSummary
-  }), [updateFormField, updateLocation, toggleMap, toggleConfirmation, setEditMode, setUpdating, resetForm, validateForm, clearErrors, getErrorSummary]);
+  }), [updateFormField, updateLocation, toggleMap, updateMapSearchQuery, toggleConfirmation, setEditMode, setUpdating, resetForm, validateForm, clearErrors, getErrorSummary]);
 
   return {
     state,
