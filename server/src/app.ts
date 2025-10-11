@@ -20,6 +20,7 @@ import dashboardRoutes from './routes/dashboard';
 import adminRoutes from './routes/admin';
 import contactRoutes from './routes/contact';
 import collaborationRoutes from './routes/collaboration';
+import whatsappRoutes from './routes/whatsapp';
 
 
 const app = express();
@@ -85,6 +86,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/collaboration', collaborationRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 
 
