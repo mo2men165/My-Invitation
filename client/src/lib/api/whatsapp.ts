@@ -1,5 +1,5 @@
 // client/src/lib/api/whatsapp.ts
-import { API_BASE_URL } from './base';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export interface WhatsappApiResponse {
   success: boolean;
