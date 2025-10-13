@@ -68,7 +68,7 @@ interface Event {
   status: string;
   approvalStatus: string;
   invitationCardUrl?: string;
-  qrCodeUrl?: string;
+  qrCodeReaderUrl?: string;
   adminNotes?: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -177,11 +177,11 @@ export const adminAPI = {
   },
 
   // Approve Event
-  async approveEvent(eventId: string, notes?: string, invitationCardUrl?: string, qrCodeUrl?: string): Promise<void> {
+  async approveEvent(eventId: string, notes?: string, invitationCardUrl?: string, qrCodeReaderUrl?: string): Promise<void> {
     const response = await fetch(`${API_URL}/api/admin/events/${eventId}/approve`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ notes, invitationCardUrl, qrCodeUrl })
+      body: JSON.stringify({ notes, invitationCardUrl, qrCodeReaderUrl })
     });
     
     const result = await response.json();

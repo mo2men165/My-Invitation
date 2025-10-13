@@ -264,7 +264,7 @@ function CartPageContent() {
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex-1 min-w-0">
                               <h3 className="text-xl font-bold text-white group-hover:text-[#C09B52] transition-colors duration-300">
-                                باقة {item.packageName} - {item.designName}
+                                باقة {item.packageName} - {item.details.eventName}
                               </h3>
                               <div className="mt-3 space-y-2">
                                 <p className="text-gray-400 text-sm flex items-center gap-2">
@@ -284,7 +284,7 @@ function CartPageContent() {
                                 
                                 <p className="text-gray-400 text-sm flex items-start gap-2">
                                   <span className="font-medium text-[#C09B52] flex-shrink-0">الموقع:</span> 
-                                  <span className="break-words">{item.details.eventLocation}</span>
+                                  <span className="break-words">{item.details.displayName || item.details.eventLocation}</span>
                                 </p>
                                 
                                 <p className="text-gray-400 text-sm flex items-center gap-2">
@@ -342,12 +342,17 @@ function CartPageContent() {
                                 {item.details.additionalCards.toLocaleString('ar-SA')} كرت إضافي
                               </span>
                             )}
-                            {item.details.gateSupervisors && (
+                            {item.details.gateSupervisors > 0 && (
                               <span className="px-3 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full border border-purple-500/30">
                                 مشرفين بوابة: {item.details.gateSupervisors}
                               </span>
                             )}
-                            {item.details.expeditedDelivery && (
+                            {item.details.extraHours > 0 && (
+                              <span className="px-3 py-1 bg-orange-500/20 text-orange-400 text-xs rounded-full border border-orange-500/30">
+                                ساعات إضافية: {item.details.extraHours}
+                              </span>
+                            )}
+                            {item.details.fastDelivery && (
                               <span className="px-3 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
                                 تسليم سريع
                               </span>

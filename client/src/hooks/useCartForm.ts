@@ -6,7 +6,6 @@ import { detectCityFromCoords } from '@/utils/detectCity';
 export const useCartForm = () => {
   const [cartForm, setCartForm] = useState<CartForm>({
     inviteCount: 100,
-    qrCode: true,
     eventDate: '',
     startTime: '',
     endTime: '',
@@ -15,8 +14,7 @@ export const useCartForm = () => {
     eventLocation: '',
     additionalCards: 0,
     gateSupervisors: 0,
-    fastDelivery: false,
-    expeditedDelivery: false
+    fastDelivery: false
   });
 
   const [locationData, setLocationData] = useState<LocationData>({
@@ -48,7 +46,6 @@ export const useCartForm = () => {
   const resetForm = useCallback(() => {
     setCartForm({
       inviteCount: 100,
-      qrCode: true,
       eventDate: '',
       startTime: '',
       endTime: '',
@@ -57,8 +54,7 @@ export const useCartForm = () => {
       eventLocation: '',
       additionalCards: 0,
       gateSupervisors: 0,
-      fastDelivery: false,
-      expeditedDelivery: false
+      fastDelivery: false
     });
     setLocationData({
       address: '',

@@ -32,7 +32,7 @@ const CartSummary = memo<CartSummaryProps>(({
       return CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST[pkgType as keyof typeof CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST] || CART_MODAL_CONSTANTS.EXPEDITED_DELIVERY_COST.classic;
     };
     
-    const expeditedDeliveryPrice = getExpeditedDeliveryPrice(packageType, formData.expeditedDelivery);
+    const expeditedDeliveryPrice = getExpeditedDeliveryPrice(packageType, formData.fastDelivery);
     
     const subtotal = basePrice + extraCardsPrice + extraHoursPrice + gateSupervisorsPrice + expeditedDeliveryPrice;
     const total = subtotal;
@@ -97,7 +97,7 @@ const CartSummary = memo<CartSummaryProps>(({
         )}
 
         {/* Expedited Delivery */}
-        {formData.expeditedDelivery && (
+        {formData.fastDelivery && (
           <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
             <span className="text-gray-300">نسليم سريع</span>
             <span className="text-white font-semibold">

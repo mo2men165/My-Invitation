@@ -48,7 +48,7 @@ export const calculatePackagePrice = (
     return EXPEDITED_COSTS[pkgType as keyof typeof EXPEDITED_COSTS] || EXPEDITED_COSTS.classic;
   };
   
-  const expeditedDeliveryPrice = getExpeditedDeliveryPrice(packageType, form.expeditedDelivery || false);
+  const expeditedDeliveryPrice = getExpeditedDeliveryPrice(packageType, form.fastDelivery || false);
   
   // Add extra hours cost (150 SAR per hour)
   const extraHoursPrice = (form.extraHours || 0) * 150;

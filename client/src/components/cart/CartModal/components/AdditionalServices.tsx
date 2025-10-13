@@ -33,8 +33,8 @@ const AdditionalServices = memo<AdditionalServicesProps>(({
   }, [formData.gateSupervisors, onInputChange]);
 
   const handleExpeditedDeliveryToggle = useCallback(() => {
-    onInputChange('expeditedDelivery', !formData.expeditedDelivery);
-  }, [formData.expeditedDelivery, onInputChange]);
+    onInputChange('fastDelivery', !formData.fastDelivery);
+  }, [formData.fastDelivery, onInputChange]);
 
   return (
     <div>
@@ -120,17 +120,17 @@ const AdditionalServices = memo<AdditionalServicesProps>(({
             type="button"
             onClick={handleExpeditedDeliveryToggle}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#C09B52] focus:ring-offset-2 focus:ring-offset-gray-900 ${
-              formData.expeditedDelivery ? 'bg-[#C09B52]' : 'bg-gray-600'
+              formData.fastDelivery ? 'bg-[#C09B52]' : 'bg-gray-600'
             }`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                formData.expeditedDelivery ? '-translate-x-7' : 'translate-x-1'
+                formData.fastDelivery ? '-translate-x-7' : 'translate-x-1'
               }`}
             />
           </button>
         </div>
-        {formData.expeditedDelivery && (
+        {formData.fastDelivery && (
           <div className="mt-2 p-2 bg-[#C09B52]/10 rounded-lg">
             <p className="text-[#C09B52] text-xs">
               ✓ سيتم تسليم طلبك خلال 48 ساعة عمل (يومين عمل) من تأكيد الدفع

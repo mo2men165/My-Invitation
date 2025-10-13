@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users2, AlertCircle, CheckSquare, Loader2 } from 'lucide-react';
+import { Users2, AlertCircle, CheckSquare, Loader2, Send } from 'lucide-react';
 import { Guest } from '@/types/event';
 import { GuestForm } from './GuestForm';
 import { GuestList } from './GuestList';

@@ -200,11 +200,6 @@ ${event.details.invitationText}
       message += `\n\nرابط الدعوة سيتم إرساله قريباً بعد موافقة الإدارة`;
     }
 
-    // Add QR Code URL if available
-    if (event.qrCodeUrl) {
-      message += `\n\nرابط QR Code: ${event.qrCodeUrl}`;
-    }
-
     message += `\n\nنتشرف بحضوركم الكريم وننتظركم معنا في هذه المناسبة المباركة`;
 
     const whatsappUrl = `https://wa.me/${guest.phone.replace(/^\+/, '')}?text=${encodeURIComponent(message)}`;

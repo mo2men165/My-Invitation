@@ -43,7 +43,6 @@ export interface EventItem {
   status: 'upcoming' | 'cancelled' | 'done';
   approvalStatus: 'pending' | 'approved' | 'rejected';
   invitationCardUrl?: string;
-  qrCodeUrl?: string;
   qrCodeReaderUrl: string;
   adminNotes?: string;
   guestListConfirmed: {

@@ -82,6 +82,7 @@ const CartModal = memo<CartModalProps>(({
     if (isOpen && editItem && !state.isEditMode) {
       setEditMode(true);
       
+      updateFormField('eventName', editItem.details.eventName || '');
       updateFormField('inviteCount', editItem.details.inviteCount || 100);
       updateFormField('eventDate', editItem.details.eventDate ? editItem.details.eventDate.split('T')[0] : '');
       updateFormField('startTime', editItem.details.startTime || '');
@@ -92,7 +93,9 @@ const CartModal = memo<CartModalProps>(({
       updateFormField('additionalCards', editItem.details.additionalCards || 0);
       updateFormField('gateSupervisors', typeof editItem.details.gateSupervisors === 'number' ? editItem.details.gateSupervisors : 0);
       updateFormField('extraHours', editItem.details.extraHours || 0);
-      updateFormField('expeditedDelivery', editItem.details.expeditedDelivery || false);
+      updateFormField('fastDelivery', editItem.details.fastDelivery || false);
+      updateFormField('isCustomDesign', editItem.details.isCustomDesign || false);
+      updateFormField('customDesignNotes', editItem.details.customDesignNotes || '');
 
       if (editItem.details.locationCoordinates) {
         updateLocation(

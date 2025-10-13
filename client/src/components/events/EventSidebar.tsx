@@ -18,7 +18,7 @@ interface EventSidebarProps {
       inviteCount: number;
       eventDate: string;
       additionalCards: number;
-      gateSupervisors?: string;
+      gateSupervisors?: number;
       fastDelivery: boolean;
     };
     approvalStatus: string;

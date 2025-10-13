@@ -89,7 +89,6 @@ export interface IEvent extends Document {
   createdAt: Date;
   updatedAt: Date;
   invitationCardUrl: string;
-  qrCodeUrl?: string;
   qrCodeReaderUrl: string;
 }
 
@@ -324,17 +323,6 @@ const eventSchema = new Schema<IEvent>({
     index: true
   },
   invitationCardUrl: {
-    type: String,
-    trim: true,
-    validate: {
-      validator: function(url: string) {
-        if (!url) return true; // Optional field
-        return url.includes('drive.google.com') || url.includes('docs.google.com');
-      },
-      message: 'يجب أن يكون الرابط من Google Drive'
-    }
-  },
-  qrCodeUrl: {
     type: String,
     trim: true,
     validate: {

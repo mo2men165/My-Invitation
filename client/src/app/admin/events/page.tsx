@@ -54,7 +54,7 @@ export default function AdminEventsPage() {
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject' | null>(null);
   const [approvalNotes, setApprovalNotes] = useState('');
   const [invitationCardUrl, setInvitationCardUrl] = useState('');
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [qrCodeReaderUrl, setQrCodeReaderUrl] = useState('');
   const [processingApproval, setProcessingApproval] = useState(false);
   const { toast } = useToast();
 
@@ -164,17 +164,7 @@ export default function AdminEventsPage() {
           return;
         }
 
-        // Validate QR Code URL if provided
-        if (qrCodeUrl.trim() && !qrCodeUrl.includes('drive.google.com') && !qrCodeUrl.includes('docs.google.com')) {
-          toast({
-            title: "خطأ",
-            description: "يجب أن يكون رابط QR Code من Google Drive",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        await adminAPI.approveEvent(selectedEvent.id, approvalNotes || undefined, invitationCardUrl, qrCodeUrl.trim() || undefined);
+        await adminAPI.approveEvent(selectedEvent.id, approvalNotes || undefined, invitationCardUrl, qrCodeReaderUrl.trim() || undefined);
         toast({
           title: "تم بنجاح",
           description: "تم الموافقة على الحدث وإرسال إشعار للمستخدم",
@@ -201,7 +191,7 @@ export default function AdminEventsPage() {
       setApprovalAction(null);
       setApprovalNotes('');
       setInvitationCardUrl('');
-      setQrCodeUrl('');
+      setQrCodeReaderUrl('');
       fetchEvents(); // Refresh the events list
     } catch (error: any) {
       console.error('Approval error:', error);
@@ -634,7 +624,7 @@ export default function AdminEventsPage() {
                       setApprovalAction(null);
                       setApprovalNotes('');
                       setInvitationCardUrl('');
-                      setQrCodeUrl('');
+                      setQrCodeReaderUrl('');
                     }}
                     className="p-2 hover:bg-gray-800 rounded-lg transition-colors duration-200"
                   >
@@ -676,17 +666,17 @@ export default function AdminEventsPage() {
                 {approvalAction === 'approve' && (
                   <div>
                     <label className="text-sm text-gray-400 mb-2 block">
-                      رابط QR Code من Google Drive (اختياري)
+                      رابط تطبيق ماسح QR Code (اختياري)
                     </label>
                     <input
                       type="url"
-                      value={qrCodeUrl}
-                      onChange={(e) => setQrCodeUrl(e.target.value)}
-                      placeholder="https://drive.google.com/file/d/..."
+                      value={qrCodeReaderUrl}
+                      onChange={(e) => setQrCodeReaderUrl(e.target.value)}
+                      placeholder="https://example.com/qr-scanner..."
                       className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52]"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      يجب أن يكون الرابط من Google Drive أو Google Docs
+                      رابط تطبيق المسح الذي سيستخدمه المشرفون على البوابة
                     </p>
                   </div>
                 )}
@@ -733,7 +723,7 @@ export default function AdminEventsPage() {
                       setApprovalAction(null);
                       setApprovalNotes('');
                       setInvitationCardUrl('');
-                      setQrCodeUrl('');
+                      setQrCodeReaderUrl('');
                     }}
                     className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200"
                   >
