@@ -14,7 +14,7 @@ export interface EventApprovalEmailData {
   eventName: string;
   eventDate: string;
   invitationCardUrl?: string;
-  qrCodeUrl?: string;
+  qrCodeReaderUrl?: string;
 }
 
 
@@ -482,8 +482,8 @@ private createEventApprovalTemplate(data: EventApprovalEmailData) {
     ? `<p><a href="${data.invitationCardUrl}" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0;">عرض بطاقة الدعوة</a></p>`
     : '';
   
-  const qrCodeSection = data.qrCodeUrl 
-    ? `<p><a href="${data.qrCodeUrl}" style="background: #17a2b8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0;">عرض QR Code</a></p>`
+  const qrCodeSection = data.qrCodeReaderUrl 
+    ? `<p><a href="${data.qrCodeReaderUrl}" style="background: #17a2b8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0;">عرض QR Code</a></p>`
     : '';
 
   const htmlTemplate = `
@@ -526,7 +526,7 @@ private createEventApprovalTemplate(data: EventApprovalEmailData) {
 نحن سعداء لإعلامك بأنه تم الموافقة على حدثك "${data.eventName}" المقرر بتاريخ ${data.eventDate}
 
     ${data.invitationCardUrl ? `رابط بطاقة الدعوة: ${data.invitationCardUrl}` : ''}
-    ${data.qrCodeUrl ? `رابط QR Code: ${data.qrCodeUrl}` : ''}
+    ${data.qrCodeReaderUrl ? `رابط QR Code: ${data.qrCodeReaderUrl}` : ''}
 
 ماذا بعد؟
 • يمكنك الآن إضافة ضيوفك إلى قائمة الدعوات

@@ -23,7 +23,7 @@ interface EventSidebarProps {
     };
     approvalStatus: string;
     invitationCardUrl?: string;
-    qrCodeUrl?: string;
+    qrCodeReaderUrl?: string;
     paymentCompletedAt?: string; // Make optional since it's filtered for collaborators
   };
   totalInvitesForView: number; // Total invites to show (allocated for collaborators)

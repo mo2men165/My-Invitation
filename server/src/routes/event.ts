@@ -135,7 +135,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       delete filteredEvent.totalPrice;
       delete filteredEvent.paymentCompletedAt;
       delete filteredEvent.invitationCardUrl;
-      delete filteredEvent.qrCodeUrl;
+      delete filteredEvent.qrCodeReaderUrl;
       delete filteredEvent.adminNotes;
       delete filteredEvent.approvedBy;
       delete filteredEvent.approvedAt;
