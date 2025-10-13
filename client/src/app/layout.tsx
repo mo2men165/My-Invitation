@@ -8,7 +8,6 @@ import { ConditionalLayout } from '@/components/layout/ConditionalLayout';
 import { AdminRouteBlocker } from '@/components/auth/AdminRouteBlocker';
 import { UserToAdminBlocker } from '@/components/auth/UserToAdminBlocker';
 import { Toaster } from '@/components/ui/Toaster';
-
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {

@@ -39,6 +39,7 @@ const selectedCartItemSchema = new Schema({
     details: {
       eventName: {
         type: String,
+        required: true,
         maxlength: 100,
         trim: true
       },
@@ -46,7 +47,7 @@ const selectedCartItemSchema = new Schema({
         type: Number,
         required: true,
         min: 100,
-        max: 500
+        max: 700
       },
       eventDate: {
         type: Date,
@@ -95,6 +96,25 @@ const selectedCartItemSchema = new Schema({
         min: 0,
         max: 3
       },
+      fastDelivery: {
+        type: Boolean,
+        default: false
+      },
+      // Location fields
+      placeId: {
+        type: String,
+        trim: true
+      },
+      displayName: {
+        type: String,
+        trim: true,
+        maxlength: 200
+      },
+      formattedAddress: {
+        type: String,
+        trim: true,
+        maxlength: 500
+      },
       locationCoordinates: {
         lat: {
           type: Number,
@@ -109,7 +129,12 @@ const selectedCartItemSchema = new Schema({
       },
       detectedCity: {
         type: String,
+        required: true,
         enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
+      },
+      googleMapsUrl: {
+        type: String,
+        trim: true
       },
       isCustomDesign: {
         type: Boolean,

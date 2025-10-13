@@ -28,6 +28,7 @@ interface Guest {
   whatsappMessageSent: boolean;
   addedAt: string;
   updatedAt: string;
+  individualInviteLink?: string;
 }
 
 interface EventDetails {
@@ -71,6 +72,9 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
   const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState<string | null>(null);
   const [showVipOnly, setShowVipOnly] = useState(false);
+  const [editingLinkForGuest, setEditingLinkForGuest] = useState<string | null>(null);
+  const [inviteLinkInput, setInviteLinkInput] = useState<string>('');
+  const [updatingLink, setUpdatingLink] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -158,6 +162,46 @@ ${event.invitationText}
     } finally {
       setSendingMessage(null);
     }
+  };
+
+  const handleUpdateInviteLink = async (guest: Guest) => {
+    if (!event) return;
+
+    try {
+      setUpdatingLink(true);
+      await adminAPI.updateGuestInviteLink(eventId, guest._id, inviteLinkInput);
+      
+      // Reload to update UI
+      await loadEventGuests();
+      
+      // Reset editing state
+      setEditingLinkForGuest(null);
+      setInviteLinkInput('');
+      
+      toast({
+        title: "تم التحديث",
+        description: "تم تحديث رابط الدعوة الفردي بنجاح",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ في تحديث الرابط",
+        description: error.message || "حدث خطأ غير متوقع",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingLink(false);
+    }
+  };
+
+  const handleStartEditingLink = (guest: Guest) => {
+    setEditingLinkForGuest(guest._id);
+    setInviteLinkInput(guest.individualInviteLink || '');
+  };
+
+  const handleCancelEditingLink = () => {
+    setEditingLinkForGuest(null);
+    setInviteLinkInput('');
   };
 
   const filteredGuests = showVipOnly 
@@ -326,26 +370,90 @@ ${event.invitationText}
         <div className="divide-y divide-gray-700">
           {filteredGuests.map((guest) => (
             <div key={guest._id} className="px-6 py-4 hover:bg-gray-800/30 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 space-x-reverse">
-                    <h4 className="text-white font-medium">{guest.name}</h4>
-                    <span className="text-gray-400 text-sm">+{guest.phone}</span>
-                    <span className="text-gray-500 text-sm">
-                      ({guest.numberOfAccompanyingGuests} مرافق)
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2 space-x-reverse mt-1">
-                    <span className="text-xs text-gray-500">
-                      أضيف في: {new Date(guest.addedAt).toLocaleDateString('ar-SA')}
-                    </span>
-                    {guest.whatsappMessageSent && (
-                      <span className="flex items-center space-x-1 space-x-reverse text-xs text-green-400">
-                        <CheckCircle className="h-3 w-3" />
-                        <span>تم الإرسال</span>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <div className="flex items-center space-x-3 space-x-reverse">
+                      <h4 className="text-white font-medium">{guest.name}</h4>
+                      <span className="text-gray-400 text-sm">+{guest.phone}</span>
+                      <span className="text-gray-500 text-sm">
+                        ({guest.numberOfAccompanyingGuests} مرافق)
                       </span>
-                    )}
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse mt-1">
+                      <span className="text-xs text-gray-500">
+                        أضيف في: {new Date(guest.addedAt).toLocaleDateString('ar-SA')}
+                      </span>
+                      {guest.whatsappMessageSent && (
+                        <span className="flex items-center space-x-1 space-x-reverse text-xs text-green-400">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>تم الإرسال</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Individual Invite Link Section (Premium & VIP only) */}
+                  {(event.packageType === 'premium' || event.packageType === 'vip') && (
+                    <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-600">
+                      {editingLinkForGuest === guest._id ? (
+                        <div className="space-y-2">
+                          <label className="text-xs text-gray-400 block">رابط الدعوة الفردي</label>
+                          <div className="flex items-center space-x-2 space-x-reverse">
+                            <input
+                              type="text"
+                              value={inviteLinkInput}
+                              onChange={(e) => setInviteLinkInput(e.target.value)}
+                              placeholder="أدخل رابط الدعوة الفردي"
+                              className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#C09B52]"
+                            />
+                            <button
+                              onClick={() => handleUpdateInviteLink(guest)}
+                              disabled={updatingLink}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {updatingLink ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Check className="h-4 w-4" />
+                              )}
+                            </button>
+                            <button
+                              onClick={handleCancelEditingLink}
+                              disabled={updatingLink}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <span className="text-xs text-gray-400 block mb-1">رابط الدعوة الفردي</span>
+                            {guest.individualInviteLink ? (
+                              <a 
+                                href={guest.individualInviteLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-400 hover:text-blue-300 underline break-all"
+                              >
+                                {guest.individualInviteLink}
+                              </a>
+                            ) : (
+                              <span className="text-sm text-gray-500">لم يتم تعيين رابط</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleStartEditingLink(guest)}
+                            className="mr-3 px-3 py-1 bg-gray-700 text-white text-sm rounded hover:bg-gray-600 transition-colors"
+                          >
+                            {guest.individualInviteLink ? 'تعديل' : 'إضافة'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center space-x-2 space-x-reverse">

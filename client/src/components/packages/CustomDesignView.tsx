@@ -10,7 +10,7 @@ interface CustomDesignViewProps {
 }
 
 const customDesign: InvitationDesign = {
-  id: "custom-design",
+  id: "000000000000000000000001",
   name: 'تصميم مخصص',
   category: 'custom',
   image: '/custom-design.webp',
@@ -67,10 +67,7 @@ export default function CustomDesignView({
               <span className="text-[#C09B52]">📞</span>
               <span>سيتم التواصل معك</span>
             </div>
-            <div className="flex items-center justify-center gap-3 text-gray-300">
-              <span className="text-[#C09B52]">🔄</span>
-              <span>مراجعات غير محدودة</span>
-            </div>
+            
           </div>
 
           {/* Action Button */}

@@ -21,6 +21,8 @@ export interface IGuest {
     collaboratorName?: string;
     collaboratorEmail?: string;
   };
+  // Individual invite link for premium and VIP packages (optional)
+  individualInviteLink?: string;
 }
 
 export interface IEvent extends Document {
@@ -28,9 +30,8 @@ export interface IEvent extends Document {
   designId: Types.ObjectId;
   packageType: 'classic' | 'premium' | 'vip';
   details: {
-    eventName?: string;
+    eventName: string;
     inviteCount: number;
-    qrCode: boolean;
     eventDate: Date;
     startTime: string;
     endTime: string;
@@ -40,11 +41,16 @@ export interface IEvent extends Document {
     additionalCards: number;
     gateSupervisors: number;
     fastDelivery: boolean;
+    // Location fields
+    placeId?: string;
+    displayName?: string;
+    formattedAddress?: string;
     locationCoordinates?: {
       lat: number;
       lng: number;
     };
     detectedCity?: string;
+    googleMapsUrl?: string;
   };
   totalPrice: number;
   status: 'upcoming' | 'cancelled' | 'done';
@@ -84,6 +90,7 @@ export interface IEvent extends Document {
   updatedAt: Date;
   invitationCardUrl: string;
   qrCodeUrl?: string;
+  qrCodeReaderUrl: string;
 }
 
 const guestSchema = new Schema<IGuest>({
@@ -146,6 +153,11 @@ const guestSchema = new Schema<IGuest>({
     collaboratorEmail: {
       type: String
     }
+  },
+  // Individual invite link for premium and VIP packages (optional)
+  individualInviteLink: {
+    type: String,
+    trim: true
   }
 }, { _id: true });
 
@@ -169,6 +181,7 @@ const eventSchema = new Schema<IEvent>({
   details: {
     eventName: {
       type: String,
+      required: true,
       maxlength: 100,
       trim: true
     },
@@ -177,10 +190,6 @@ const eventSchema = new Schema<IEvent>({
       required: true,
       min: 100,
       max: 700
-    },
-    qrCode: {
-      type: Boolean,
-      default: true
     },
     eventDate: {
       type: Date,
@@ -220,11 +229,28 @@ const eventSchema = new Schema<IEvent>({
     },
     gateSupervisors: {
       type: Number,
-      default: 0
+      default: 0,
+      min: 0,
+      max: 10
     },
     fastDelivery: {
       type: Boolean,
       default: false
+    },
+    // Location fields
+    placeId: {
+      type: String,
+      trim: true
+    },
+    displayName: {
+      type: String,
+      trim: true,
+      maxlength: 200
+    },
+    formattedAddress: {
+      type: String,
+      trim: true,
+      maxlength: 500
     },
     locationCoordinates: {
       lat: {
@@ -241,6 +267,10 @@ const eventSchema = new Schema<IEvent>({
     detectedCity: {
       type: String,
       enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
+    },
+    googleMapsUrl: {
+      type: String,
+      trim: true
     }
   },
   totalPrice: {
@@ -314,6 +344,11 @@ const eventSchema = new Schema<IEvent>({
       },
       message: 'يجب أن يكون الرابط من Google Drive'
     }
+  },
+  qrCodeReaderUrl: {
+    type: String,
+    default: '',
+    trim: true
   },
   guestListConfirmed: {
     isConfirmed: {

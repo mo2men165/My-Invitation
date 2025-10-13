@@ -38,11 +38,6 @@ export const ctaFeatures = [
     description: "دعوتك جاهزة في دقائق"
   },
   {
-    icon: Gift,
-    title: "تجربة مجانية",
-    description: "ابدأ بدون أي تكلفة"
-  },
-  {
     icon: Shield,
     title: "أمان مضمون",
     description: "بياناتك محمية 100%"

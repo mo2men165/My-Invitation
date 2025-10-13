@@ -6,6 +6,7 @@ export interface CartItem {
   designId: string;
   packageType: 'classic' | 'premium' | 'vip';
   details: {
+    eventName: string;
     inviteCount: number;
     eventDate: string; // Will be converted to Date on backend
     startTime: string;
@@ -16,13 +17,20 @@ export interface CartItem {
     additionalCards: number;
     gateSupervisors: number;
     extraHours: number;
-    expeditedDelivery: boolean;
-    // New location fields
+    fastDelivery: boolean;
+    // Location fields
+    placeId?: string;
+    displayName?: string;
+    formattedAddress?: string;
+    detectedCity: string;
     locationCoordinates?: {
       lat: number;
       lng: number;
     };
-    detectedCity: string;
+    googleMapsUrl?: string;
+    // Custom design fields
+    isCustomDesign?: boolean;
+    customDesignNotes?: string;
   };
   totalPrice: number;
   addedAt?: string;

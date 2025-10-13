@@ -44,6 +44,9 @@ export default function CustomDesignSection({
           ملاحظات التصميم المخصص
           <span className="text-gray-500 text-xs mr-2">(اختياري)</span>
         </label>
+        <p className="text-sm text-gray-400 mb-3">
+          سيتم تصميم الدعوة حسب طلبك. يرجى إضافة أي ملاحظات خاصة في الحقل أدناه.
+        </p>
         <textarea
           value={formData.customDesignNotes || ''}
           onChange={(e) => onInputChange('customDesignNotes', e.target.value)}
@@ -75,10 +78,7 @@ export default function CustomDesignSection({
           <span className="text-green-400">✓</span>
           <span>استشارة مجانية</span>
         </div>
-        <div className="flex items-center gap-2 text-gray-300">
-          <span className="text-green-400">✓</span>
-          <span>مراجعات غير محدودة</span>
-        </div>
+
         <div className="flex items-center gap-2 text-gray-300">
           <span className="text-green-400">✓</span>
           <span>تسليم خلال 3-5 أيام</span>

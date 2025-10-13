@@ -83,7 +83,7 @@ export function AboutSection() {
                 variants={itemVariants}
               >
                 <p className="text-lg text-gray-700 leading-relaxed">
-                  نحن في <strong className="uppercase" style={{ color: '#C09B52' }}>Invitation</strong> نقدم حلاً ثورياً لإدارة دعواتك الرقمية 
+                  نحن في <strong className="uppercase" style={{ color: '#C09B52' }}>Invitation</strong> نقدم حلاً حديثا لإدارة دعواتك الرقمية 
                   - من الأفراح الى الفعاليات الخاصة. بطاقاتنا الذكية المزودة باركود شخصي تضمن:
                 </p>
               </motion.div>

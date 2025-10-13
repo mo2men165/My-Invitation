@@ -14,16 +14,13 @@ import '../cart-scroll.css';
 // Components
 import CartHeader from './components/CartHeader';
 import EventDetailsForm from './components/EventDetailsForm';
-import LocationSection from './components/LocationSection';
+import GoogleMapsLocationPicker from './components/GoogleMapsLocationPicker';
 import CustomDesignSection from './components/CustomDesignSection';
 import AdditionalServices from './components/AdditionalServices';
 import CartSummary from './components/CartSummary';
 import CartActions from './components/CartActions';
 import PackageFeatures from './components/PackageFeatures';
 import ConfirmationModal from './components/ConfirmationModal';
-
-// Lazy load heavy components
-import LazyGoogleMaps from './components/LazyGoogleMaps';
 
 const CartModal = memo<CartModalProps>(({
   isOpen,
@@ -49,8 +46,6 @@ const CartModal = memo<CartModalProps>(({
   const {
     updateFormField,
     updateLocation,
-    toggleMap,
-    updateMapSearchQuery,
     setEditMode,
     resetForm,
     validateForm,
@@ -101,22 +96,21 @@ const CartModal = memo<CartModalProps>(({
 
       if (editItem.details.locationCoordinates) {
         updateLocation(
+          editItem.details.placeId || '',
+          editItem.details.displayName || editItem.details.eventLocation || '',
+          editItem.details.detectedCity || 'الرياض',
           editItem.details.locationCoordinates.lat,
           editItem.details.locationCoordinates.lng,
-          editItem.details.eventLocation || '',
-          editItem.details.detectedCity || 'الرياض'
+          editItem.details.eventLocation || ''
         );
-        toggleMap();
       }
     }
-  }, [editItem, isOpen, state.isEditMode, setEditMode, updateFormField, updateLocation, toggleMap]);
+  }, [editItem, isOpen, state.isEditMode, setEditMode, updateFormField, updateLocation]);
 
   // Detect custom design selection and set appropriate form fields
   useEffect(() => {
     if (isOpen && selectedDesign && selectedDesign.isCustom && !state.isEditMode) {
       updateFormField('isCustomDesign', true);
-      // Pre-populate invitation text with a helpful message for custom design
-      updateFormField('invitationText', 'سيتم تصميم الدعوة حسب طلبك. يرجى إضافة أي ملاحظات خاصة في الحقل المخصص أدناه.');
     } else if (isOpen && selectedDesign && !selectedDesign.isCustom && !state.isEditMode) {
       updateFormField('isCustomDesign', false);
       updateFormField('customDesignNotes', '');
@@ -151,7 +145,7 @@ const CartModal = memo<CartModalProps>(({
   useEffect(() => {
     if (isOpen && !editItem && user?.city) {
       const coords = CITY_COORDINATES[user.city as keyof typeof CITY_COORDINATES] || DEFAULT_LOCATION;
-      updateLocation(coords.lat, coords.lng, '', user.city);
+      updateLocation('', '', user.city, coords.lat, coords.lng, '');
     }
   }, [isOpen, editItem, user?.city, updateLocation]);
 
@@ -176,7 +170,13 @@ const CartModal = memo<CartModalProps>(({
       gateSupervisorsValue = isNaN(parsed) ? 0 : parsed;
     }
 
+    // Generate Google Maps URL if placeId exists
+    const googleMapsUrl = locationData.placeId 
+      ? `https://www.google.com/maps/place/?q=place_id:${locationData.placeId}`
+      : '';
+
     return {
+      eventName: formData.eventName || '',
       inviteCount: formData.inviteCount || 100,
       eventDate: formData.eventDate ? new Date(formData.eventDate).toISOString() : new Date().toISOString(),
       startTime: formData.startTime || '12:00',
@@ -187,9 +187,15 @@ const CartModal = memo<CartModalProps>(({
       additionalCards: formData.additionalCards || 0,
       gateSupervisors: gateSupervisorsValue,
       extraHours: formData.extraHours || 0,
-      expeditedDelivery: formData.expeditedDelivery || false,
+      fastDelivery: formData.fastDelivery || false,
+      placeId: locationData.placeId || '',
+      displayName: locationData.displayName || '',
+      formattedAddress: locationData.address || '',
+      detectedCity: locationData.city || 'الرياض',
       locationCoordinates: locationData.coordinates,
-      detectedCity: locationData.city || 'الرياض' // Always pass city, default to Riyadh if empty
+      googleMapsUrl: googleMapsUrl,
+      isCustomDesign: formData.isCustomDesign || false,
+      customDesignNotes: formData.customDesignNotes || ''
     };
   }, [formData, locationData]);
 
@@ -361,26 +367,13 @@ const CartModal = memo<CartModalProps>(({
                 isEditMode={state.isEditMode}
                 isUpdating={state.isUpdating}
               />
-              
-              <LocationSection
-                eventLocation={formData.eventLocation}
-                onLocationChange={(value) => updateFormField('eventLocation', value)}
-                onToggleMap={toggleMap}
-                showMap={state.showMap}
-                locationError={errors.eventLocation}
-                mapComponent={
-                  <div className={`mt-4 ${state.showMap ? 'block' : 'hidden'}`}>
-                    <LazyGoogleMaps
-                      locationData={locationData}
-                      onLocationSelect={updateLocation}
-                      errors={errors}
-                      searchQuery={state.mapSearchQuery}
-                      onSearchQueryChange={updateMapSearchQuery}
-                    />
-                  </div>
-                }
+
+              <GoogleMapsLocationPicker
+                locationData={locationData}
+                onLocationSelect={updateLocation}
+                errors={errors}
               />
-              
+
               <CustomDesignSection
                 formData={formData}
                 errors={errors}

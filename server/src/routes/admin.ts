@@ -716,6 +716,62 @@ router.post('/events/:eventId/guests/:guestId/whatsapp', async (req: Request, re
   }
 });
 
+/**
+ * PUT /api/admin/events/:eventId/guests/:guestId/invite-link
+ * Update individual invite link for a guest (premium and VIP packages only)
+ */
+router.put('/events/:eventId/guests/:guestId/invite-link', async (req: Request, res: Response) => {
+  try {
+    const { eventId, guestId } = req.params;
+    const { individualInviteLink } = req.body;
+    const adminId = req.user!.id;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    // Check if package type is premium or VIP
+    if (event.packageType !== 'premium' && event.packageType !== 'vip') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'روابط الدعوة الفردية متاحة فقط لباقات Premium و VIP' }
+      });
+    }
+
+    const guest = event.guests.find(g => g._id?.toString() === guestId);
+    if (!guest) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'الضيف غير موجود' }
+      });
+    }
+
+    // Update the individual invite link
+    guest.individualInviteLink = individualInviteLink || undefined;
+    guest.updatedAt = new Date();
+    await event.save();
+
+    logger.info(`Admin ${adminId} updated invite link for guest ${guestId} in event ${eventId}`);
+
+    return res.json({
+      success: true,
+      message: 'تم تحديث رابط الدعوة الفردي بنجاح',
+      data: { guest }
+    });
+
+  } catch (error) {
+    logger.error('Error updating guest invite link:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تحديث رابط الدعوة' }
+    });
+  }
+});
+
 // ============================================
 // USER MANAGEMENT
 // ============================================

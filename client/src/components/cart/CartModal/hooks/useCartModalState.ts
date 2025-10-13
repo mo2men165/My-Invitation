@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { CartModalState, CartFormData, LocationData, FormErrors } from '../types';
+import { CartModalState, CartFormData, FormErrors } from '../types';
+import { LocationData } from '@/types/location';
 
 const initialFormData: CartFormData = {
   eventName: '',
@@ -13,17 +14,17 @@ const initialFormData: CartFormData = {
   additionalCards: 0,
   gateSupervisors: 0,
   extraHours: 0,
-  qrCode: true,
   fastDelivery: false,
-  expeditedDelivery: false,
   isCustomDesign: false,
   customDesignNotes: '',
 };
 
 const initialLocationData: LocationData = {
-  address: '',
-  coordinates: { lat: 24.7136, lng: 46.6753 },
+  placeId: '',
+  displayName: '',
   city: '',
+  coordinates: { lat: 24.7136, lng: 46.6753 },
+  address: '',
 };
 
 export const useCartModalState = (editItem?: any) => {
@@ -90,14 +91,23 @@ export const useCartModalState = (editItem?: any) => {
     });
   }, []);
 
-  const updateLocation = useCallback((lat: number, lng: number, address: string, city?: string) => {
+  const updateLocation = useCallback((
+    placeId: string,
+    displayName: string,
+    city: string,
+    lat: number,
+    lng: number,
+    formattedAddress: string
+  ) => {
     setLocationData({
-      address,
+      placeId,
+      displayName,
+      city,
       coordinates: { lat, lng },
-      city: city || '', // Will be detected separately
+      address: formattedAddress,
     });
-    setFormData(prev => ({ ...prev, eventLocation: address }));
-    
+    setFormData(prev => ({ ...prev, eventLocation: formattedAddress }));
+
     // Clear eventLocation error when location is updated
     setErrors(prev => {
       if (prev.eventLocation) {
@@ -147,6 +157,11 @@ export const useCartModalState = (editItem?: any) => {
     let isValid = true;
 
     // Required field validation
+    if (!formData.eventName?.trim()) {
+      newErrors.eventName = 'اسم المناسبة مطلوب';
+      isValid = false;
+    }
+
     if (!formData.hostName?.trim()) {
       newErrors.hostName = 'اسم المضيف مطلوب';
       isValid = false;

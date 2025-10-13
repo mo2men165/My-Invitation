@@ -42,7 +42,7 @@ const CartActions = memo<CartActionsProps>(({
         variant="outline"
         onClick={onCancel}
         disabled={isLoading}
-        className="w-full py-3 border-2 border-gray-500/30 text-gray-300 hover:bg-gray-500/10 transition-all duration-300 disabled:opacity-50"
+        className="w-full py-3 border-2 border-gray-500/30 text-gray-300 hover:bg-gray-700 transition-all duration-300 disabled:opacity-50 bg-gray-500/10"
       >
         إلغاء
       </Button>

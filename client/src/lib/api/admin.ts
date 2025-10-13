@@ -360,5 +360,20 @@ export const adminAPI = {
     if (!response.ok) {
       throw new Error(result.error?.message || 'فشل في تحديث حالة الرسالة');
     }
+  },
+
+  // Update Guest Individual Invite Link (premium and VIP only)
+  async updateGuestInviteLink(eventId: string, guestId: string, individualInviteLink: string): Promise<void> {
+    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/guests/${guestId}/invite-link`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ individualInviteLink })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في تحديث رابط الدعوة');
+    }
   }
 };

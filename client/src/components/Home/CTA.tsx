@@ -197,27 +197,6 @@ export function CTA() {
             className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8"
             variants={itemVariants}
           >
-            <Button 
-              size="lg" 
-              asChild 
-              className="group text-black font-bold px-10 py-4 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-105 relative overflow-hidden"
-              style={{ 
-                backgroundColor: '#C09B52',
-                boxShadow: '0 20px 60px rgba(192, 155, 82, 0.4)'
-              }}
-            >
-              <Link href="/packages" className="flex items-center relative z-10">
-                ابدأ الآن مجاناً
-                <ArrowLeft className="mr-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                
-                {/* Shimmer Effect */}
-                <motion.div 
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                  animate={{ x: [-100, 200] }}
-                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                />
-              </Link>
-            </Button>
             
             <Button 
               variant="outline" 

@@ -178,7 +178,7 @@ export function CounterSection() {
           </motion.p>
         </motion.div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12 place-items-center">
           {counters.map((counter, index) => (
             <CounterItem
               key={index}

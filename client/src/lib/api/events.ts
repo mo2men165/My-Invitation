@@ -17,9 +17,8 @@ export interface EventItem {
   designId: string;
   packageType: 'classic' | 'premium' | 'vip';
   details: {
-    eventName?: string;
+    eventName: string;
     inviteCount: number;
-    qrCode: boolean;
     eventDate: string;
     startTime: string;
     endTime: string;
@@ -27,19 +26,25 @@ export interface EventItem {
     hostName: string;
     eventLocation: string;
     additionalCards: number;
-    gateSupervisors: string;
+    gateSupervisors: number;
     fastDelivery: boolean;
+    // Location fields
+    placeId?: string;
+    displayName?: string;
+    formattedAddress?: string;
+    detectedCity?: string;
     locationCoordinates?: {
       lat: number;
       lng: number;
     };
-    detectedCity?: string;
+    googleMapsUrl?: string;
   };
   totalPrice: number;
   status: 'upcoming' | 'cancelled' | 'done';
   approvalStatus: 'pending' | 'approved' | 'rejected';
   invitationCardUrl?: string;
   qrCodeUrl?: string;
+  qrCodeReaderUrl: string;
   adminNotes?: string;
   guestListConfirmed: {
     isConfirmed: boolean;

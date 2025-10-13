@@ -67,7 +67,10 @@ export const resetPasswordSchema = z.object({
 
 // Cart item details schema with location support
 const cartItemDetailsSchema = z.object({
-  inviteCount: z.number().int().min(100).max(500), // Changed max from 700 to 500
+  eventName: z.string()
+    .min(2, 'اسم المناسبة يجب أن يكون حرفين على الأقل')
+    .max(100, 'اسم المناسبة لا يجب أن يتجاوز 100 حرف'),
+  inviteCount: z.number().int().min(100).max(700),
   eventDate: z.string().transform((str) => {
     const date = new Date(str);
     if (isNaN(date.getTime())) {
@@ -99,22 +102,21 @@ const cartItemDetailsSchema = z.object({
       if (isNaN(parsed)) return 0;
       return Math.max(0, Math.min(10, parsed));
     })
-  ]).default(0), // Handle both number and string inputs
-  extraHours: z.number().int().min(0).max(3).default(0).optional(), // Added extraHours
-  expeditedDelivery: z.boolean().default(false), // Added expeditedDelivery
+  ]).default(0),
+  extraHours: z.number().int().min(0).max(3).default(0),
+  fastDelivery: z.boolean().default(false),
+  // Location fields
+  placeId: z.string().optional(),
+  displayName: z.string().max(200).optional(),
+  formattedAddress: z.string().max(500).optional(),
   locationCoordinates: locationCoordinatesSchema,
   detectedCity: z.enum(saudiCities, {
     message: 'يجب اختيار مدينة صحيحة من القائمة المحددة'
-  })
-}).refine((data) => {
-  const [startHour, startMin] = data.startTime.split(':').map(Number);
-  const [endHour, endMin] = data.endTime.split(':').map(Number);
-  const startMinutes = startHour * 60 + startMin;
-  const endMinutes = endHour * 60 + endMin;
-  return endMinutes > startMinutes;
-}, {
-  message: 'وقت النهاية يجب أن يكون بعد وقت البداية',
-  path: ['endTime']
+  }),
+  googleMapsUrl: z.string().optional(),
+  // Custom design fields
+  isCustomDesign: z.boolean().default(false).optional(),
+  customDesignNotes: z.string().max(500).optional()
 }).refine((data) => {
   if (data.locationCoordinates && !data.detectedCity) {
     return false;
@@ -127,7 +129,7 @@ const cartItemDetailsSchema = z.object({
 
 // Main cart item schema
 export const cartItemSchema = z.object({
-  designId: z.string().min(1, 'معرف التصميم مطلوب'),
+  designId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'معرف التصميم غير صحيح'),
   packageType: z.enum(['classic', 'premium', 'vip']),
   details: cartItemDetailsSchema,
   totalPrice: z.number().min(0, 'السعر يجب أن يكون موجب')

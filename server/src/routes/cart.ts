@@ -75,9 +75,18 @@ router.post('/', async (req: Request, res: Response) => {
     const validationResult = cartItemSchema.safeParse(req.body);
     if (!validationResult.success) {
       const firstError = validationResult.error.issues[0];
+      logger.error('Cart validation failed:', {
+        error: firstError,
+        allErrors: validationResult.error.issues,
+        receivedData: req.body
+      });
       return res.status(400).json({
         success: false,
-        error: { message: firstError.message }
+        error: { 
+          message: firstError.message,
+          path: firstError.path.join('.'),
+          received: firstError.code === 'invalid_type' ? typeof (req.body as any)[firstError.path[0]] : undefined
+        }
       });
     }
 
@@ -100,17 +109,20 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Check if item already exists in cart
-    const existingItem = user.cart.find(
-      item => item.designId.toString() === cartItemData.designId && 
-               item.packageType === cartItemData.packageType
-    );
+    // Check if item already exists in cart (skip for custom designs as each is unique)
+    // Custom design ID is 000000000000000000000001
+    if (cartItemData.designId !== '000000000000000000000001') {
+      const existingItem = user.cart.find(
+        item => item.designId.toString() === cartItemData.designId && 
+                 item.packageType === cartItemData.packageType
+      );
 
-    if (existingItem) {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'هذا العنصر موجود بالفعل في السلة' }
-      });
+      if (existingItem) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'هذا العنصر موجود بالفعل في السلة' }
+        });
+      }
     }
 
     // Create new cart item with data sanitization

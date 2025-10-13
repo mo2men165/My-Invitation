@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useMemo, useEffect } from 'react';
-import { Calendar, Clock, User, MessageSquare, Plus } from 'lucide-react';
+import { Calendar, Clock, User, MessageSquare, Plus, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { CartFormData, FormErrors } from '../types';
 import { formatCurrency } from '@/utils/calculations';
@@ -181,18 +181,29 @@ const EventDetailsForm = memo<EventDetailsFormProps>(({
         <label className="text-white font-medium mb-3 flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-[#C09B52]" />
           اسم المناسبة
+          <span className="text-red-400 mr-1">*</span>
         </label>
         <Input
           type="text"
           value={formData.eventName || ''}
           onChange={(e) => onInputChange('eventName', e.target.value)}
           disabled={isUpdating}
-          className="w-full px-4 py-4 bg-gradient-to-r from-white/5 to-white/10 border-2 border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C09B52]/50 focus:border-[#C09B52] transition-all duration-300 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          placeholder="أدخل اسم المناسبة (اختياري)"
+          className={`w-full px-4 py-4 bg-gradient-to-r from-white/5 to-white/10 border-2 ${
+            errors?.eventName ? 'border-red-500' : 'border-white/20'
+          } rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C09B52]/50 focus:border-[#C09B52] transition-all duration-300 text-lg disabled:opacity-50 disabled:cursor-not-allowed`}
+          placeholder="أدخل اسم المناسبة "
         />
-        <div className="text-gray-400 text-sm mt-2">
-          مثال: حفل زفاف أحمد وفاطمة، تخرج دفعة 2024، عيد ميلاد سارة
-        </div>
+        {errors?.eventName && (
+          <div className="text-red-400 text-sm mt-2 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.eventName}
+          </div>
+        )}
+        {!errors?.eventName && (
+          <div className="text-gray-400 text-sm mt-2">
+            مثال: حفل زفاف أحمد وفاطمة، تخرج دفعة 2024، عيد ميلاد سارة
+          </div>
+        )}
       </div>
 
       {/* Date and Time Row */}

@@ -9,7 +9,7 @@ export interface ICartItem {
   designId: Types.ObjectId;
   packageType: 'classic' | 'premium' | 'vip';
   details: {
-    eventName?: string;
+    eventName: string;
     inviteCount: number;
     eventDate: Date;
     startTime: string;
@@ -18,14 +18,19 @@ export interface ICartItem {
     hostName: string;
     eventLocation: string;
     additionalCards: number;
-    gateSupervisors: number; // Changed from string to number
-    extraHours?: number; // Added extraHours
-    expeditedDelivery: boolean; // Added expeditedDelivery field
+    gateSupervisors: number;
+    extraHours: number;
+    fastDelivery: boolean;
+    // Location fields
+    placeId?: string;
+    displayName?: string;
+    formattedAddress?: string;
     locationCoordinates?: {
       lat: number;
       lng: number;
     };
-    detectedCity: string; // Required field
+    detectedCity: string;
+    googleMapsUrl?: string;
     // Custom design fields
     isCustomDesign?: boolean;
     customDesignNotes?: string;
@@ -107,6 +112,7 @@ const cartItemSchema = new Schema<ICartItem>({
   details: {
     eventName: {
       type: String,
+      required: true,
       maxlength: 100,
       trim: true
     },
@@ -114,7 +120,7 @@ const cartItemSchema = new Schema<ICartItem>({
       type: Number,
       required: true,
       min: 100,
-      max: 500 // Changed from 700 to 500
+      max: 700
     },
     eventDate: {
       type: Date,
@@ -152,16 +158,35 @@ const cartItemSchema = new Schema<ICartItem>({
       max: 100
     },
     gateSupervisors: {
-      type: Number, // Changed from String to Number
+      type: Number,
       default: 0,
       min: 0,
       max: 10
     },
     extraHours: {
-      type: Number, // Added extraHours field
+      type: Number,
       default: 0,
       min: 0,
       max: 3
+    },
+    fastDelivery: {
+      type: Boolean,
+      default: false
+    },
+    // Location fields
+    placeId: {
+      type: String,
+      trim: true
+    },
+    displayName: {
+      type: String,
+      trim: true,
+      maxlength: 200
+    },
+    formattedAddress: {
+      type: String,
+      trim: true,
+      maxlength: 500
     },
     locationCoordinates: {
       lat: {
@@ -173,11 +198,16 @@ const cartItemSchema = new Schema<ICartItem>({
         type: Number,
         min: -180,
         max: 180
-      },
+      }
     },
     detectedCity: {
       type: String,
-      enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'],
+      required: true,
+      enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
+    },
+    googleMapsUrl: {
+      type: String,
+      trim: true
     },
     // Custom design fields
     isCustomDesign: {

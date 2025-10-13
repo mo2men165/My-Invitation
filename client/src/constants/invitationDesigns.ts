@@ -42,7 +42,7 @@ export const invitationDesigns: InvitationDesign[] = [
   
   // Custom Design Option (only for Premium and VIP packages)
   { 
-    id: "custom-design", 
+    id: "000000000000000000000001", 
     name: 'تصميم مخصص', 
     category: 'custom', 
     image: '/custom-design.webp',
