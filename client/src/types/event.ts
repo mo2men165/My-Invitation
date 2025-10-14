@@ -5,6 +5,7 @@ export interface Guest {
   numberOfAccompanyingGuests: number;
   whatsappMessageSent: boolean;
   whatsappSentAt?: string;
+  whatsappMessageId?: string;
   rsvpStatus?: 'pending' | 'accepted' | 'declined';
   rsvpResponse?: string;
   rsvpRespondedAt?: string;

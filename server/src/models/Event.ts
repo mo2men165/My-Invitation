@@ -9,6 +9,7 @@ export interface IGuest {
   numberOfAccompanyingGuests: number;
   whatsappMessageSent: boolean;
   whatsappSentAt?: Date;
+  whatsappMessageId?: string;
   rsvpStatus?: 'pending' | 'accepted' | 'declined';
   rsvpResponse?: string;
   rsvpRespondedAt?: Date;
@@ -126,6 +127,10 @@ const guestSchema = new Schema<IGuest>({
   },
   whatsappSentAt: {
     type: Date
+  },
+  whatsappMessageId: {
+    type: String,
+    trim: true
   },
   rsvpStatus: {
     type: String,

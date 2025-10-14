@@ -90,10 +90,13 @@ export class WhatsappService {
         from: message.from,
         timestamp: message.timestamp,
         type: message.type,
+        hasContext: !!message.context,
+        contextId: message.context?.id,
         fullMessage: JSON.stringify(message, null, 2)
       });
 
       const guestPhone = message.from;
+      const originalMessageId = message.context?.id;
       let messageText = '';
 
     // Extract text from message
@@ -132,18 +135,37 @@ export class WhatsappService {
         normalized: normalizedGuestPhone
       });
 
-      // Find event by guest phone number
-      logger.info('WHATSAPP WEBHOOK: Looking for event with guest phone...');
-      
-      const event = await Event.findOne({
+      // Build query with phone and optionally message context for accurate event matching
+      const query: any = {
         'guests.phone': normalizedGuestPhone,
         status: 'upcoming'
+      };
+      
+      // If we have context (reply to specific message), use it for precise matching
+      if (originalMessageId) {
+        query['guests.whatsappMessageId'] = originalMessageId;
+        logger.info('WHATSAPP WEBHOOK: Using message context for precise event lookup', {
+          originalMessageId,
+          queryingBoth: true
+        });
+      } else {
+        logger.warn('WHATSAPP WEBHOOK: No context ID - using phone only (may be ambiguous if guest in multiple events)', {
+          guestPhone: normalizedGuestPhone
+        });
+      }
+      
+      logger.info('WHATSAPP WEBHOOK: Looking for event with query...', {
+        query: JSON.stringify(query)
       });
+      
+      const event = await Event.findOne(query);
 
       if (!event) {
         logger.warn('WHATSAPP WEBHOOK: No upcoming event found for guest phone', {
           guestPhone,
-          normalizedPhone: normalizedGuestPhone
+          normalizedPhone: normalizedGuestPhone,
+          hadContextId: !!originalMessageId,
+          contextId: originalMessageId
         });
         return;
       }
@@ -154,11 +176,20 @@ export class WhatsappService {
         packageType: event.packageType
       });
 
-      const guest = event.guests.find(g => g.phone === normalizedGuestPhone);
+      // Find the specific guest - match by both phone and message ID if available
+      const guest = originalMessageId
+        ? event.guests.find(g => 
+            g.phone === normalizedGuestPhone && 
+            g.whatsappMessageId === originalMessageId
+          )
+        : event.guests.find(g => g.phone === normalizedGuestPhone);
+        
       if (!guest) {
         logger.warn('WHATSAPP WEBHOOK: Guest not found in event', { 
           guestPhone: normalizedGuestPhone, 
-          eventId: event._id 
+          eventId: event._id,
+          searchedWithMessageId: !!originalMessageId,
+          messageId: originalMessageId
         });
         return;
       }
@@ -568,14 +599,17 @@ export class WhatsappService {
       });
 
       const response = await this.sendMessage(messageData);
+      const sentMessageId = response.messages?.[0]?.id;
 
       logger.info('WHATSAPP: Message sent successfully', {
-        messageId: response.messages?.[0]?.id,
+        messageId: sentMessageId,
         response: JSON.stringify(response)
       });
 
-      // Mark as sent in database
-      logger.info('WHATSAPP: Updating database with sent status...');
+      // Mark as sent in database with message ID for context tracking
+      logger.info('WHATSAPP: Updating database with sent status and message ID...', {
+        messageId: sentMessageId
+      });
       
       const updateResult = await Event.updateOne(
         { 
@@ -586,6 +620,7 @@ export class WhatsappService {
           $set: {
             'guests.$.whatsappMessageSent': true,
             'guests.$.whatsappSentAt': new Date(),
+            'guests.$.whatsappMessageId': sentMessageId,
             'guests.$.rsvpStatus': 'pending'
           }
         }
