@@ -480,35 +480,43 @@ export class WhatsappService {
               parameters: [
                 {
                   type: 'text',
-                  text: event.details.hostName
+                  text: event.details.hostName,
+                  parameter_name: 'host_name'
                 },
                 {
                   type: 'text',
-                  text: eventType
+                  text: eventType,
+                  parameter_name: 'event_type'
                 },
                 {
                   type: 'text',
-                  text: dayOfWeek
+                  text: dayOfWeek,
+                  parameter_name: 'day_of_week'
                 },
                 {
                   type: 'text',
-                  text: hijriDate
+                  text: hijriDate,
+                  parameter_name: 'hijri_date'
                 },
                 {
                   type: 'text',
-                  text: gregorianDate
+                  text: gregorianDate,
+                  parameter_name: 'gregorian_date'
                 },
                 {
                   type: 'text',
-                  text: `${event.details.startTime} - ${event.details.endTime}`
+                  text: `${event.details.startTime} - ${event.details.endTime}`,
+                  parameter_name: 'event_time'
                 },
                 {
                   type: 'text',
-                  text: event.details.displayName || event.details.eventLocation
+                  text: event.details.displayName || event.details.eventLocation,
+                  parameter_name: 'event_location'
                 },
                 {
                   type: 'text',
-                  text: event.details.invitationText || ''
+                  text: event.details.invitationText || '',
+                  parameter_name: 'invitation_text'
                 }
               ]
             },
