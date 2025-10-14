@@ -27,13 +27,31 @@ const app = express();
 
 // Security middleware
 app.use(helmet());
+
+// Log ALL incoming requests BEFORE CORS for debugging
+app.use((req, res, next) => {
+  logger.info('=== INCOMING REQUEST ===', {
+    method: req.method,
+    path: req.path,
+    origin: req.headers.origin,
+    contentType: req.headers['content-type'],
+    authorization: req.headers.authorization ? 'PRESENT' : 'MISSING',
+    userAgent: req.headers['user-agent']
+  });
+  next();
+});
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      logger.info('CORS: Allowing request with no origin');
+      return callback(null, true);
+    }
     
     // Allow your frontend
     if (origin === process.env.FRONTEND_URL) {
+      logger.info('CORS: Allowing frontend origin', { origin });
       return callback(null, true);
     }
     
@@ -43,10 +61,15 @@ app.use(cors({
       origin.includes('accept.paymob.com') ||
       origin.includes('ksa.paymob.com')
     )) {
+      logger.info('CORS: Allowing Paymob origin', { origin });
       return callback(null, true);
     }
     
     // Block other origins
+    logger.error('CORS: BLOCKING request from unauthorized origin', {
+      origin,
+      expectedOrigin: process.env.FRONTEND_URL
+    });
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true
@@ -57,9 +80,27 @@ app.use(morgan('combined', {
   stream: { write: (message: string) => logger.info(message.trim()) }
 }));
 
-// Body parsing
+// Body parsing with error handling
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Handle JSON parsing errors
+app.use((err: any, req: any, res: any, next: any) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    logger.error('=== JSON PARSING ERROR ===', {
+      error: err.message,
+      method: req.method,
+      path: req.path,
+      body: req.body,
+      rawBody: err.body
+    });
+    return res.status(400).json({
+      success: false,
+      error: { message: 'Invalid JSON format' }
+    });
+  }
+  next();
+});
 
 // Health check
 app.get('/health', (req, res) => {

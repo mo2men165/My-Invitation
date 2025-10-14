@@ -2,8 +2,17 @@
 import { Router, Request, Response } from 'express';
 import { logger } from '../config/logger';
 import { WhatsappService } from '../services/whatsappService';
+import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 
 const router = Router();
+
+// Apply authentication middleware to protected routes
+// Webhook routes need to be public for Meta to send notifications
+// But send-invitation routes need authentication
+router.use('/send-invitation', checkJwt, extractUser, requireActiveUser);
+router.use('/send-bulk-invitations', checkJwt, extractUser, requireActiveUser);
+router.use('/send-event-reminders', checkJwt, extractUser, requireActiveUser);
+router.use('/send-thank-you-messages', checkJwt, extractUser, requireActiveUser);
 
 /**
  * GET /api/whatsapp/webhook
@@ -99,17 +108,36 @@ router.post('/webhook', async (req: Request, res: Response) => {
  */
 router.post('/send-invitation', async (req: Request, res: Response) => {
   try {
-    const { eventId, guestId } = req.body;
-
-    logger.info('=== ROUTE: POST /api/whatsapp/send-invitation ===', {
-      eventId,
-      guestId,
+    logger.info('=== ROUTE: POST /api/whatsapp/send-invitation - REQUEST RECEIVED ===', {
+      hasBody: !!req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+      body: req.body,
+      hasUser: !!req.user,
       userId: req.user?.id,
+      headers: {
+        contentType: req.headers['content-type'],
+        authorization: req.headers.authorization ? 'PRESENT' : 'MISSING'
+      },
       timestamp: new Date().toISOString()
     });
 
+    const { eventId, guestId } = req.body;
+
+    logger.info('ROUTE: Destructured parameters', {
+      eventId,
+      guestId,
+      eventIdType: typeof eventId,
+      guestIdType: typeof guestId
+    });
+
     if (!eventId || !guestId) {
-      logger.error('ROUTE: Missing required parameters', { eventId, guestId });
+      logger.error('ROUTE: Missing required parameters', { 
+        eventId, 
+        guestId,
+        hasEventId: !!eventId,
+        hasGuestId: !!guestId,
+        bodyReceived: req.body
+      });
       return res.status(400).json({
         success: false,
         error: { message: 'Event ID and Guest ID are required' }
