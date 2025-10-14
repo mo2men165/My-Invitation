@@ -85,11 +85,12 @@ export class WhatsappService {
    */
   private static async handleIncomingMessage(message: any): Promise<void> {
     try {
-      logger.info('Incoming WhatsApp message:', {
+      logger.info('=== WHATSAPP WEBHOOK: Incoming message received ===', {
         messageId: message.id,
         from: message.from,
         timestamp: message.timestamp,
-        type: message.type
+        type: message.type,
+        fullMessage: JSON.stringify(message, null, 2)
       });
 
       const guestPhone = message.from;
@@ -98,38 +99,79 @@ export class WhatsappService {
       // Extract text from message
       if (message.text) {
         messageText = message.text.body;
+        logger.info('WHATSAPP WEBHOOK: Text message extracted', {
+          messageText
+        });
       } else if (message.interactive) {
         // Handle button responses
         if (message.interactive.type === 'button_reply') {
           messageText = message.interactive.button_reply.title;
+          logger.info('WHATSAPP WEBHOOK: Interactive button response', {
+            buttonId: message.interactive.button_reply.id,
+            buttonTitle: messageText
+          });
         }
+      } else {
+        logger.warn('WHATSAPP WEBHOOK: Unknown message type', {
+          type: message.type,
+          message: JSON.stringify(message)
+        });
       }
 
       // Convert WhatsApp phone format to our stored format
       const normalizedGuestPhone = this.normalizeWhatsAppPhone(guestPhone);
+      
+      logger.info('WHATSAPP WEBHOOK: Phone normalized', {
+        original: guestPhone,
+        normalized: normalizedGuestPhone
+      });
 
       // Find event by guest phone number
+      logger.info('WHATSAPP WEBHOOK: Looking for event with guest phone...');
+      
       const event = await Event.findOne({
         'guests.phone': normalizedGuestPhone,
         status: 'upcoming'
       });
 
       if (!event) {
-        logger.warn('No upcoming event found for guest phone:', guestPhone);
+        logger.warn('WHATSAPP WEBHOOK: No upcoming event found for guest phone', {
+          guestPhone,
+          normalizedPhone: normalizedGuestPhone
+        });
         return;
       }
 
+      logger.info('WHATSAPP WEBHOOK: Event found', {
+        eventId: event._id,
+        eventName: event.details.eventName,
+        packageType: event.packageType
+      });
+
       const guest = event.guests.find(g => g.phone === normalizedGuestPhone);
       if (!guest) {
-        logger.warn('Guest not found in event:', { guestPhone, eventId: event._id });
+        logger.warn('WHATSAPP WEBHOOK: Guest not found in event', { 
+          guestPhone: normalizedGuestPhone, 
+          eventId: event._id 
+        });
         return;
       }
+
+      logger.info('WHATSAPP WEBHOOK: Guest found, processing RSVP', {
+        guestId: guest._id,
+        guestName: guest.name,
+        messageText
+      });
 
       // Process RSVP response
       await this.processRSVPResponse(event, guest, messageText);
 
     } catch (error: any) {
-      logger.error('Error handling incoming message:', error);
+      logger.error('=== WHATSAPP WEBHOOK: ERROR handling incoming message ===', {
+        error: error.message,
+        stack: error.stack,
+        message: JSON.stringify(message, null, 2)
+      });
     }
   }
 
@@ -138,15 +180,22 @@ export class WhatsappService {
    */
   private static async processRSVPResponse(event: any, guest: any, response: string): Promise<void> {
     try {
-      logger.info('Processing RSVP response:', {
+      logger.info('=== WHATSAPP RSVP: Processing response ===', {
         eventId: event._id,
+        guestId: guest._id,
         guestName: guest.name,
         guestPhone: guest.phone,
-        response
+        response,
+        currentRsvpStatus: guest.rsvpStatus
       });
 
       // Normalize response
       const normalizedResponse = response.toLowerCase().trim();
+      
+      logger.info('WHATSAPP RSVP: Response normalized', {
+        original: response,
+        normalized: normalizedResponse
+      });
 
       // Check for positive responses
       const positiveResponses = ['نعم', 'yes', 'أوافق', 'موافق', 'سأحضر', 'حاضر', 'تأكيد الحضور'];
@@ -155,13 +204,30 @@ export class WhatsappService {
       let rsvpStatus = null;
       if (positiveResponses.some(pos => normalizedResponse.includes(pos))) {
         rsvpStatus = 'accepted';
+        logger.info('WHATSAPP RSVP: Positive response detected', { 
+          matchedKeywords: positiveResponses.filter(pos => normalizedResponse.includes(pos))
+        });
       } else if (negativeResponses.some(neg => normalizedResponse.includes(neg))) {
         rsvpStatus = 'declined';
+        logger.info('WHATSAPP RSVP: Negative response detected', { 
+          matchedKeywords: negativeResponses.filter(neg => normalizedResponse.includes(neg))
+        });
+      } else {
+        logger.warn('WHATSAPP RSVP: No recognized RSVP pattern in response', {
+          response,
+          normalizedResponse
+        });
       }
 
       if (rsvpStatus) {
+        logger.info('WHATSAPP RSVP: Updating database...', {
+          eventId: event._id,
+          guestId: guest._id,
+          newStatus: rsvpStatus
+        });
+
         // Update guest RSVP status in database
-        await Event.updateOne(
+        const updateResult = await Event.updateOne(
           { 
             _id: event._id,
             'guests._id': guest._id
@@ -175,37 +241,74 @@ export class WhatsappService {
           }
         );
 
-        logger.info('RSVP status updated:', {
-          eventId: event._id,
-          guestName: guest.name,
+        logger.info('WHATSAPP RSVP: Database updated', {
+          matched: updateResult.matchedCount,
+          modified: updateResult.modifiedCount,
           rsvpStatus
         });
 
         // If accepted, send confirmation with links
         if (rsvpStatus === 'accepted') {
+          logger.info('WHATSAPP RSVP: Guest accepted - sending confirmation message...');
           await this.sendConfirmationWithLinks(event, guest);
+        } else {
+          logger.info('WHATSAPP RSVP: Guest declined - no further action needed');
         }
-        // If declined, do nothing (as per requirements)
+      } else {
+        logger.warn('WHATSAPP RSVP: Could not determine RSVP status from response');
       }
 
     } catch (error: any) {
-      logger.error('Error processing RSVP response:', error);
+      logger.error('=== WHATSAPP RSVP: ERROR processing response ===', {
+        error: error.message,
+        stack: error.stack,
+        eventId: event._id,
+        guestId: guest._id
+      });
     }
   }
 
   /**
    * Send confirmation message with invitation card and location links
+   * Template: invitation_message - sent after guest accepts RSVP
    */
   private static async sendConfirmationWithLinks(event: any, guest: any): Promise<void> {
     try {
+      logger.info('=== WHATSAPP CONFIRMATION: Preparing confirmation message ===', {
+        eventId: event._id,
+        guestId: guest._id,
+        guestName: guest.name
+      });
+
       // Generate Google Maps link
       const mapsLink = event.details.locationCoordinates 
         ? `https://maps.google.com/?q=${event.details.locationCoordinates.lat},${event.details.locationCoordinates.lng}`
-        : `https://maps.google.com/?q=${encodeURIComponent(event.details.eventLocation)}`;
+        : event.details.googleMapsUrl || `https://maps.google.com/?q=${encodeURIComponent(event.details.eventLocation)}`;
+
+      logger.info('WHATSAPP CONFIRMATION: Maps link generated', { mapsLink });
+
+      // Use individual invite link for Premium/VIP, fallback to general invitation card
+      const inviteCardLink = guest.individualInviteLink || event.invitationCardUrl || '';
+      
+      if (!inviteCardLink) {
+        logger.error('WHATSAPP CONFIRMATION: No invite card link available', {
+          hasIndividualLink: !!guest.individualInviteLink,
+          hasEventCard: !!event.invitationCardUrl
+        });
+      } else {
+        logger.info('WHATSAPP CONFIRMATION: Invite card link ready', {
+          link: inviteCardLink,
+          source: guest.individualInviteLink ? 'individual' : 'event'
+        });
+      }
+
+      // Format event date
+      const eventDate = new Date(event.details.eventDate);
+      const formattedDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'long', day: 'numeric' });
 
       const messageData = {
         messaging_product: 'whatsapp',
-        to: guest.phone,
+        to: guest.phone.replace(/^\+/, ''),
         type: 'template',
         template: {
           name: 'invitation_message',
@@ -214,24 +317,19 @@ export class WhatsappService {
           },
           components: [
             {
-              type: 'header',
-              parameters: [
-                {
-                  type: 'text',
-                  text: guest.name
-                }
-              ]
-            },
-            {
               type: 'body',
               parameters: [
                 {
                   type: 'text',
-                  text: event.details.eventName || 'مناسبة خاصة'
+                  text: guest.name
                 },
                 {
                   type: 'text',
-                  text: new Date(event.details.eventDate).toLocaleDateString('ar-SA')
+                  text: event.details.eventName || 'المناسبة'
+                },
+                {
+                  type: 'text',
+                  text: formattedDate
                 }
               ]
             },
@@ -242,7 +340,7 @@ export class WhatsappService {
               parameters: [
                 {
                   type: 'text',
-                  text: event.invitationCardUrl || ''
+                  text: inviteCardLink
                 }
               ]
             },
@@ -261,16 +359,27 @@ export class WhatsappService {
         }
       };
 
+      logger.info('WHATSAPP CONFIRMATION: Sending confirmation message...', {
+        template: 'invitation_message',
+        to: guest.phone.replace(/^\+/, '')
+      });
+
       await this.sendMessage(messageData);
 
-      logger.info('Confirmation with links sent:', {
+      logger.info('=== WHATSAPP CONFIRMATION: Confirmation sent successfully ===', {
         eventId: event._id,
         guestName: guest.name,
-        guestPhone: guest.phone
+        guestPhone: guest.phone,
+        inviteCardLink
       });
 
     } catch (error: any) {
-      logger.error('Error sending confirmation with links:', error);
+      logger.error('=== WHATSAPP CONFIRMATION: ERROR sending confirmation ===', {
+        error: error.message,
+        stack: error.stack,
+        eventId: event._id,
+        guestId: guest._id
+      });
     }
   }
 
@@ -279,40 +388,93 @@ export class WhatsappService {
    */
   static async sendInvitation(eventId: string, guestId: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
+      logger.info('=== WHATSAPP: Starting sendInvitation ===', {
+        eventId,
+        guestId,
+        timestamp: new Date().toISOString()
+      });
+
       const event = await Event.findById(eventId);
       if (!event) {
+        logger.error('WHATSAPP: Event not found', { eventId });
         return { success: false, error: 'Event not found' };
       }
 
+      logger.info('WHATSAPP: Event found', {
+        eventId,
+        packageType: event.packageType,
+        eventName: event.details.eventName,
+        hostName: event.details.hostName
+      });
+
       const guest = event.guests.find(g => g._id?.toString() === guestId);
       if (!guest) {
+        logger.error('WHATSAPP: Guest not found', { eventId, guestId });
         return { success: false, error: 'Guest not found' };
       }
 
+      logger.info('WHATSAPP: Guest found', {
+        guestId,
+        guestName: guest.name,
+        guestPhone: guest.phone,
+        hasIndividualLink: !!guest.individualInviteLink
+      });
+
       // Check package type
       if (event.packageType === 'classic') {
+        logger.warn('WHATSAPP: Classic package - API not available', { eventId });
         return { success: false, error: 'WhatsApp integration not available for classic packages' };
       }
 
+      // For Premium/VIP, ensure individual invite link is set
+      if (!guest.individualInviteLink) {
+        logger.error('WHATSAPP: Individual invite link missing', {
+          eventId,
+          guestId,
+          guestName: guest.name,
+          packageType: event.packageType
+        });
+        return { success: false, error: 'Individual invite link not set for guest' };
+      }
+
+      logger.info('WHATSAPP: Individual invite link validated', {
+        link: guest.individualInviteLink
+      });
+
+      // Format dates
+      const eventDate = new Date(event.details.eventDate);
+      const hijriDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'islamic' });
+      const gregorianDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'long', day: 'numeric' });
+      const dayOfWeek = eventDate.toLocaleDateString('ar-SA', { weekday: 'long' });
+
+      logger.info('WHATSAPP: Date formatting complete', {
+        eventDate: event.details.eventDate,
+        hijriDate,
+        gregorianDate,
+        dayOfWeek
+      });
+
+      // Determine event type based on context (could be enhanced)
+      const eventType = event.details.eventName || 'حفل';
+
+      // Prepare phone number (remove + for WhatsApp API)
+      const phoneNumber = guest.phone.replace(/^\+/, '');
+      
+      logger.info('WHATSAPP: Phone number prepared', {
+        original: guest.phone,
+        formatted: phoneNumber
+      });
+
       const messageData = {
         messaging_product: 'whatsapp',
-        to: guest.phone,
+        to: phoneNumber,
         type: 'template',
         template: {
-          name: 'initial_invitation', // You'll need to create this template
+          name: 'initial_invitation',
           language: {
             code: 'ar'
           },
           components: [
-            {
-              type: 'header',
-              parameters: [
-                {
-                  type: 'text',
-                  text: guest.name
-                }
-              ]
-            },
             {
               type: 'body',
               parameters: [
@@ -322,11 +484,19 @@ export class WhatsappService {
                 },
                 {
                   type: 'text',
-                  text: event.details.eventName || 'مناسبة خاصة'
+                  text: eventType
                 },
                 {
                   type: 'text',
-                  text: new Date(event.details.eventDate).toLocaleDateString('ar-SA')
+                  text: dayOfWeek
+                },
+                {
+                  type: 'text',
+                  text: hijriDate
+                },
+                {
+                  type: 'text',
+                  text: gregorianDate
                 },
                 {
                   type: 'text',
@@ -334,7 +504,11 @@ export class WhatsappService {
                 },
                 {
                   type: 'text',
-                  text: event.details.eventLocation
+                  text: event.details.displayName || event.details.eventLocation
+                },
+                {
+                  type: 'text',
+                  text: event.details.invitationText || ''
                 }
               ]
             }
@@ -342,10 +516,32 @@ export class WhatsappService {
         }
       };
 
+      logger.info('WHATSAPP: Message data prepared', {
+        template: 'initial_invitation',
+        to: phoneNumber,
+        parametersCount: messageData.template.components[0].parameters.length,
+        parameters: messageData.template.components[0].parameters.map((p, i) => ({
+          index: i,
+          value: p.text?.substring(0, 50) + (p.text && p.text.length > 50 ? '...' : '')
+        }))
+      });
+
+      logger.info('WHATSAPP: Sending message to WhatsApp API...', {
+        endpoint: `${this.WHATSAPP_API_URL}/${this.PHONE_NUMBER_ID}/messages`,
+        phoneNumberId: this.PHONE_NUMBER_ID
+      });
+
       const response = await this.sendMessage(messageData);
 
+      logger.info('WHATSAPP: Message sent successfully', {
+        messageId: response.messages?.[0]?.id,
+        response: JSON.stringify(response)
+      });
+
       // Mark as sent in database
-      await Event.updateOne(
+      logger.info('WHATSAPP: Updating database with sent status...');
+      
+      const updateResult = await Event.updateOne(
         { 
           _id: event._id,
           'guests._id': guest._id
@@ -353,16 +549,24 @@ export class WhatsappService {
         {
           $set: {
             'guests.$.whatsappMessageSent': true,
-            'guests.$.whatsappSentAt': new Date()
+            'guests.$.whatsappSentAt': new Date(),
+            'guests.$.rsvpStatus': 'pending'
           }
         }
       );
 
-      logger.info('Invitation sent successfully:', {
+      logger.info('WHATSAPP: Database updated', {
+        matched: updateResult.matchedCount,
+        modified: updateResult.modifiedCount
+      });
+
+      logger.info('=== WHATSAPP: Initial invitation sent successfully ===', {
         eventId,
         guestId,
         guestName: guest.name,
-        guestPhone: guest.phone
+        guestPhone: guest.phone,
+        messageId: response.messages?.[0]?.id,
+        packageType: event.packageType
       });
 
       return { 
@@ -374,7 +578,14 @@ export class WhatsappService {
       };
 
     } catch (error: any) {
-      logger.error('Error sending invitation:', error);
+      logger.error('=== WHATSAPP: ERROR in sendInvitation ===', {
+        eventId,
+        guestId,
+        error: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+        statusCode: error.response?.status
+      });
       return { success: false, error: error.message };
     }
   }
@@ -383,20 +594,56 @@ export class WhatsappService {
    * Send bulk invitations
    */
   static async sendBulkInvitations(eventId: string, guestIds: string[]): Promise<any> {
+    logger.info('=== WHATSAPP BULK: Starting bulk invitation send ===', {
+      eventId,
+      guestCount: guestIds.length,
+      guestIds
+    });
+
     const results = [];
+    let successCount = 0;
+    let failureCount = 0;
     
-    for (const guestId of guestIds) {
+    for (let i = 0; i < guestIds.length; i++) {
+      const guestId = guestIds[i];
+      
+      logger.info(`WHATSAPP BULK: Processing guest ${i + 1}/${guestIds.length}`, {
+        guestId,
+        progress: `${i + 1}/${guestIds.length}`
+      });
+
       try {
         const result = await this.sendInvitation(eventId, guestId);
         results.push({
           guestId,
           success: result.success,
-          error: result.error
+          error: result.error,
+          messageId: result.data?.messageId
         });
         
+        if (result.success) {
+          successCount++;
+          logger.info(`WHATSAPP BULK: Guest ${i + 1} SUCCESS`, { guestId });
+        } else {
+          failureCount++;
+          logger.error(`WHATSAPP BULK: Guest ${i + 1} FAILED`, { 
+            guestId, 
+            error: result.error 
+          });
+        }
+        
         // Add delay between messages to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (i < guestIds.length - 1) {
+          logger.info('WHATSAPP BULK: Waiting 1 second before next message...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       } catch (error: any) {
+        failureCount++;
+        logger.error(`WHATSAPP BULK: Guest ${i + 1} EXCEPTION`, {
+          guestId,
+          error: error.message,
+          stack: error.stack
+        });
         results.push({
           guestId,
           success: false,
@@ -404,6 +651,13 @@ export class WhatsappService {
         });
       }
     }
+
+    logger.info('=== WHATSAPP BULK: Bulk send complete ===', {
+      eventId,
+      total: guestIds.length,
+      success: successCount,
+      failed: failureCount
+    });
 
     return results;
   }
@@ -458,6 +712,27 @@ export class WhatsappService {
    */
   private static async sendMessage(messageData: any): Promise<any> {
     try {
+      logger.info('=== WHATSAPP API: Preparing to send message ===', {
+        to: messageData.to,
+        type: messageData.type,
+        templateName: messageData.template?.name,
+        hasAccessToken: !!this.ACCESS_TOKEN,
+        hasPhoneNumberId: !!this.PHONE_NUMBER_ID,
+        apiUrl: `${this.WHATSAPP_API_URL}/${this.PHONE_NUMBER_ID}/messages`
+      });
+
+      if (!this.ACCESS_TOKEN) {
+        throw new Error('WHATSAPP_ACCESS_TOKEN not configured');
+      }
+
+      if (!this.PHONE_NUMBER_ID) {
+        throw new Error('WHATSAPP_PHONE_NUMBER_ID not configured');
+      }
+
+      logger.info('WHATSAPP API: Sending request to Meta...', {
+        messageDataSample: JSON.stringify(messageData, null, 2).substring(0, 500)
+      });
+
       const response = await axios.post(
         `${this.WHATSAPP_API_URL}/${this.PHONE_NUMBER_ID}/messages`,
         messageData,
@@ -469,29 +744,45 @@ export class WhatsappService {
         }
       );
 
-      logger.info('WhatsApp message sent:', {
+      logger.info('=== WHATSAPP API: Message sent successfully ===', {
         messageId: response.data.messages?.[0]?.id,
-        to: messageData.to
+        to: messageData.to,
+        statusCode: response.status,
+        responseData: JSON.stringify(response.data)
       });
 
       return response.data;
     } catch (error: any) {
-      logger.error('Error sending WhatsApp message:', {
-        error: error.response?.data || error.message,
-        messageData
+      logger.error('=== WHATSAPP API: ERROR sending message ===', {
+        error: error.message,
+        statusCode: error.response?.status,
+        errorData: JSON.stringify(error.response?.data),
+        errorCode: error.response?.data?.error?.code,
+        errorMessage: error.response?.data?.error?.message,
+        errorDetails: error.response?.data?.error?.error_data,
+        to: messageData.to,
+        templateName: messageData.template?.name,
+        fullError: JSON.stringify(error.response?.data, null, 2)
       });
       throw error;
     }
   }
 
   /**
-   * Send reminder message for VIP packages
+   * Send reminder message for Premium/VIP packages
+   * Premium: 3 days before event
+   * VIP: 5 days before event
    */
   static async sendReminderMessage(eventId: string, guestId: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       const event = await Event.findById(eventId);
-      if (!event || event.packageType !== 'vip') {
-        return { success: false, error: 'Event not found or not VIP package' };
+      if (!event) {
+        return { success: false, error: 'Event not found' };
+      }
+
+      // Only for Premium and VIP packages
+      if (event.packageType !== 'premium' && event.packageType !== 'vip') {
+        return { success: false, error: 'Reminders only available for Premium and VIP packages' };
       }
 
       const guest = event.guests.find(g => g._id?.toString() === guestId);
@@ -499,9 +790,21 @@ export class WhatsappService {
         return { success: false, error: 'Guest not found' };
       }
 
+      // Use individual invite link for Premium/VIP
+      const inviteCardLink = guest.individualInviteLink || event.invitationCardUrl || '';
+      
+      // Generate Google Maps link
+      const mapsLink = event.details.locationCoordinates 
+        ? `https://maps.google.com/?q=${event.details.locationCoordinates.lat},${event.details.locationCoordinates.lng}`
+        : event.details.googleMapsUrl || `https://maps.google.com/?q=${encodeURIComponent(event.details.eventLocation)}`;
+
+      // Format event date
+      const eventDate = new Date(event.details.eventDate);
+      const formattedDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'long', day: 'numeric' });
+
       const messageData = {
         messaging_product: 'whatsapp',
-        to: guest.phone,
+        to: guest.phone.replace(/^\+/, ''),
         type: 'template',
         template: {
           name: 'event_reminder',
@@ -510,24 +813,19 @@ export class WhatsappService {
           },
           components: [
             {
-              type: 'header',
-              parameters: [
-                {
-                  type: 'text',
-                  text: guest.name
-                }
-              ]
-            },
-            {
               type: 'body',
               parameters: [
                 {
                   type: 'text',
-                  text: event.details.eventName || 'مناسبة خاصة'
+                  text: guest.name
                 },
                 {
                   type: 'text',
-                  text: new Date(event.details.eventDate).toLocaleDateString('ar-SA')
+                  text: event.details.eventName || 'المناسبة'
+                },
+                {
+                  type: 'text',
+                  text: formattedDate
                 },
                 {
                   type: 'text',
@@ -535,7 +833,7 @@ export class WhatsappService {
                 },
                 {
                   type: 'text',
-                  text: event.details.eventLocation
+                  text: event.details.displayName || event.details.eventLocation
                 }
               ]
             },
@@ -546,7 +844,18 @@ export class WhatsappService {
               parameters: [
                 {
                   type: 'text',
-                  text: event.invitationCardUrl || ''
+                  text: inviteCardLink
+                }
+              ]
+            },
+            {
+              type: 'button',
+              sub_type: 'url',
+              index: 1,
+              parameters: [
+                {
+                  type: 'text',
+                  text: mapsLink
                 }
               ]
             }
@@ -559,7 +868,8 @@ export class WhatsappService {
       logger.info('Reminder message sent:', {
         eventId,
         guestName: guest.name,
-        guestPhone: guest.phone
+        guestPhone: guest.phone,
+        packageType: event.packageType
       });
 
       return { 
@@ -577,7 +887,7 @@ export class WhatsappService {
   }
 
   /**
-   * Send thank you message after event
+   * Send thank you message after event (VIP only - 4 hours after end time)
    */
   static async sendThankYouMessage(eventId: string, guestId: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
@@ -586,14 +896,28 @@ export class WhatsappService {
         return { success: false, error: 'Event not found' };
       }
 
+      // Only for VIP packages
+      if (event.packageType !== 'vip') {
+        return { success: false, error: 'Thank you messages only for VIP packages' };
+      }
+
       const guest = event.guests.find(g => g._id?.toString() === guestId);
       if (!guest) {
         return { success: false, error: 'Guest not found' };
       }
 
+      // Only send to guests who actually attended
+      if (guest.actuallyAttended !== true) {
+        logger.info('Skipping thank you message - guest did not attend:', {
+          eventId,
+          guestName: guest.name
+        });
+        return { success: false, error: 'Guest did not attend event' };
+      }
+
       const messageData = {
         messaging_product: 'whatsapp',
-        to: guest.phone,
+        to: guest.phone.replace(/^\+/, ''),
         type: 'template',
         template: {
           name: 'thank_you_message',
@@ -602,20 +926,15 @@ export class WhatsappService {
           },
           components: [
             {
-              type: 'header',
-              parameters: [
-                {
-                  type: 'text',
-                  text: guest.name
-                }
-              ]
-            },
-            {
               type: 'body',
               parameters: [
                 {
                   type: 'text',
-                  text: event.details.eventName || 'مناسبة خاصة'
+                  text: guest.name
+                },
+                {
+                  type: 'text',
+                  text: event.details.eventName || 'المناسبة'
                 },
                 {
                   type: 'text',
@@ -650,29 +969,149 @@ export class WhatsappService {
   }
 
   /**
-   * Schedule reminder for VIP packages
+   * Send reminders to all confirmed guests
+   * Premium: 3 days before event
+   * VIP: 5 days before event
    */
-  static async scheduleReminder(eventId: string, reminderDays: number = 3): Promise<void> {
+  static async sendEventReminders(eventId: string): Promise<{ success: boolean; sent: number; failed: number; results: any[] }> {
     try {
       const event = await Event.findById(eventId);
-      if (!event || event.packageType !== 'vip') {
-        return;
+      if (!event) {
+        return { success: false, sent: 0, failed: 0, results: [] };
       }
 
-      const eventDate = new Date(event.details.eventDate);
-      const reminderDate = new Date(eventDate);
-      reminderDate.setDate(reminderDate.getDate() - reminderDays);
+      // Only for Premium and VIP packages
+      if (event.packageType !== 'premium' && event.packageType !== 'vip') {
+        return { success: false, sent: 0, failed: 0, results: [] };
+      }
 
-      // Schedule reminder (you might want to use a job queue like Bull or Agenda)
-      logger.info('Reminder scheduled for VIP event:', {
+      const results = [];
+      let sent = 0;
+      let failed = 0;
+
+      // Send to guests who accepted RSVP
+      const confirmedGuests = event.guests.filter(g => 
+        g.rsvpStatus === 'accepted' && g.whatsappMessageSent
+      );
+
+      for (const guest of confirmedGuests) {
+        try {
+          const result = await this.sendReminderMessage(eventId, guest._id!.toString());
+          
+          if (result.success) {
+            sent++;
+            results.push({
+              guestId: guest._id,
+              guestName: guest.name,
+              success: true
+            });
+          } else {
+            failed++;
+            results.push({
+              guestId: guest._id,
+              guestName: guest.name,
+              success: false,
+              error: result.error
+            });
+          }
+
+          // Delay between messages to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error: any) {
+          failed++;
+          results.push({
+            guestId: guest._id,
+            guestName: guest.name,
+            success: false,
+            error: error.message
+          });
+        }
+      }
+
+      logger.info('Event reminders sent:', {
         eventId,
-        reminderDate,
-        eventDate
+        packageType: event.packageType,
+        sent,
+        failed,
+        total: confirmedGuests.length
       });
 
-      // TODO: Implement actual scheduling logic
+      return { success: true, sent, failed, results };
+
     } catch (error: any) {
-      logger.error('Error scheduling reminder:', error);
+      logger.error('Error sending event reminders:', error);
+      return { success: false, sent: 0, failed: 0, results: [] };
+    }
+  }
+
+  /**
+   * Send thank you messages to all attended guests (VIP only)
+   */
+  static async sendThankYouMessages(eventId: string): Promise<{ success: boolean; sent: number; failed: number; results: any[] }> {
+    try {
+      const event = await Event.findById(eventId);
+      if (!event) {
+        return { success: false, sent: 0, failed: 0, results: [] };
+      }
+
+      // Only for VIP packages
+      if (event.packageType !== 'vip') {
+        return { success: false, sent: 0, failed: 0, results: [] };
+      }
+
+      const results = [];
+      let sent = 0;
+      let failed = 0;
+
+      // Send to guests who actually attended
+      const attendedGuests = event.guests.filter(g => g.actuallyAttended === true);
+
+      for (const guest of attendedGuests) {
+        try {
+          const result = await this.sendThankYouMessage(eventId, guest._id!.toString());
+          
+          if (result.success) {
+            sent++;
+            results.push({
+              guestId: guest._id,
+              guestName: guest.name,
+              success: true
+            });
+          } else {
+            failed++;
+            results.push({
+              guestId: guest._id,
+              guestName: guest.name,
+              success: false,
+              error: result.error
+            });
+          }
+
+          // Delay between messages to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error: any) {
+          failed++;
+          results.push({
+            guestId: guest._id,
+            guestName: guest.name,
+            success: false,
+            error: error.message
+          });
+        }
+      }
+
+      logger.info('Thank you messages sent:', {
+        eventId,
+        sent,
+        failed,
+        total: attendedGuests.length
+      });
+
+      return { success: true, sent, failed, results };
+
+    } catch (error: any) {
+      logger.error('Error sending thank you messages:', error);
+      return { success: false, sent: 0, failed: 0, results: [] };
     }
   }
 }

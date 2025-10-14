@@ -1,8 +1,7 @@
 import React from 'react';
 import { 
   Send, 
-  ExternalLink,
-  Users2
+  ExternalLink
 } from 'lucide-react';
 
 interface EventSidebarProps {
@@ -22,6 +21,7 @@ interface EventSidebarProps {
       fastDelivery: boolean;
     };
     approvalStatus: string;
+    packageType: 'classic' | 'premium' | 'vip';
     invitationCardUrl?: string;
     qrCodeReaderUrl?: string;
     paymentCompletedAt?: string; // Make optional since it's filtered for collaborators
@@ -162,10 +162,18 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-green-400">
               <Send className="w-4 h-4" />
-              <span className="font-medium">إرسال شخصي</span>
+              <span className="font-medium">طريقة إرسال الدعوات</span>
             </div>
             <p className="text-gray-300 text-xs leading-relaxed">
-              يمكنك إرسال الدعوات للضيوف مباشرة عبر واتساب. ستتضمن الرسائل رابط الدعوة تلقائياً
+              {event.packageType === 'classic' && (
+                'قم بإدخال تفاصيل ضيوفك في قائمة الضيوف، ثم قم بتأكيد القائمة لإتمامها. بعد التأكيد، سنقوم بإرسال جميع الدعوات عبر الواتساب إليك، ويمكنك توزيعها على الضيوف بالطريقة المناسبة لك'
+              )}
+              {event.packageType === 'premium' && (
+                'قم بإدخال تفاصيل ضيوفك في قائمة الضيوف، وسيقوم الإداريون بتوفير روابط فردية لكل ضيف. يمكنك بعدها إرسال الدعوات بسهولة من خلال الموقع باستخدام بوت الواتساب الآلي الخاص بنا'
+              )}
+              {event.packageType === 'vip' && (
+                'قم فقط بتوفير تفاصيل ضيوفك وتأكيد قائمة الضيوف، وسنتولى نحن إرسال الدعوات لهم بشكل كامل'
+              )}
             </p>
           </div>
         </div>

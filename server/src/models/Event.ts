@@ -23,6 +23,10 @@ export interface IGuest {
   };
   // Individual invite link for premium and VIP packages (optional)
   individualInviteLink?: string;
+  // Post-event attendance tracking (VIP only)
+  actuallyAttended?: boolean;
+  attendanceMarkedAt?: Date;
+  attendanceMarkedBy?: Types.ObjectId;
 }
 
 export interface IEvent extends Document {
@@ -51,6 +55,9 @@ export interface IEvent extends Document {
     };
     detectedCity?: string;
     googleMapsUrl?: string;
+    // Custom design fields
+    isCustomDesign?: boolean;
+    customDesignNotes?: string;
   };
   totalPrice: number;
   status: 'upcoming' | 'cancelled' | 'done';
@@ -68,6 +75,9 @@ export interface IEvent extends Document {
     isConfirmed: boolean;
     confirmedAt?: Date;
     confirmedBy?: Types.ObjectId;
+    reopenedAt?: Date;
+    reopenedBy?: Types.ObjectId;
+    reopenCount?: number;
   };
   
   // Collaboration tracking (optional fields)
@@ -157,6 +167,17 @@ const guestSchema = new Schema<IGuest>({
   individualInviteLink: {
     type: String,
     trim: true
+  },
+  // Post-event attendance tracking (VIP only)
+  actuallyAttended: {
+    type: Boolean
+  },
+  attendanceMarkedAt: {
+    type: Date
+  },
+  attendanceMarkedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, { _id: true });
 
@@ -270,6 +291,16 @@ const eventSchema = new Schema<IEvent>({
     googleMapsUrl: {
       type: String,
       trim: true
+    },
+    // Custom design fields
+    isCustomDesign: {
+      type: Boolean,
+      default: false
+    },
+    customDesignNotes: {
+      type: String,
+      maxlength: 500,
+      default: ''
     }
   },
   totalPrice: {
@@ -349,6 +380,17 @@ const eventSchema = new Schema<IEvent>({
     confirmedBy: {
       type: Schema.Types.ObjectId,
       ref: 'User'
+    },
+    reopenedAt: {
+      type: Date
+    },
+    reopenedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    reopenCount: {
+      type: Number,
+      default: 0
     }
   },
   

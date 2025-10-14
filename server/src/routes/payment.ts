@@ -1019,7 +1019,7 @@ router.get('/order/:merchantOrderId', async (req: Request, res: Response) => {
     if (order.status === 'completed' && order.eventsCreated.length > 0) {
       events = await Event.find({
         _id: { $in: order.eventsCreated }
-      }).select('_id details.hostName details.eventDate details.eventLocation packageType');
+      }).select('_id details.eventName details.displayName details.eventLocation packageType totalPrice');
     }
 
     const orderData = {

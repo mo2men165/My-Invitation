@@ -4,12 +4,20 @@ export interface Guest {
   phone: string;
   numberOfAccompanyingGuests: number;
   whatsappMessageSent: boolean;
+  whatsappSentAt?: string;
+  rsvpStatus?: 'pending' | 'accepted' | 'declined';
+  rsvpResponse?: string;
+  rsvpRespondedAt?: string;
   addedBy?: {
     type: 'owner' | 'collaborator';
     userId: string;
     collaboratorName?: string;
     collaboratorEmail?: string;
   };
+  individualInviteLink?: string;
+  actuallyAttended?: boolean;
+  attendanceMarkedAt?: string;
+  attendanceMarkedBy?: string;
   addedAt?: string;
   updatedAt?: string;
 }

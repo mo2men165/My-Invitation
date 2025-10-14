@@ -37,6 +37,7 @@ interface EventItem {
     startTime: string;
     endTime: string;
     eventLocation: string;
+    displayName?: string;
     inviteCount: number;
   };
   totalPrice: number;
@@ -400,7 +401,7 @@ export const MyEventsPage: React.FC = () => {
                     
                     <div className="flex items-center gap-2 text-gray-300 text-sm">
                       <MapPin className="w-4 h-4 text-[#C09B52]" />
-                      <span className="truncate">{event.details.eventLocation}</span>
+                      <span className="truncate">{event.details.displayName || event.details.eventLocation}</span>
                     </div>
                     
                     <div className="flex items-center gap-2 text-gray-300 text-sm">

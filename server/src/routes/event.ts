@@ -278,8 +278,8 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
       }
     }
 
-    // For VIP packages, check if guest list is already confirmed
-    if (event.packageType === 'vip' && event.guestListConfirmed.isConfirmed) {
+    // Check if guest list is already confirmed (all package types)
+    if (event.guestListConfirmed.isConfirmed) {
       return res.status(400).json({
         success: false,
         error: { message: 'تم تأكيد قائمة الضيوف مسبقاً. لا يمكن إضافة ضيوف جدد' }
@@ -490,7 +490,7 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
 
 /**
  * POST /api/events/:id/guests/confirm
- * Confirm final guest list for VIP packages
+ * Confirm final guest list for all package types
  */
 router.post('/:id/guests/confirm', async (req: Request, res: Response) => {
   try {
@@ -509,15 +509,7 @@ router.post('/:id/guests/confirm', async (req: Request, res: Response) => {
       });
     }
 
-    // Only allow for VIP packages
-    if (event.packageType !== 'vip') {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'تأكيد قائمة الضيوف متاح فقط لحزم VIP' }
-      });
-    }
-
-    // Check if already confirmed
+    // Check if already confirmed (and not reopened by admin)
     if (event.guestListConfirmed.isConfirmed) {
       return res.status(400).json({
         success: false,
@@ -537,19 +529,31 @@ router.post('/:id/guests/confirm', async (req: Request, res: Response) => {
     event.guestListConfirmed = {
       isConfirmed: true,
       confirmedAt: new Date(),
-      confirmedBy: new Types.ObjectId(userId)
+      confirmedBy: new Types.ObjectId(userId),
+      reopenCount: event.guestListConfirmed.reopenCount || 0
     };
 
     await event.save();
 
-    logger.info(`Guest list confirmed for event ${id} by user ${userId}`);
+    logger.info(`Guest list confirmed for event ${id} (${event.packageType}) by user ${userId}`);
+
+    // Different messages based on package type
+    let message = 'تم تأكيد قائمة الضيوف بنجاح';
+    if (event.packageType === 'classic') {
+      message = 'تم تأكيد قائمة الضيوف. سنقوم بإرسال الدعوات إليك عبر الواتساب';
+    } else if (event.packageType === 'premium') {
+      message = 'تم تأكيد قائمة الضيوف. بعد إضافة الروابط الفردية يمكنك إرسال الدعوات';
+    } else if (event.packageType === 'vip') {
+      message = 'تم تأكيد قائمة الضيوف. سيقوم فريقنا بإرسال الدعوات للضيوف قريباً';
+    }
 
     return res.json({
       success: true,
-      message: 'تم تأكيد قائمة الضيوف بنجاح. سيتم إرسال الدعوات قريباً',
+      message,
       data: {
         confirmedAt: event.guestListConfirmed.confirmedAt,
-        guestCount: event.guests.length
+        guestCount: event.guests.length,
+        packageType: event.packageType
       }
     });
 

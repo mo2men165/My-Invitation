@@ -180,15 +180,35 @@ router.get('/events/pending', async (req: Request, res: Response) => {
           city: (event.userId as any).city
         },
         eventDetails: {
+          eventName: event.details.eventName,
           hostName: event.details.hostName,
           eventDate: event.details.eventDate,
           eventLocation: event.details.eventLocation,
+          displayName: event.details.displayName,
           inviteCount: event.details.inviteCount,
-          packageType: event.packageType
+          packageType: event.packageType,
+          startTime: event.details.startTime,
+          endTime: event.details.endTime,
+          invitationText: event.details.invitationText,
+          additionalCards: event.details.additionalCards,
+          gateSupervisors: event.details.gateSupervisors,
+          fastDelivery: event.details.fastDelivery,
+          formattedAddress: event.details.formattedAddress,
+          googleMapsUrl: event.details.googleMapsUrl,
+          detectedCity: event.details.detectedCity,
+          isCustomDesign: event.details.isCustomDesign,
+          customDesignNotes: event.details.customDesignNotes
         },
+        designId: event.designId,
         totalPrice: event.totalPrice,
         paymentCompletedAt: event.paymentCompletedAt,
         status: event.status,
+        approvalStatus: event.approvalStatus,
+        adminNotes: event.adminNotes,
+        invitationCardUrl: event.invitationCardUrl,
+        qrCodeReaderUrl: event.qrCodeReaderUrl,
+        createdAt: event.createdAt,
+        updatedAt: event.updatedAt,
         guests: formattedGuests,
         guestListConfirmed: event.guestListConfirmed,
         // Show guest count for VIP packages even if not confirmed
@@ -307,12 +327,26 @@ router.get('/events/all', async (req: Request, res: Response) => {
           phone: (event.userId as any).phone
         },
         eventDetails: {
+          eventName: event.details.eventName,
           hostName: event.details.hostName,
           eventDate: event.details.eventDate,
           eventLocation: event.details.eventLocation,
+          displayName: event.details.displayName,
           inviteCount: event.details.inviteCount,
-          packageType: event.packageType
+          packageType: event.packageType,
+          startTime: event.details.startTime,
+          endTime: event.details.endTime,
+          invitationText: event.details.invitationText,
+          additionalCards: event.details.additionalCards,
+          gateSupervisors: event.details.gateSupervisors,
+          fastDelivery: event.details.fastDelivery,
+          formattedAddress: event.details.formattedAddress,
+          googleMapsUrl: event.details.googleMapsUrl,
+          detectedCity: event.details.detectedCity,
+          isCustomDesign: event.details.isCustomDesign,
+          customDesignNotes: event.details.customDesignNotes
         },
+        designId: event.designId,
         totalPrice: event.totalPrice,
         status: event.status,
         approvalStatus: event.approvalStatus,
@@ -321,6 +355,10 @@ router.get('/events/all', async (req: Request, res: Response) => {
         approvedAt: event.approvedAt,
         rejectedAt: event.rejectedAt,
         paymentCompletedAt: event.paymentCompletedAt,
+        invitationCardUrl: event.invitationCardUrl,
+        qrCodeReaderUrl: event.qrCodeReaderUrl,
+        createdAt: event.createdAt,
+        updatedAt: event.updatedAt,
         guests: formattedGuests,
         guestListConfirmed: event.guestListConfirmed,
         // Show guest count for VIP packages even if not confirmed
@@ -409,9 +447,10 @@ router.post('/events/:eventId/approve', async (req: Request, res: Response) => {
       await emailService.sendEventApprovalEmail({
         name: user.firstName,
         email: user.email,
-        eventName: event.details.hostName,
-        eventDate: event.details.eventDate.toLocaleDateString('ar-SA'),
-        invitationCardUrl: event.invitationCardUrl
+        eventName: event.details.eventName || event.details.hostName,
+        eventDate: event.details.eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory' }),
+        invitationCardUrl: event.invitationCardUrl,
+        qrCodeReaderUrl: event.qrCodeReaderUrl
       });
       
       logger.info(`Approval email sent to user ${user.email} for event ${eventId}`);
@@ -607,9 +646,11 @@ router.get('/events/:eventId/guests', async (req: Request, res: Response) => {
       data: {
         event: {
           id: event._id,
+          eventName: event.details.eventName,
           hostName: event.details.hostName,
           eventDate: event.details.eventDate,
           eventLocation: event.details.eventLocation,
+          displayName: event.details.displayName,
           packageType: event.packageType,
           invitationText: event.details.invitationText,
           startTime: event.details.startTime,
@@ -759,6 +800,222 @@ router.put('/events/:eventId/guests/:guestId/invite-link', async (req: Request, 
     return res.status(500).json({
       success: false,
       error: { message: 'خطأ في تحديث رابط الدعوة' }
+    });
+  }
+});
+
+/**
+ * POST /api/admin/events/:eventId/reopen-guest-list
+ * Reopen guest list for users after confirmation (all package types)
+ */
+router.post('/events/:eventId/reopen-guest-list', async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const adminId = req.user!.id;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    // Check if guest list was confirmed
+    if (!event.guestListConfirmed.isConfirmed) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'قائمة الضيوف لم يتم تأكيدها بعد' }
+      });
+    }
+
+    // Reopen the guest list
+    const currentReopenCount = event.guestListConfirmed.reopenCount || 0;
+    event.guestListConfirmed = {
+      isConfirmed: false,
+      confirmedAt: event.guestListConfirmed.confirmedAt,
+      confirmedBy: event.guestListConfirmed.confirmedBy,
+      reopenedAt: new Date(),
+      reopenedBy: new Types.ObjectId(adminId),
+      reopenCount: currentReopenCount + 1
+    };
+
+    await event.save();
+
+    logger.info(`Admin ${adminId} reopened guest list for event ${eventId} (reopen count: ${currentReopenCount + 1})`);
+
+    return res.json({
+      success: true,
+      message: 'تم إعادة فتح قائمة الضيوف بنجاح',
+      data: {
+        reopenedAt: event.guestListConfirmed.reopenedAt,
+        reopenCount: event.guestListConfirmed.reopenCount
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error reopening guest list:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في إعادة فتح قائمة الضيوف' }
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/events/:eventId/guests/:guestId/attendance
+ * Mark guest attendance (VIP packages only - post-event)
+ */
+router.put('/events/:eventId/guests/:guestId/attendance', async (req: Request, res: Response) => {
+  try {
+    const { eventId, guestId } = req.params;
+    const { attended } = req.body;
+    const adminId = req.user!.id;
+
+    if (typeof attended !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'حالة الحضور يجب أن تكون true أو false' }
+      });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    // Check if package type is VIP
+    if (event.packageType !== 'vip') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'تتبع الحضور متاح فقط لباقات VIP' }
+      });
+    }
+
+    const guest = event.guests.find(g => g._id?.toString() === guestId);
+    if (!guest) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'الضيف غير موجود' }
+      });
+    }
+
+    // Update attendance
+    guest.actuallyAttended = attended;
+    guest.attendanceMarkedAt = new Date();
+    guest.attendanceMarkedBy = new Types.ObjectId(adminId);
+    guest.updatedAt = new Date();
+    
+    await event.save();
+
+    logger.info(`Admin ${adminId} marked attendance for guest ${guestId} in event ${eventId}: ${attended}`);
+
+    return res.json({
+      success: true,
+      message: attended ? 'تم تسجيل حضور الضيف' : 'تم تسجيل عدم حضور الضيف',
+      data: { guest }
+    });
+
+  } catch (error) {
+    logger.error('Error marking guest attendance:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تسجيل الحضور' }
+    });
+  }
+});
+
+/**
+ * POST /api/admin/events/:eventId/send-reminders
+ * Send reminder messages to all confirmed guests (Premium: 3 days, VIP: 5 days)
+ */
+router.post('/events/:eventId/send-reminders', async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const adminId = req.user!.id;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    // Only for Premium and VIP packages
+    if (event.packageType !== 'premium' && event.packageType !== 'vip') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'التذكيرات متاحة فقط لباقات Premium و VIP' }
+      });
+    }
+
+    // Import WhatsappService
+    const { WhatsappService } = await import('../services/whatsappService');
+    const result = await WhatsappService.sendEventReminders(eventId);
+
+    logger.info(`Admin ${adminId} triggered reminders for event ${eventId}`, result);
+
+    return res.json({
+      success: true,
+      message: `تم إرسال ${result.sent} تذكير، فشل ${result.failed}`,
+      data: result
+    });
+
+  } catch (error) {
+    logger.error('Error sending reminders:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في إرسال التذكيرات' }
+    });
+  }
+});
+
+/**
+ * POST /api/admin/events/:eventId/send-thank-you
+ * Send thank you messages to all attended guests (VIP only - after event)
+ */
+router.post('/events/:eventId/send-thank-you', async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const adminId = req.user!.id;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    // Only for VIP packages
+    if (event.packageType !== 'vip') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'رسائل الشكر متاحة فقط لباقات VIP' }
+      });
+    }
+
+    // Import WhatsappService
+    const { WhatsappService } = await import('../services/whatsappService');
+    const result = await WhatsappService.sendThankYouMessages(eventId);
+
+    logger.info(`Admin ${adminId} triggered thank you messages for event ${eventId}`, result);
+
+    return res.json({
+      success: true,
+      message: `تم إرسال ${result.sent} رسالة شكر، فشل ${result.failed}`,
+      data: result
+    });
+
+  } catch (error) {
+    logger.error('Error sending thank you messages:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في إرسال رسائل الشكر' }
     });
   }
 });
@@ -1107,7 +1364,7 @@ router.get('/notifications', async (req: Request, res: Response) => {
     }
 
     const notifications = await AdminNotification.find(query)
-      .populate('eventId', 'details.hostName details.eventDate')
+      .populate('eventId', 'details.eventName details.hostName details.eventDate details.displayName details.eventLocation packageType')
       .populate('userId', 'firstName lastName')
       .sort({ createdAt: -1 })
       .skip(skip)

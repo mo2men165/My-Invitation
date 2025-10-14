@@ -236,79 +236,93 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
         </div>
         
         <div className="flex items-center gap-2">
-          {/* WhatsApp buttons for different packages */}
-          {packageType === 'classic' && !isEditing && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onSendWhatsapp(guest)}
-                className={`flex items-center gap-1 px-3 py-1 text-white text-sm rounded-lg transition-colors ${
-                  invitationCardUrl 
-                    ? 'bg-green-600 hover:bg-green-700' 
-                    : 'bg-yellow-600 hover:bg-yellow-700'
-                }`}
-                title={invitationCardUrl ? 'إرسال دعوة مع رابط الدعوة' : 'إرسال دعوة (رابط الدعوة سيتم إضافته لاحقاً)'}
-              >
-                <Send className="w-4 h-4" />
-                إرسال دعوة
-              </button>
-              
-              {guest.whatsappMessageSent && (
-                <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
-                  <Check className="w-3 h-3" />
-                  تم الإرسال
-                </span>
-              )}
-            </div>
+          {/* Classic Package - No send button for users (admins handle sending) */}
+          {packageType === 'classic' && !isEditing && guest.whatsappMessageSent && (
+            <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+              <Check className="w-3 h-3" />
+              تم الإرسال
+            </span>
           )}
 
-          {/* Premium/VIP packages - show both manual and API options */}
-          {(packageType === 'premium' || packageType === 'vip') && !isEditing && (
+          {/* Premium Package - Show send button only if guest list confirmed AND individual invite link is added */}
+          {packageType === 'premium' && !isEditing && userRole === 'owner' && (
             <div className="flex items-center gap-2">
-              {/* Manual WhatsApp button */}
-              <button
-                onClick={() => onSendWhatsapp(guest)}
-                className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
-                title="إرسال دعوة يدوياً عبر الواتساب"
-              >
-                <Send className="w-3 h-3" />
-                يدوياً
-              </button>
-
-              {/* WhatsApp API button */}
-              {onSendWhatsappAPI && (
-                <button
-                  onClick={() => onSendWhatsappAPI(guest)}
-                  disabled={sendingWhatsapp === guest._id}
-                  className={`flex items-center gap-1 px-2 py-1 text-white text-xs rounded transition-colors ${
-                    sendingWhatsapp === guest._id
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                  title="إرسال دعوة تفاعلية عبر الواتساب"
-                >
-                  {sendingWhatsapp === guest._id ? (
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Send className="w-3 h-3" />
+              {/* Show RSVP status if guest responded */}
+              {guest.rsvpStatus && guest.rsvpStatus !== 'pending' && (
+                <span className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                  guest.rsvpStatus === 'accepted' 
+                    ? 'bg-green-500/20 text-green-400' 
+                    : 'bg-red-500/20 text-red-400'
+                }`}>
+                  {guest.rsvpStatus === 'accepted' ? 'سيحضر' : 'اعتذر'}
+                </span>
+              )}
+              
+              {/* Show send button only if individual link is added */}
+              {guest.individualInviteLink ? (
+                <>
+                  {/* WhatsApp API button */}
+                  {onSendWhatsappAPI && (
+                    <button
+                      onClick={() => onSendWhatsappAPI(guest)}
+                      disabled={sendingWhatsapp === guest._id}
+                      className={`flex items-center gap-1 px-2 py-1 text-white text-xs rounded transition-colors ${
+                        sendingWhatsapp === guest._id
+                          ? 'bg-gray-600 cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700'
+                      }`}
+                      title="إرسال دعوة تفاعلية عبر الواتساب"
+                    >
+                      {sendingWhatsapp === guest._id ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-3 h-3" />
+                      )}
+                      إرسال
+                    </button>
                   )}
-                  تلقائياً
-                </button>
-              )}
-              
-              {guest.whatsappMessageSent && (
-                <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
-                  <Check className="w-3 h-3" />
-                  تم الإرسال
+                  
+                  {guest.whatsappMessageSent && (
+                    <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                      <Check className="w-3 h-3" />
+                      تم الإرسال
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
+                  في انتظار الرابط
                 </span>
               )}
             </div>
           )}
-          
-          {/* VIP package status */}
-          {packageType === 'vip' && !isEditing && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-yellow-500/20 text-yellow-400 text-sm rounded-lg">
-              <Users2 className="w-4 h-4" />
-              في انتظار الإرسال
+
+          {/* VIP Package - Only admins send invitations */}
+          {packageType === 'vip' && !isEditing && userRole === 'owner' && (
+            <div className="flex items-center gap-2">
+              {/* Show RSVP status if guest responded */}
+              {guest.rsvpStatus && guest.rsvpStatus !== 'pending' && (
+                <span className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                  guest.rsvpStatus === 'accepted' 
+                    ? 'bg-green-500/20 text-green-400' 
+                    : 'bg-red-500/20 text-red-400'
+                }`}>
+                  {guest.rsvpStatus === 'accepted' ? 'سيحضر' : 'اعتذر'}
+                </span>
+              )}
+              
+              {/* Show if invitation was sent by admin */}
+              {guest.whatsappMessageSent ? (
+                <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                  <Check className="w-3 h-3" />
+                  تم الإرسال
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
+                  <Users2 className="w-4 h-4" />
+                  في انتظار الإرسال
+                </span>
+              )}
             </div>
           )}
           

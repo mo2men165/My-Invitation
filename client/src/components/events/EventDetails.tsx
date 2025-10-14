@@ -18,6 +18,7 @@ interface EventDetailsProps {
       startTime: string;
       endTime: string;
       eventLocation: string;
+      displayName?: string;
       inviteCount: number;
       invitationText: string;
     };
@@ -83,7 +84,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               <MapPin className="w-5 h-5 text-[#C09B52]" />
               <div>
                 <div className="text-white font-medium">المكان</div>
-                <div className="text-gray-300 text-sm">{event.details.eventLocation}</div>
+                <div className="text-gray-300 text-sm">{event.details.displayName || event.details.eventLocation}</div>
               </div>
             </div>
           </div>
@@ -170,15 +171,15 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
       )}
 
       {/* QR Code Reader URL - Scanner app for gate supervisors */}
-      {event.qrCodeReaderUrl && (
-        <div className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 rounded-2xl border border-cyan-700/30 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <QrCode className="w-5 h-5 text-cyan-400" />
-            <h3 className="text-lg font-bold text-white">ماسح QR Code</h3>
-          </div>
-          <p className="text-cyan-200 text-sm mb-4">
-            استخدم هذا الرابط لفتح تطبيق الماسح على البوابة لمسح QR codes الخاصة بالضيوف
-          </p>
+      <div className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 rounded-2xl border border-cyan-700/30 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <QrCode className="w-5 h-5 text-cyan-400" />
+          <h3 className="text-lg font-bold text-white">ماسح QR Code</h3>
+        </div>
+        <p className="text-cyan-200 text-sm mb-4">
+          استخدم هذا الرابط لفتح تطبيق الماسح على البوابة لمسح QR codes الخاصة بالضيوف
+        </p>
+        {event.qrCodeReaderUrl && event.qrCodeReaderUrl.trim() ? (
           <div className="bg-cyan-900/20 border border-cyan-700/30 rounded-xl p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0 max-w-xs">
@@ -205,8 +206,12 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               </a>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="bg-cyan-900/20 border border-cyan-700/30 rounded-xl p-4">
+            <p className="text-gray-400 text-center">لم يتم توفيره من قبل الإدارة</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

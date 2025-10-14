@@ -33,11 +33,12 @@ interface OrderData {
   events: Array<{
     _id: string;
     details: {
-      hostName: string;
-      eventDate: string;
+      eventName: string;
+      displayName?: string;
       eventLocation: string;
     };
     packageType: string;
+    totalPrice: number;
   }>;
   selectedItems: Array<{
     cartItemId: string;
@@ -389,14 +390,19 @@ const PaymentResultContent: React.FC = () => {
                       <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                         <span className="text-white text-xs font-bold">{index + 1}</span>
                       </div>
-                      <div>
-                        <h3 className="text-green-400 font-semibold mb-1">{event.details.hostName}</h3>
+                      <div className="flex-1">
+                        <h3 className="text-green-400 font-semibold mb-1">{event.details.eventName}</h3>
                         <p className="text-green-300/80 text-sm">
-                          {event.details.eventDate} - {event.details.eventLocation}
+                          {event.details.displayName || event.details.eventLocation}
                         </p>
-                        <p className="text-green-300/60 text-xs mt-1">
-                          {event.packageType}
-                        </p>
+                        <div className="flex items-center justify-between mt-2">
+                          <p className="text-green-300/60 text-xs">
+                            {event.packageType}
+                          </p>
+                          <p className="text-green-400 font-bold text-sm">
+                            {event.totalPrice.toLocaleString('ar-SA')} ر.س
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))

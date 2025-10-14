@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminEventGuests } from '@/components/admin/AdminEventGuests';
-import { Calendar, Search, Check, X, Clock, Eye, CheckCircle, XCircle, MessageSquare, Users } from 'lucide-react';
+import { Calendar, Search, Check, X, Clock, Eye, CheckCircle, XCircle, MessageSquare, Users, MapPin, Package, ExternalLink, QrCode, CreditCard, Truck, UserCheck, ImageIcon } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
+import { invitationDesigns } from '@/constants/invitationDesigns';
+import Image from 'next/image';
 
 interface Event {
   id: string;
@@ -15,12 +17,26 @@ interface Event {
     phone: string;
   };
   eventDetails: {
+    eventName?: string;
     hostName: string;
     eventDate: string;
     eventLocation: string;
+    displayName?: string;
     inviteCount: number;
     packageType: string;
+    startTime?: string;
+    endTime?: string;
+    invitationText?: string;
+    additionalCards?: number;
+    gateSupervisors?: number;
+    fastDelivery?: boolean;
+    formattedAddress?: string;
+    googleMapsUrl?: string;
+    detectedCity?: string;
+    isCustomDesign?: boolean;
+    customDesignNotes?: string;
   };
+  designId?: string;
   totalPrice: number;
   status: string;
   approvalStatus: string;
@@ -29,6 +45,8 @@ interface Event {
   approvedAt?: string;
   rejectedAt?: string;
   paymentCompletedAt: string;
+  invitationCardUrl?: string;
+  qrCodeReaderUrl?: string;
   guests?: any[];
   guestListConfirmed?: {
     isConfirmed: boolean;
@@ -36,6 +54,8 @@ interface Event {
     confirmedBy?: string;
   };
   guestCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export default function AdminEventsPage() {
@@ -356,8 +376,8 @@ export default function AdminEventsPage() {
                 {/* Table Header */}
                 <div className="bg-gray-800/50 border-b border-gray-700 px-6 py-5">
                   <div className="grid grid-cols-7 gap-6 text-sm font-medium text-gray-400 min-w-[700px]">
-                    <div className="text-right">الحدث</div>
-                    <div className="text-right">المضيف</div>
+                    <div className="text-right">المناسبة</div>
+                    <div className="text-right">المستخدم</div>
                     <div className="text-right">التاريخ</div>
                     <div className="text-right">السعر</div>
                     <div className="text-center">حالة الموافقة</div>
@@ -373,20 +393,37 @@ export default function AdminEventsPage() {
                       <div className="grid grid-cols-7 gap-6 items-center min-w-[700px]">
                         {/* Event Info */}
                         <div className="text-right">
-                          <div className="text-white font-medium text-sm">
-                            {event.eventDetails.hostName}
+                          <div className="text-white font-semibold text-sm">
+                            {event.eventDetails.eventName || event.eventDetails.hostName}
                           </div>
                           <div className="text-gray-400 text-xs mt-1">
-                            {event.eventDetails.packageType}
+                            مضيف: {event.eventDetails.hostName}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="text-[#C09B52] text-xs font-medium">
+                              {event.eventDetails.packageType}
+                            </div>
+                            {event.approvalStatus === 'approved' && (
+                              <div className={`text-xs px-1.5 py-0.5 rounded ${
+                                event.guestListConfirmed?.isConfirmed 
+                                  ? 'bg-green-900/30 text-green-400' 
+                                  : 'bg-yellow-900/30 text-yellow-400'
+                              }`}>
+                                {event.guestListConfirmed?.isConfirmed 
+                                  ? `✓ ${event.guestCount || 0} ضيف` 
+                                  : `${event.guestCount || 0} ضيف`
+                                }
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* Host Info */}
+                        {/* User Info */}
                         <div className="min-w-0 text-right">
-                          <div className="text-gray-300 text-sm truncate">
+                          <div className="text-gray-300 text-sm truncate font-medium">
                             {event.user.name}
                           </div>
-                          <div className="text-gray-500 text-xs font-mono" dir="ltr">
+                          <div className="text-gray-500 text-xs font-mono mt-1" dir="ltr">
                             {event.user.phone}
                           </div>
                         </div>
@@ -426,8 +463,8 @@ export default function AdminEventsPage() {
                             <Eye className="w-4 h-4" />
                           </button>
                           
-                          {/* VIP Guests Management Button */}
-                          {event.eventDetails.packageType === 'vip' && event.approvalStatus === 'approved' && (
+                          {/* Guest Management Button - All Packages */}
+                          {event.approvalStatus === 'approved' && (
                             <button
                               onClick={() => handleViewGuests(event.id)}
                               className={`p-2.5 text-white rounded-lg transition-colors duration-200 ${
@@ -437,8 +474,8 @@ export default function AdminEventsPage() {
                               }`}
                               title={
                                 event.guestListConfirmed?.isConfirmed 
-                                  ? `إدارة ضيوف VIP (${event.guestCount || 0} ضيف مؤكد)` 
-                                  : `إدارة ضيوف VIP (${event.guestCount || 0} ضيف في انتظار التأكيد)`
+                                  ? `إدارة الضيوف (${event.guestCount || 0} ضيف مؤكد - ${event.eventDetails.packageType})` 
+                                  : `إدارة الضيوف (${event.guestCount || 0} ضيف في انتظار التأكيد - ${event.eventDetails.packageType})`
                               }
                             >
                               <Users className="w-4 h-4" />
@@ -504,10 +541,10 @@ export default function AdminEventsPage() {
         {/* Event Details Modal */}
         {showDetailsModal && selectedEvent && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-700">
+            <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-700 sticky top-0 bg-gray-900 z-10">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-white">تفاصيل الحدث</h3>
+                  <h3 className="text-xl font-bold text-white">تفاصيل الحدث الكاملة</h3>
                   <button
                     onClick={() => setShowDetailsModal(false)}
                     className="p-2 hover:bg-gray-800 rounded-lg transition-colors duration-200"
@@ -520,51 +557,241 @@ export default function AdminEventsPage() {
               <div className="p-6 space-y-6">
                 {/* Event Details */}
                 <div>
-                  <h4 className="text-lg font-semibold text-white mb-4">بيانات الحدث</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm text-gray-400">اسم الحدث</label>
-                      <div className="text-white">{selectedEvent.eventDetails.hostName}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-400">نوع الحزمة</label>
-                      <div className="text-white">{selectedEvent.eventDetails.packageType}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-400">تاريخ الحدث</label>
-                      <div className="text-white">{formatDate(selectedEvent.eventDetails.eventDate)}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-400">عدد الدعوات</label>
-                      <div className="text-white">{selectedEvent.eventDetails.inviteCount}</div>
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-sm text-gray-400">موقع الحدث</label>
-                      <div className="text-white">{selectedEvent.eventDetails.eventLocation}</div>
+                  <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-[#C09B52]" />
+                    بيانات المناسبة
+                  </h4>
+                  <div className="bg-gray-800/50 rounded-xl p-5 space-y-4">
+                    {selectedEvent.eventDetails.eventName && (
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">اسم المناسبة</label>
+                        <div className="text-white font-bold text-lg mt-1">{selectedEvent.eventDetails.eventName}</div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">المضيف</label>
+                        <div className="text-white font-semibold mt-1">{selectedEvent.eventDetails.hostName}</div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">نوع الحزمة</label>
+                        <div className="mt-1">
+                          <span className="inline-block px-3 py-1 bg-[#C09B52]/20 border border-[#C09B52]/40 rounded-full text-[#C09B52] text-sm font-bold">
+                            {selectedEvent.eventDetails.packageType}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">تاريخ المناسبة</label>
+                        <div className="text-white mt-1">{formatDate(selectedEvent.eventDetails.eventDate)}</div>
+                      </div>
+                      {selectedEvent.eventDetails.startTime && selectedEvent.eventDetails.endTime && (
+                        <div>
+                          <label className="text-sm text-gray-400 font-medium flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            الوقت
+                          </label>
+                          <div className="text-white mt-1">
+                            من {selectedEvent.eventDetails.startTime} إلى {selectedEvent.eventDetails.endTime}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium flex items-center gap-1">
+                          <Users className="w-4 h-4" />
+                          عدد الدعوات
+                        </label>
+                        <div className="text-white font-semibold mt-1">{selectedEvent.eventDetails.inviteCount}</div>
+                      </div>
+                      {selectedEvent.eventDetails.packageType === 'vip' && selectedEvent.guestCount !== undefined && (
+                        <div>
+                          <label className="text-sm text-gray-400 font-medium flex items-center gap-1">
+                            <UserCheck className="w-4 h-4" />
+                            عدد الضيوف المضافين
+                          </label>
+                          <div className="text-white font-semibold mt-1">{selectedEvent.guestCount}</div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Host Details */}
+                {/* Design Selection */}
                 <div>
-                  <h4 className="text-lg font-semibold text-white mb-4">بيانات المضيف</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-[#C09B52]" />
+                    التصميم المختار
+                  </h4>
+                  <div className="bg-gray-800/50 rounded-xl p-5">
+                    {selectedEvent.eventDetails.isCustomDesign ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="px-3 py-1 bg-purple-900/30 border border-purple-700/40 rounded-full text-purple-400 text-sm font-bold">
+                            تصميم مخصص
+                          </div>
+                        </div>
+                        {selectedEvent.eventDetails.customDesignNotes && (
+                          <div>
+                            <label className="text-sm text-gray-400 font-medium">ملاحظات التصميم المخصص</label>
+                            <div className="mt-2 bg-gray-900/50 rounded-lg p-3 border border-gray-700">
+                              <p className="text-white whitespace-pre-wrap">{selectedEvent.eventDetails.customDesignNotes}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {selectedEvent.designId && (() => {
+                          const design = invitationDesigns.find(d => d.id === selectedEvent.designId);
+                          return design ? (
+                            <div className="flex flex-col sm:flex-row gap-4 items-start">
+                              <div className="relative w-full sm:w-48 h-64 rounded-lg overflow-hidden border border-gray-700 flex-shrink-0">
+                                <Image
+                                  src={design.image}
+                                  alt={design.name}
+                                  fill
+                                  className="object-cover"
+                                  sizes="(max-width: 640px) 100vw, 192px"
+                                />
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <div>
+                                  <label className="text-sm text-gray-400 font-medium">اسم التصميم</label>
+                                  <div className="text-white font-semibold mt-1">{design.name}</div>
+                                </div>
+                                <div>
+                                  <label className="text-sm text-gray-400 font-medium">الفئة</label>
+                                  <div className="text-white mt-1">{design.category}</div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-gray-400">لم يتم العثور على معلومات التصميم</div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Location Details */}
+                <div>
+                  <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-[#C09B52]" />
+                    تفاصيل الموقع
+                  </h4>
+                  <div className="bg-gray-800/50 rounded-xl p-5 space-y-3">
                     <div>
-                      <label className="text-sm text-gray-400">الاسم</label>
-                      <div className="text-white">{selectedEvent.user.name}</div>
+                      <label className="text-sm text-gray-400 font-medium">اسم المكان</label>
+                      <div className="text-white mt-1">{selectedEvent.eventDetails.displayName || selectedEvent.eventDetails.eventLocation}</div>
                     </div>
-                    <div>
-                      <label className="text-sm text-gray-400">الإيميل</label>
-                      <div className="text-white break-all">{selectedEvent.user.email}</div>
+                    {selectedEvent.eventDetails.formattedAddress && (
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">العنوان الكامل</label>
+                        <div className="text-white mt-1">{selectedEvent.eventDetails.formattedAddress}</div>
+                      </div>
+                    )}
+                    {selectedEvent.eventDetails.detectedCity && (
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">المدينة</label>
+                        <div className="text-white mt-1">{selectedEvent.eventDetails.detectedCity}</div>
+                      </div>
+                    )}
+                    {selectedEvent.eventDetails.googleMapsUrl && (
+                      <div>
+                        <a
+                          href={selectedEvent.eventDetails.googleMapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          فتح في خرائط جوجل
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Invitation Text */}
+                {selectedEvent.eventDetails.invitationText && (
+                  <div>
+                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5 text-[#C09B52]" />
+                      نص الدعوة
+                    </h4>
+                    <div className="bg-gray-800/50 rounded-xl p-5">
+                      <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">{selectedEvent.eventDetails.invitationText}</p>
                     </div>
-                    <div>
-                      <label className="text-sm text-gray-400">الهاتف</label>
-                      <div className="text-white">{selectedEvent.user.phone}</div>
+                  </div>
+                )}
+
+                {/* Additional Services */}
+                {(selectedEvent.eventDetails.additionalCards || selectedEvent.eventDetails.gateSupervisors || selectedEvent.eventDetails.fastDelivery) && (
+                  <div>
+                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <Package className="w-5 h-5 text-[#C09B52]" />
+                      الخدمات الإضافية
+                    </h4>
+                    <div className="bg-gray-800/50 rounded-xl p-5">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {selectedEvent.eventDetails.additionalCards ? (
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-5 h-5 text-[#C09B52]" />
+                            <div>
+                              <div className="text-sm text-gray-400">بطاقات إضافية</div>
+                              <div className="text-white font-semibold">{selectedEvent.eventDetails.additionalCards}</div>
+                            </div>
+                          </div>
+                        ) : null}
+                        {selectedEvent.eventDetails.gateSupervisors ? (
+                          <div className="flex items-center gap-2">
+                            <Users className="w-5 h-5 text-[#C09B52]" />
+                            <div>
+                              <div className="text-sm text-gray-400">مشرفو البوابة</div>
+                              <div className="text-white font-semibold">{selectedEvent.eventDetails.gateSupervisors}</div>
+                            </div>
+                          </div>
+                        ) : null}
+                        {selectedEvent.eventDetails.fastDelivery && (
+                          <div className="flex items-center gap-2">
+                            <Truck className="w-5 h-5 text-green-400" />
+                            <div>
+                              <div className="text-sm text-gray-400">التوصيل السريع</div>
+                              <div className="text-green-400 font-semibold">مفعّل</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-sm text-gray-400">السعر الإجمالي</label>
-                      <div className="text-[#C09B52] font-bold">
-                        {selectedEvent.totalPrice.toLocaleString('ar-SA')} ر.س
+                  </div>
+                )}
+
+                {/* User Details */}
+                <div>
+                  <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-[#C09B52]" />
+                    بيانات المستخدم
+                  </h4>
+                  <div className="bg-gray-800/50 rounded-xl p-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">الاسم</label>
+                        <div className="text-white font-semibold mt-1">{selectedEvent.user.name}</div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">الإيميل</label>
+                        <div className="text-white break-all mt-1">{selectedEvent.user.email}</div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">الهاتف</label>
+                        <div className="text-white font-mono text-right mt-1" dir="ltr">{selectedEvent.user.phone}</div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">السعر الإجمالي</label>
+                        <div className="text-[#C09B52] font-bold text-lg mt-1">
+                          {selectedEvent.totalPrice.toLocaleString('ar-SA')} ر.س
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -572,35 +799,161 @@ export default function AdminEventsPage() {
 
                 {/* Status Information */}
                 <div>
-                  <h4 className="text-lg font-semibold text-white mb-4">معلومات الحالة</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm text-gray-400">حالة الموافقة</label>
-                      <div>{getApprovalStatusBadge(selectedEvent.approvalStatus)}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-400">حالة الحدث</label>
-                      <div>{getStatusBadge(selectedEvent.status)}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-400">تاريخ الدفع</label>
-                      <div className="text-white">{formatDate(selectedEvent.paymentCompletedAt)}</div>
-                    </div>
-                    {selectedEvent.approvedBy && (
+                  <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-[#C09B52]" />
+                    معلومات الحالة والموافقة
+                  </h4>
+                  <div className="bg-gray-800/50 rounded-xl p-5 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm text-gray-400">معتمد بواسطة</label>
-                        <div className="text-white">{selectedEvent.approvedBy}</div>
+                        <label className="text-sm text-gray-400 font-medium">حالة الموافقة</label>
+                        <div className="mt-1">{getApprovalStatusBadge(selectedEvent.approvalStatus)}</div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">حالة المناسبة</label>
+                        <div className="mt-1">{getStatusBadge(selectedEvent.status)}</div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400 font-medium">تاريخ الدفع</label>
+                        <div className="text-white mt-1">{formatDate(selectedEvent.paymentCompletedAt)}</div>
+                      </div>
+                      {selectedEvent.createdAt && (
+                        <div>
+                          <label className="text-sm text-gray-400 font-medium">تاريخ الإنشاء</label>
+                          <div className="text-white mt-1">{formatDate(selectedEvent.createdAt)}</div>
+                        </div>
+                      )}
+                      {selectedEvent.approvedBy && (
+                        <div>
+                          <label className="text-sm text-gray-400 font-medium">معتمد بواسطة</label>
+                          <div className="text-green-400 font-semibold mt-1">{selectedEvent.approvedBy}</div>
+                        </div>
+                      )}
+                      {selectedEvent.approvedAt && (
+                        <div>
+                          <label className="text-sm text-gray-400 font-medium">تاريخ الموافقة</label>
+                          <div className="text-green-400 mt-1">{formatDate(selectedEvent.approvedAt)}</div>
+                        </div>
+                      )}
+                      {selectedEvent.rejectedAt && (
+                        <div>
+                          <label className="text-sm text-gray-400 font-medium">تاريخ الرفض</label>
+                          <div className="text-red-400 mt-1">{formatDate(selectedEvent.rejectedAt)}</div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Guest List Confirmation for VIP */}
+                    {selectedEvent.eventDetails.packageType === 'vip' && selectedEvent.guestListConfirmed && (
+                      <div className="pt-4 border-t border-gray-700">
+                        <label className="text-sm text-gray-400 font-medium">تأكيد قائمة الضيوف</label>
+                        <div className="mt-2 flex items-center gap-2">
+                          {selectedEvent.guestListConfirmed.isConfirmed ? (
+                            <>
+                              <CheckCircle className="w-5 h-5 text-green-400" />
+                              <span className="text-green-400 font-semibold">تم التأكيد</span>
+                              {selectedEvent.guestListConfirmed.confirmedAt && (
+                                <span className="text-gray-400 text-sm">
+                                  - {formatDate(selectedEvent.guestListConfirmed.confirmedAt)}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="w-5 h-5 text-yellow-400" />
+                              <span className="text-yellow-400 font-semibold">في انتظار التأكيد</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
 
+                {/* Invitation Card URL */}
+                {selectedEvent.invitationCardUrl && (
+                  <div>
+                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <ExternalLink className="w-5 h-5 text-blue-400" />
+                      بطاقة الدعوة
+                    </h4>
+                    <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-5">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-blue-100 text-sm mb-2">رابط بطاقة الدعوة:</p>
+                          <a
+                            href={selectedEvent.invitationCardUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-300 hover:text-blue-200 text-sm block truncate"
+                            title={selectedEvent.invitationCardUrl}
+                            dir="ltr"
+                          >
+                            {selectedEvent.invitationCardUrl}
+                          </a>
+                        </div>
+                        <a
+                          href={selectedEvent.invitationCardUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 whitespace-nowrap"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          عرض البطاقة
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* QR Code Reader URL */}
+                {selectedEvent.qrCodeReaderUrl && (
+                  <div>
+                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <QrCode className="w-5 h-5 text-cyan-400" />
+                      ماسح QR Code
+                    </h4>
+                    <div className="bg-cyan-900/20 border border-cyan-700/30 rounded-xl p-5">
+                      <p className="text-cyan-200 text-sm mb-4">
+                        استخدم هذا الرابط لفتح تطبيق الماسح على البوابة لمسح QR codes الخاصة بالضيوف
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-cyan-100 text-sm mb-2">رابط تطبيق الماسح:</p>
+                          <a
+                            href={selectedEvent.qrCodeReaderUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-300 hover:text-cyan-200 text-sm block truncate"
+                            title={selectedEvent.qrCodeReaderUrl}
+                            dir="ltr"
+                          >
+                            {selectedEvent.qrCodeReaderUrl}
+                          </a>
+                        </div>
+                        <a
+                          href={selectedEvent.qrCodeReaderUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 whitespace-nowrap"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          فتح الماسح
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Admin Notes */}
                 {selectedEvent.adminNotes && (
                   <div>
-                    <h4 className="text-lg font-semibold text-white mb-4">ملاحظات الإدارة</h4>
-                    <div className="bg-gray-800 border border-gray-600 rounded-lg p-4">
-                      <p className="text-gray-300">{selectedEvent.adminNotes}</p>
+                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5 text-amber-400" />
+                      ملاحظات الإدارة
+                    </h4>
+                    <div className="bg-amber-900/20 border border-amber-700/40 rounded-xl p-5">
+                      <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">{selectedEvent.adminNotes}</p>
                     </div>
                   </div>
                 )}
@@ -612,8 +965,8 @@ export default function AdminEventsPage() {
         {/* Approval Modal */}
         {showApprovalModal && selectedEvent && approvalAction && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md">
-              <div className="p-6 border-b border-gray-700">
+            <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-700 sticky top-0 bg-gray-900 z-10">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-white">
                     {approvalAction === 'approve' ? 'موافقة على الحدث' : 'رفض الحدث'}
@@ -634,14 +987,22 @@ export default function AdminEventsPage() {
               </div>
               
               <div className="p-6 space-y-4">
+                {selectedEvent.eventDetails.eventName && (
+                  <div>
+                    <label className="text-sm text-gray-400 font-medium">اسم المناسبة</label>
+                    <div className="text-white font-bold text-lg">{selectedEvent.eventDetails.eventName}</div>
+                  </div>
+                )}
+                
                 <div>
-                  <label className="text-sm text-gray-400">اسم الحدث</label>
-                  <div className="text-white font-medium">{selectedEvent.eventDetails.hostName}</div>
+                  <label className="text-sm text-gray-400 font-medium">المضيف</label>
+                  <div className="text-white font-semibold">{selectedEvent.eventDetails.hostName}</div>
                 </div>
                 
                 <div>
-                  <label className="text-sm text-gray-400">المضيف</label>
+                  <label className="text-sm text-gray-400 font-medium">المستخدم</label>
                   <div className="text-white">{selectedEvent.user.name}</div>
+                  <div className="text-gray-400 text-right text-sm font-mono mt-1" dir="ltr">{selectedEvent.user.phone}</div>
                 </div>
 
                 {approvalAction === 'approve' && (

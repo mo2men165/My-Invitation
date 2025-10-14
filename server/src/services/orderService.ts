@@ -250,7 +250,10 @@ export class OrderService {
           packageType: cartItem.packageType,
           details: {
             ...cartItem.details,
-            eventDate: new Date(cartItem.details.eventDate)
+            eventDate: new Date(cartItem.details.eventDate),
+            // Explicitly preserve custom design fields
+            isCustomDesign: cartItem.details.isCustomDesign || false,
+            customDesignNotes: cartItem.details.customDesignNotes || ''
           },
           totalPrice: cartItem.totalPrice,
           status: 'upcoming' as const,

@@ -75,56 +75,102 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
         </div>
       </div>
 
-      {/* WhatsApp Bulk Send Button for Premium/VIP */}
-      {(event.packageType === 'premium' || event.packageType === 'vip') && guests.length > 0 && (
+      {/* WhatsApp Bulk Send Button for Premium packages */}
+      {event.packageType === 'premium' && guests.length > 0 && (
+        event.guestListConfirmed.isConfirmed ? (
         <div className="mb-6">
-          <button
-            onClick={onSendBulkWhatsapp}
-            disabled={sendingBulkWhatsapp || !onSendBulkWhatsapp}
-            className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-          >
-            {sendingBulkWhatsapp ? (
+          {/* Check if all guests have individual invite links */}
+          {(() => {
+            const guestsWithoutLinks = guests.filter(g => !g.individualInviteLink);
+            const canSendBulk = guestsWithoutLinks.length === 0;
+            
+            return canSendBulk ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                جاري الإرسال...
+                <button
+                  onClick={onSendBulkWhatsapp}
+                  disabled={sendingBulkWhatsapp || !onSendBulkWhatsapp}
+                  className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                >
+                  {sendingBulkWhatsapp ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      جاري الإرسال...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      إرسال جميع الدعوات عبر الواتساب ({guests.filter(g => !g.whatsappMessageSent).length} دعوة)
+                    </>
+                  )}
+                </button>
+                <p className="text-sm text-gray-400 mt-2 text-center">
+                  سيتم إرسال دعوات تفاعلية مع أزرار القبول/الاعتذار
+                </p>
               </>
             ) : (
-              <>
-                <Send className="w-5 h-5" />
-                إرسال جميع الدعوات عبر الواتساب ({guests.filter(g => !g.whatsappMessageSent).length} دعوة)
-              </>
-            )}
-          </button>
-          <p className="text-sm text-gray-400 mt-2 text-center">
-            سيتم إرسال دعوات تفاعلية مع أزرار القبول/الاعتذار
-          </p>
+              <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-400" />
+                  <div className="flex-1">
+                    <h4 className="text-yellow-400 font-medium text-sm">في انتظار الروابط الفردية</h4>
+                    <p className="text-yellow-100 text-xs mt-1">
+                      يجب إضافة روابط فردية لجميع الضيوف ({guestsWithoutLinks.length} ضيف في انتظار الرابط) قبل إرسال الدعوات
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
+        ) : (
+          <div className="mb-6">
+            <div className="bg-orange-900/20 border border-orange-700/30 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-orange-400" />
+                <div className="flex-1">
+                  <h4 className="text-orange-400 font-medium text-sm">قم بتأكيد قائمة الضيوف أولاً</h4>
+                  <p className="text-orange-100 text-xs mt-1">
+                    بعد تأكيد القائمة، سيتم إضافة الروابط الفردية ويمكنك إرسال الدعوات
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
-      {/* VIP Package Notice */}
-      {event.packageType === 'vip' && (
-        <div className={`rounded-xl p-4 mb-6 ${
-          event.guestListConfirmed.isConfirmed 
-            ? 'bg-gradient-to-r from-green-900/30 to-green-800/20 border border-green-700' 
-            : 'bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-700'
-        }`}>
+      {/* Package-specific Notice */}
+      {event.guestListConfirmed.isConfirmed ? (
+        <div className="rounded-xl p-4 mb-6 bg-gradient-to-r from-green-900/30 to-green-800/20 border border-green-700">
           <div className="flex items-center gap-3">
-            <Users2 className={`w-5 h-5 ${
-              event.guestListConfirmed.isConfirmed ? 'text-green-400' : 'text-yellow-400'
-            }`} />
+            <CheckSquare className="w-5 h-5 text-green-400" />
             <div>
-              <h4 className={`font-medium ${
-                event.guestListConfirmed.isConfirmed ? 'text-green-400' : 'text-yellow-400'
-              }`}>
-                حزمة VIP
-              </h4>
-              <p className={`text-sm ${
-                event.guestListConfirmed.isConfirmed ? 'text-green-100' : 'text-yellow-100'
-              }`}>
-                {event.guestListConfirmed.isConfirmed 
-                  ? `تم تأكيد قائمة الضيوف. سيتم إرسال الدعوات قريباً (${event.guestListConfirmed.confirmedAt ? new Date(event.guestListConfirmed.confirmedAt).toLocaleDateString('ar-SA', { calendar: 'gregory' }) : ''})`
-                  : 'فريقنا سيتولى إرسال الدعوات للضيوف نيابة عنك. أضف جميع الضيوف ثم اضغط على "تأكيد القائمة النهائية"'
+              <h4 className="font-medium text-green-400">تم تأكيد قائمة الضيوف</h4>
+              <p className="text-sm text-green-100">
+                {event.packageType === 'classic' && 'سنقوم بإرسال الدعوات إليك عبر الواتساب قريباً'}
+                {event.packageType === 'premium' && 'بعد إضافة الروابط الفردية يمكنك إرسال الدعوات'}
+                {event.packageType === 'vip' && 'فريقنا سيتولى إرسال الدعوات للضيوف قريباً'}
+                {event.guestListConfirmed.confirmedAt && 
+                  ` (${new Date(event.guestListConfirmed.confirmedAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })})`
                 }
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl p-4 mb-6 bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-700">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-400" />
+            <div>
+              <h4 className="font-medium text-yellow-400">
+                {event.packageType === 'classic' && 'باقة كلاسيك'}
+                {event.packageType === 'premium' && 'باقة بريميوم'}
+                {event.packageType === 'vip' && 'باقة VIP'}
+              </h4>
+              <p className="text-sm text-yellow-100">
+                {event.packageType === 'classic' && 'أضف جميع ضيوفك ثم قم بتأكيد القائمة. سنقوم بإرسال الدعوات إليك عبر الواتساب'}
+                {event.packageType === 'premium' && 'أضف جميع ضيوفك وقم بتأكيد القائمة. بعدها سيتم إضافة الروابط الفردية لكل ضيف ويمكنك إرسال الدعوات'}
+                {event.packageType === 'vip' && 'أضف جميع ضيوفك ثم قم بتأكيد القائمة. فريقنا سيتولى إرسال الدعوات للضيوف نيابة عنك'}
               </p>
             </div>
           </div>
@@ -158,26 +204,28 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
         sendingWhatsapp={sendingWhatsapp}
       />
 
-      {/* VIP Package - Confirm Final Guest List Button - Only for owners */}
-      {userRole === 'owner' && event.packageType === 'vip' && guests.length > 0 && !event.guestListConfirmed.isConfirmed && (
+      {/* Confirm Final Guest List Button - For all packages - Only for owners */}
+      {userRole === 'owner' && guests.length > 0 && !event.guestListConfirmed.isConfirmed && (
         <div className="mt-6 pt-6 border-t border-white/10">
           <div className="bg-gradient-to-r from-yellow-900/20 to-yellow-800/10 border border-yellow-700/30 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between flex-col md:flex-row gap-4">
+              <div className="flex-1">
                 <h4 className="text-yellow-400 font-medium mb-1">تأكيد القائمة النهائية</h4>
                 <p className="text-yellow-100 text-sm mb-2">
-                  بعد التأكيد، سيقوم فريقنا بإرسال الدعوات لجميع الضيوف
+                  {event.packageType === 'classic' && 'بعد التأكيد، سنقوم بإرسال الدعوات إليك عبر الواتساب'}
+                  {event.packageType === 'premium' && 'بعد التأكيد، سيتم إضافة الروابط الفردية لكل ضيف'}
+                  {event.packageType === 'vip' && 'بعد التأكيد، سيقوم فريقنا بإرسال الدعوات لجميع الضيوف'}
                 </p>
-                <div className="bg-red-900/20 border border-red-700/30 rounded-lg p-3">
-                  <p className="text-red-300 text-xs font-medium">
-                    ⚠️ تحذير: بعد النقر على تأكيد القائمة، ستكون القائمة نهائية ولن يمكن تعديلها أو إضافة/حذف ضيوف
+                <div className="bg-orange-900/20 border border-orange-700/30 rounded-lg p-3 mt-2">
+                  <p className="text-orange-300 text-xs font-medium">
+                    ⚠️ ملاحظة: بعد تأكيد القائمة، يمكن للإدارة إعادة فتحها إذا احتجت لإضافة أو تعديل ضيوف
                   </p>
                 </div>
               </div>
               <button
                 onClick={onConfirmGuestList}
                 disabled={confirmingGuestList}
-                className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors duration-200 flex items-center gap-2"
+                className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors duration-200 flex items-center gap-2 whitespace-nowrap"
               >
                 {confirmingGuestList ? (
                   <>
@@ -187,7 +235,7 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
                 ) : (
                   <>
                     <CheckSquare className="w-4 h-4" />
-                    تأكيد القائمة النهائية
+                    تأكيد القائمة
                   </>
                 )}
               </button>

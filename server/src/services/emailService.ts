@@ -510,7 +510,7 @@ private createEventApprovalTemplate(data: EventApprovalEmailData) {
               <p style="margin: 10px 0;">• إدارة تفاصيل حدثك</p>
           </div>
           
-          <a href="${process.env.FRONTEND_URL}/dashboard" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; font-weight: bold;">انتقل إلى لوحة التحكم</a>
+          <a href="https://www.myinvitation-sa.com/dashboard" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; font-weight: bold;">انتقل إلى لوحة التحكم</a>
           
           <p style="color: #999; font-size: 14px; margin-top: 30px;">شكراً لاستخدامك منصة My Invitation<br>فريق My Invitation</p>
       </div>
@@ -526,14 +526,13 @@ private createEventApprovalTemplate(data: EventApprovalEmailData) {
 نحن سعداء لإعلامك بأنه تم الموافقة على حدثك "${data.eventName}" المقرر بتاريخ ${data.eventDate}
 
     ${data.invitationCardUrl ? `رابط بطاقة الدعوة: ${data.invitationCardUrl}` : ''}
-    ${data.qrCodeReaderUrl ? `رابط QR Code: ${data.qrCodeReaderUrl}` : ''}
 
 ماذا بعد؟
 • يمكنك الآن إضافة ضيوفك إلى قائمة الدعوات
 • إرسال رسائل واتساب للضيوف  
 • إدارة تفاصيل حدثك
 
-انتقل إلى لوحة التحكم: ${process.env.FRONTEND_URL}/dashboard
+انتقل إلى لوحة التحكم: https://www.myinvitation-sa.com/dashboard
 
 شكراً لاستخدامك منصة My Invitation،
 فريق My Invitation

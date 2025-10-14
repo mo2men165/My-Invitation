@@ -14,11 +14,13 @@ import {
   Loader2,
   Eye,
   CheckCircle,
-  XCircle
+  XCircle,
+  UserCheck,
+  AlertCircle
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
-import { formatPhoneForDisplay } from '@/utils/phoneValidation';
+import ConfirmationModal from '@/components/cart/CartModal/components/ConfirmationModal';
 
 interface Guest {
   _id: string;
@@ -26,16 +28,25 @@ interface Guest {
   phone: string;
   numberOfAccompanyingGuests: number;
   whatsappMessageSent: boolean;
+  whatsappSentAt?: string;
+  rsvpStatus?: 'pending' | 'accepted' | 'declined';
+  rsvpResponse?: string;
+  rsvpRespondedAt?: string;
   addedAt: string;
   updatedAt: string;
   individualInviteLink?: string;
+  actuallyAttended?: boolean;
+  attendanceMarkedAt?: string;
+  attendanceMarkedBy?: string;
 }
 
 interface EventDetails {
   id: string;
+  eventName?: string;
   hostName: string;
   eventDate: string;
   eventLocation: string;
+  displayName?: string;
   packageType: string;
   invitationText: string;
   startTime: string;
@@ -49,6 +60,9 @@ interface EventDetails {
     isConfirmed: boolean;
     confirmedAt?: string;
     confirmedBy?: string;
+    reopenedAt?: string;
+    reopenedBy?: string;
+    reopenCount?: number;
   };
 }
 
@@ -75,6 +89,7 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
   const [editingLinkForGuest, setEditingLinkForGuest] = useState<string | null>(null);
   const [inviteLinkInput, setInviteLinkInput] = useState<string>('');
   const [updatingLink, setUpdatingLink] = useState(false);
+  const [showReopenConfirmation, setShowReopenConfirmation] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -105,16 +120,75 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-      weekday: 'long'
+      weekday: 'long',
+      calendar: 'gregory' // Force Gregorian calendar
     });
   };
 
   const handleSendWhatsapp = async (guest: Guest) => {
     if (!event) return;
 
+    console.log('=== FRONTEND: Starting handleSendWhatsapp ===', {
+      eventId,
+      guestId: guest._id,
+      guestName: guest.name,
+      guestPhone: guest.phone,
+      packageType: event.packageType,
+      hasIndividualLink: !!guest.individualInviteLink
+    });
+
     setSendingMessage(guest._id);
 
-    let message = `بسم الله الرحمن الرحيم
+    try {
+      // For VIP packages, use WhatsApp Business API
+      if (event.packageType === 'vip') {
+        console.log('FRONTEND: VIP package - using WhatsApp API', {
+          apiUrl: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/whatsapp/send-invitation`,
+          hasToken: !!localStorage.getItem('access_token')
+        });
+
+        const requestBody = { eventId, guestId: guest._id };
+        console.log('FRONTEND: Sending API request', { requestBody });
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/whatsapp/send-invitation`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        console.log('FRONTEND: API response received', {
+          status: response.status,
+          ok: response.ok
+        });
+
+        const result = await response.json();
+        console.log('FRONTEND: Response data', result);
+
+        if (!response.ok) {
+          console.error('FRONTEND: API request failed', {
+            status: response.status,
+            error: result.error
+          });
+          throw new Error(result.error?.message || 'فشل في إرسال الدعوة');
+        }
+
+        console.log('FRONTEND: Invitation sent successfully via API', {
+          messageId: result.data?.messageId
+        });
+
+        toast({
+          title: "تم إرسال الدعوة",
+          description: "تم إرسال دعوة تفاعلية عبر واتساب",
+          variant: "default"
+        });
+      } else {
+        // For Classic packages - use manual wa.me link (admins send to user, not to guests)
+        console.log('FRONTEND: Classic/Premium package - using manual wa.me link');
+
+        let message = `بسم الله الرحمن الرحيم
 
 دعوة كريمة
 
@@ -126,36 +200,48 @@ ${event.invitationText}
 - المضيف: ${event.hostName}
 - التاريخ: ${formatEventDate(event.eventDate)}
 - الوقت: من ${event.startTime} إلى ${event.endTime}
-- المكان: ${event.eventLocation}
+- المكان: ${event.displayName || event.eventLocation}
 - عدد الأشخاص المدعوين: ${guest.numberOfAccompanyingGuests}`;
 
-    // Add invitation URL for classic and premium packages
-    if (event.packageType === 'classic' || event.packageType === 'premium') {
-      message += `\n\nرابط الدعوة سيتم إرساله قريباً بعد موافقة الإدارة`;
-    }
+        message += `\n\nنتشرف بحضوركم الكريم وننتظركم معنا في هذه المناسبة المباركة`;
 
-    message += `\n\nنتشرف بحضوركم الكريم وننتظركم معنا في هذه المناسبة المباركة`;
+        const whatsappUrl = `https://wa.me/${guest.phone.replace(/^\+/, '')}?text=${encodeURIComponent(message)}`;
+        
+        console.log('FRONTEND: WhatsApp URL generated', {
+          phone: guest.phone,
+          messageLength: message.length
+        });
 
-    const whatsappUrl = `https://wa.me/${guest.phone.replace(/^\+/, '')}?text=${encodeURIComponent(message)}`;
-    
-    try {
-      // Mark as sent in backend
-      await adminAPI.markGuestWhatsappSent(eventId, guest._id);
-      
-      // Open WhatsApp
-      window.open(whatsappUrl, '_blank');
+        // Mark as sent in backend
+        console.log('FRONTEND: Marking as sent in backend...');
+        await adminAPI.markGuestWhatsappSent(eventId, guest._id);
+        console.log('FRONTEND: Marked as sent successfully');
+        
+        // Open WhatsApp
+        console.log('FRONTEND: Opening WhatsApp...');
+        window.open(whatsappUrl, '_blank');
+        
+        toast({
+          title: "تم فتح واتساب",
+          description: "تم تحديث حالة الرسالة",
+          variant: "default"
+        });
+      }
       
       // Reload to update UI
+      console.log('FRONTEND: Reloading event guests...');
       await loadEventGuests();
+      console.log('=== FRONTEND: handleSendWhatsapp complete ===');
       
-      toast({
-        title: "تم إرسال الرسالة",
-        description: "تم تحديث حالة الرسالة بنجاح",
-        variant: "default"
-      });
     } catch (error: any) {
+      console.error('=== FRONTEND: ERROR in handleSendWhatsapp ===', {
+        error: error.message,
+        stack: error.stack,
+        guestId: guest._id,
+        packageType: event.packageType
+      });
       toast({
-        title: "خطأ في تحديث حالة الرسالة",
+        title: "خطأ في إرسال الدعوة",
         description: error.message || "حدث خطأ غير متوقع",
         variant: "destructive"
       });
@@ -204,6 +290,25 @@ ${event.invitationText}
     setInviteLinkInput('');
   };
 
+  const handleConfirmReopenGuestList = async () => {
+    try {
+      await adminAPI.reopenGuestList(eventId);
+      toast({
+        title: "تم إعادة فتح القائمة",
+        description: "يمكن للمستخدم الآن إضافة وتعديل الضيوف",
+        variant: "default"
+      });
+      setShowReopenConfirmation(false);
+      loadEventGuests();
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "حدث خطأ غير متوقع",
+        variant: "destructive"
+      });
+    }
+  };
+
   const filteredGuests = showVipOnly 
     ? guests.filter(guest => !guest.whatsappMessageSent)
     : guests;
@@ -226,50 +331,24 @@ ${event.invitationText}
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4 space-x-reverse">
-          <button
-            onClick={onBack}
-            className="flex items-center space-x-2 space-x-reverse text-gray-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            <span>العودة</span>
-          </button>
-          <h2 className="text-2xl font-bold text-white">إدارة ضيوف المناسبة</h2>
-        </div>
-        
-        {/* VIP Filter */}
-        {event.packageType === 'vip' && (
-          <div className="flex items-center space-x-2 space-x-reverse">
-            <label className="text-sm text-gray-300">عرض VIP فقط</label>
-            <input
-              type="checkbox"
-              checked={showVipOnly}
-              onChange={(e) => setShowVipOnly(e.target.checked)}
-              className="rounded border-gray-600 bg-gray-700 text-[#C09B52] focus:ring-[#C09B52]"
-            />
-          </div>
-        )}
-      </div>
 
       {/* Event Details */}
       <div className="bg-gray-900/60 border border-gray-700 rounded-xl p-6">
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <h3 className="text-xl font-bold text-white mb-4">{event.hostName}</h3>
+            <h3 className="text-xl font-bold text-white mb-4">{event.eventName || event.hostName}</h3>
             <div className="space-y-2 text-gray-300">
-              <div className="flex items-center space-x-2 space-x-reverse">
+              <div className="flex items-center space-x-2 ">
                 <Calendar className="h-4 w-4 text-[#C09B52]" />
                 <span>{formatEventDate(event.eventDate)}</span>
               </div>
-              <div className="flex items-center space-x-2 space-x-reverse">
+              <div className="flex items-center space-x-2 ">
                 <Clock className="h-4 w-4 text-[#C09B52]" />
                 <span>من {event.startTime} إلى {event.endTime}</span>
               </div>
-              <div className="flex items-center space-x-2 space-x-reverse">
+              <div className="flex items-center space-x-2 ">
                 <MapPin className="h-4 w-4 text-[#C09B52]" />
-                <span>{event.eventLocation}</span>
+                <span>{event.displayName || event.eventLocation}</span>
               </div>
             </div>
           </div>
@@ -279,7 +358,7 @@ ${event.invitationText}
             <div className="space-y-1 text-gray-300">
               <p><span className="text-gray-400">الاسم:</span> {event.user.name}</p>
               <p><span className="text-gray-400">البريد:</span> {event.user.email}</p>
-              <p><span className="text-gray-400">الهاتف:</span> {event.user.phone}</p>
+              <p><span  className="text-gray-400">الهاتف:</span> {event.user.phone}</p>
               <p><span className="text-gray-400">نوع الباقة:</span> 
                 <span className={`ml-2 px-2 py-1 rounded text-xs ${
                   event.packageType === 'vip' ? 'bg-purple-900/20 text-purple-300' :
@@ -291,21 +370,19 @@ ${event.invitationText}
                 </span>
               </p>
               
-              {/* VIP Confirmation Status */}
-              {event.packageType === 'vip' && (
-                <p><span className="text-gray-400">حالة قائمة الضيوف:</span> 
-                  <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                    event.guestListConfirmed?.isConfirmed 
-                      ? 'bg-green-900/20 text-green-300' 
-                      : 'bg-yellow-900/20 text-yellow-300'
-                  }`}>
-                    {event.guestListConfirmed?.isConfirmed 
-                      ? `مؤكدة (${event.guestListConfirmed.confirmedAt ? new Date(event.guestListConfirmed.confirmedAt).toLocaleDateString('ar-SA', { calendar: 'gregory' }) : ''})` 
-                      : 'في انتظار التأكيد'
-                    }
-                  </span>
-                </p>
-              )}
+              {/* Guest List Confirmation Status - All Packages */}
+              <p><span className="text-gray-400">حالة قائمة الضيوف:</span> 
+                <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                  event.guestListConfirmed?.isConfirmed 
+                    ? 'bg-green-900/20 text-green-300' 
+                    : 'bg-yellow-900/20 text-yellow-300'
+                }`}>
+                  {event.guestListConfirmed?.isConfirmed 
+                    ? `مؤكدة (${event.guestListConfirmed.confirmedAt ? new Date(event.guestListConfirmed.confirmedAt).toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'numeric', day: 'numeric' }) : ''})` 
+                    : 'في انتظار التأكيد'
+                  }
+                </span>
+              </p>
             </div>
           </div>
         </div>
@@ -313,44 +390,200 @@ ${event.invitationText}
 
       {/* Guest Stats */}
       {guestStats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-center">
-            <Users className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-white">{guestStats.totalGuests}</div>
-            <div className="text-sm text-gray-400">إجمالي الضيوف</div>
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-center">
+              <Users className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+              <div className="text-2xl font-bold text-white">{guestStats.totalGuests}</div>
+              <div className="text-sm text-gray-400">إجمالي الضيوف</div>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-center">
+              <Users className="h-8 w-8 text-green-400 mx-auto mb-2" />
+              <div className="text-2xl font-bold text-white">{guestStats.totalInvited}</div>
+              <div className="text-sm text-gray-400">إجمالي المدعوين</div>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-center">
+              <CheckCircle className="h-8 w-8 text-[#C09B52] mx-auto mb-2" />
+              <div className="text-2xl font-bold text-white">{guestStats.whatsappMessagesSent}</div>
+              <div className="text-sm text-gray-400">رسائل مرسلة</div>
+            </div>
+            
+            <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-center">
+              <XCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+              <div className="text-2xl font-bold text-white">{guestStats.remainingInvites}</div>
+              <div className="text-sm text-gray-400">دعوات متبقية</div>
+            </div>
           </div>
           
-          <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-center">
-            <Users className="h-8 w-8 text-green-400 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-white">{guestStats.totalInvited}</div>
-            <div className="text-sm text-gray-400">إجمالي المدعوين</div>
-          </div>
-          
-          <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-center">
-            <CheckCircle className="h-8 w-8 text-[#C09B52] mx-auto mb-2" />
-            <div className="text-2xl font-bold text-white">{guestStats.whatsappMessagesSent}</div>
-            <div className="text-sm text-gray-400">رسائل مرسلة</div>
-          </div>
-          
-          <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-center">
-            <XCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-white">{guestStats.remainingInvites}</div>
-            <div className="text-sm text-gray-400">دعوات متبقية</div>
-          </div>
+          {/* VIP Package - Attendance Statistics */}
+          {event.packageType === 'vip' && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+              <div className="bg-green-900/20 border border-green-700 rounded-lg p-4 text-center">
+                <CheckCircle className="h-8 w-8 text-green-400 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-white">
+                  {guests.filter(g => g.actuallyAttended === true).length}
+                </div>
+                <div className="text-sm text-gray-400">حضر فعلياً</div>
+              </div>
+              
+              <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 text-center">
+                <XCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-white">
+                  {guests.filter(g => g.actuallyAttended === false).length}
+                </div>
+                <div className="text-sm text-gray-400">لم يحضر</div>
+              </div>
+              
+              <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 text-center">
+                <UserCheck className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-white">
+                  {guests.filter(g => g.rsvpStatus === 'accepted').length}
+                </div>
+                <div className="text-sm text-gray-400">قبل الدعوة</div>
+              </div>
+              
+              <div className="bg-purple-900/20 border border-purple-700 rounded-lg p-4 text-center">
+                <Users className="h-8 w-8 text-purple-400 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-white">
+                  {guests.filter(g => g.actuallyAttended === true || g.actuallyAttended === false).length > 0 
+                    ? `${Math.round((guests.filter(g => g.actuallyAttended === true).length / guests.filter(g => g.actuallyAttended === true || g.actuallyAttended === false).length) * 100)}%`
+                    : 'N/A'
+                  }
+                </div>
+                <div className="text-sm text-gray-400">نسبة الحضور</div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Premium/VIP Bulk Actions */}
+      {(event.packageType === 'premium' || event.packageType === 'vip') && event.guestListConfirmed?.isConfirmed && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Send Reminders Button */}
+          <button
+            onClick={async () => {
+              if (confirm(`هل تريد إرسال تذكيرات لجميع الضيوف الذين قبلوا الدعوة؟`)) {
+                try {
+                  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/events/${eventId}/send-reminders`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    }
+                  });
+
+                  const result = await response.json();
+
+                  if (response.ok) {
+                    toast({
+                      title: "تم إرسال التذكيرات",
+                      description: result.message,
+                      variant: "default"
+                    });
+                  } else {
+                    throw new Error(result.error?.message);
+                  }
+                } catch (error: any) {
+                  toast({
+                    title: "خطأ",
+                    description: error.message || "فشل في إرسال التذكيرات",
+                    variant: "destructive"
+                  });
+                }
+              }
+            }}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
+          >
+            <Send className="w-4 h-4" />
+            إرسال تذكيرات للضيوف
+          </button>
+
+          {/* Send Thank You Messages Button (VIP only) */}
+          {event.packageType === 'vip' && (
+            <button
+              onClick={async () => {
+                if (confirm(`هل تريد إرسال رسائل شكر لجميع الضيوف الذين حضروا؟`)) {
+                  try {
+                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/events/${eventId}/send-thank-you`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                      }
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                      toast({
+                        title: "تم إرسال رسائل الشكر",
+                        description: result.message,
+                        variant: "default"
+                      });
+                    } else {
+                      throw new Error(result.error?.message);
+                    }
+                  } catch (error: any) {
+                    toast({
+                      title: "خطأ",
+                      description: error.message || "فشل في إرسال رسائل الشكر",
+                      variant: "destructive"
+                    });
+                  }
+                }
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200"
+            >
+              <MessageSquare className="w-4 h-4" />
+              إرسال رسائل شكر
+            </button>
+          )}
         </div>
       )}
 
-      {/* VIP Confirmation Warning */}
-      {event.packageType === 'vip' && !event.guestListConfirmed?.isConfirmed && (
+      {/* Guest List Status Warning/Actions */}
+      {!event.guestListConfirmed?.isConfirmed ? (
         <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-xl p-4 mb-6">
           <div className="flex items-center gap-3">
             <XCircle className="w-5 h-5 text-yellow-400" />
             <div>
               <h4 className="text-yellow-400 font-medium">قائمة الضيوف غير مؤكدة</h4>
               <p className="text-yellow-100 text-sm mt-1">
-                المستخدم لم يؤكد قائمة الضيوف النهائية بعد. لا يمكن إرسال الدعوات حتى يتم التأكيد.
+                المستخدم لم يؤكد قائمة الضيوف النهائية بعد. 
+                {event.packageType === 'vip' && ' لا يمكن إرسال الدعوات حتى يتم التأكيد.'}
+                {event.packageType === 'premium' && ' بعد التأكيد يمكنك إضافة الروابط الفردية.'}
+                {event.packageType === 'classic' && ' بعد التأكيد يمكنك إرسال الدعوات للمستخدم.'}
               </p>
             </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-green-900/20 border border-green-700/30 rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-5 h-5 text-green-400" />
+              <div>
+                <h4 className="text-green-400 font-medium">قائمة الضيوف مؤكدة</h4>
+                <p className="text-green-100 text-sm mt-1">
+                  تم تأكيد القائمة في {new Date(event.guestListConfirmed.confirmedAt!).toLocaleDateString('ar-SA', { calendar: 'gregory' })}
+                  {event.guestListConfirmed.reopenCount && event.guestListConfirmed.reopenCount > 0 && (
+                    <span className="mr-2 text-xs">
+                      (تم إعادة الفتح {event.guestListConfirmed.reopenCount} مرة)
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowReopenConfirmation(true)}
+              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2"
+            >
+              <XCircle className="w-4 h-4" />
+              إعادة فتح القائمة
+            </button>
           </div>
         </div>
       )}
@@ -373,19 +606,19 @@ ${event.invitationText}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 space-y-3">
                   <div>
-                    <div className="flex items-center space-x-3 space-x-reverse">
+                    <div className="flex items-center space-x-3 ">
                       <h4 className="text-white font-medium">{guest.name}</h4>
                       <span className="text-gray-400 text-sm">+{guest.phone}</span>
                       <span className="text-gray-500 text-sm">
                         ({guest.numberOfAccompanyingGuests} مرافق)
                       </span>
                     </div>
-                    <div className="flex items-center space-x-2 space-x-reverse mt-1">
+                    <div className="flex items-center space-x-2  mt-1">
                       <span className="text-xs text-gray-500">
-                        أضيف في: {new Date(guest.addedAt).toLocaleDateString('ar-SA')}
+                        أضيف في: {new Date(guest.addedAt).toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'numeric', day: 'numeric' })}
                       </span>
                       {guest.whatsappMessageSent && (
-                        <span className="flex items-center space-x-1 space-x-reverse text-xs text-green-400">
+                        <span className="flex items-center space-x-1  text-xs text-green-400">
                           <CheckCircle className="h-3 w-3" />
                           <span>تم الإرسال</span>
                         </span>
@@ -399,7 +632,7 @@ ${event.invitationText}
                       {editingLinkForGuest === guest._id ? (
                         <div className="space-y-2">
                           <label className="text-xs text-gray-400 block">رابط الدعوة الفردي</label>
-                          <div className="flex items-center space-x-2 space-x-reverse">
+                          <div className="flex items-center space-x-2 ">
                             <input
                               type="text"
                               value={inviteLinkInput}
@@ -456,28 +689,154 @@ ${event.invitationText}
                   )}
                 </div>
                 
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  {event.packageType === 'vip' && (
-                    <div className="flex items-center space-x-2 space-x-reverse">
-                      <button
-                        onClick={() => handleSendWhatsapp(guest)}
-                        disabled={sendingMessage === guest._id}
-                        className="flex items-center space-x-2 space-x-reverse px-4 py-2 bg-[#C09B52] text-white rounded-lg hover:bg-[#A0884A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {sendingMessage === guest._id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                        <span>إرسال واتساب</span>
-                      </button>
+                <div className="flex items-center space-x-2 ">
+                  {/* Classic Package - Admin view only */}
+                  {event.packageType === 'classic' && (
+                    <div className="flex items-center space-x-2  flex-wrap gap-2">
+                      {guest.whatsappMessageSent ? (
+                        <span className="flex items-center space-x-1  px-2 py-1 bg-green-900/20 text-green-300 rounded text-xs">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>تم الإرسال للمستخدم</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center space-x-1 px-3 py-2 bg-gray-700/50 text-gray-400 rounded-lg text-xs">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>سيتم الإرسال للمستخدم</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Premium Package Actions */}
+                  {event.packageType === 'premium' && (
+                    <div className="flex items-center space-x-2  flex-wrap gap-2">
+                      {/* RSVP Status Display */}
+                      {guest.rsvpStatus && guest.rsvpStatus !== 'pending' && (
+                        <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs ${
+                          guest.rsvpStatus === 'accepted' 
+                            ? 'bg-blue-900/20 text-blue-300' 
+                            : 'bg-red-900/20 text-red-300'
+                        }`}>
+                          {guest.rsvpStatus === 'accepted' ? 'قبل الدعوة' : 'اعتذر'}
+                        </span>
+                      )}
                       
                       {guest.whatsappMessageSent && (
-                        <span className="flex items-center space-x-1 space-x-reverse px-2 py-1 bg-green-900/20 text-green-300 rounded text-xs">
+                        <span className="flex items-center space-x-1  px-2 py-1 bg-green-900/20 text-green-300 rounded text-xs">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>تم الإرسال بواسطة المستخدم</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* VIP Package Actions */}
+                  {event.packageType === 'vip' && (
+                    <div className="flex items-center space-x-2  flex-wrap gap-2">
+                      {/* Only show send button if guest list is confirmed AND individual invite link is added */}
+                      {event.guestListConfirmed?.isConfirmed ? (
+                        guest.individualInviteLink ? (
+                          <button
+                            onClick={() => handleSendWhatsapp(guest)}
+                            disabled={sendingMessage === guest._id}
+                            className="flex items-center space-x-2  px-4 py-2 bg-[#C09B52] text-white rounded-lg hover:bg-[#A0884A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {sendingMessage === guest._id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                            <span>إرسال واتساب</span>
+                          </button>
+                        ) : (
+                          <span className="flex items-center space-x-1 px-3 py-2 bg-yellow-900/20 text-yellow-300 rounded-lg text-xs border border-yellow-700/30">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>في انتظار الرابط الفردي</span>
+                          </span>
+                        )
+                      ) : (
+                        <span className="flex items-center space-x-1 px-3 py-2 bg-orange-900/20 text-orange-300 rounded-lg text-xs border border-orange-700/30">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>في انتظار تأكيد القائمة</span>
+                        </span>
+                      )}
+                      
+                      {guest.whatsappMessageSent && (
+                        <span className="flex items-center space-x-1  px-2 py-1 bg-green-900/20 text-green-300 rounded text-xs">
                           <CheckCircle className="h-3 w-3" />
                           <span>تم الإرسال</span>
                         </span>
                       )}
+                      
+                      {/* RSVP Status Display */}
+                      {guest.rsvpStatus && guest.rsvpStatus !== 'pending' && (
+                        <span className={`flex items-center space-x-1 px-2 py-1 rounded text-xs ${
+                          guest.rsvpStatus === 'accepted' 
+                            ? 'bg-blue-900/20 text-blue-300' 
+                            : 'bg-red-900/20 text-red-300'
+                        }`}>
+                          {guest.rsvpStatus === 'accepted' ? 'قبل الدعوة' : 'اعتذر'}
+                        </span>
+                      )}
+                      
+                      {/* Post-Event Attendance Tracking */}
+                      <div className="flex items-center space-x-2  bg-gray-800/50 px-3 py-1 rounded-lg border border-gray-700">
+                        <span className="text-xs text-gray-400">الحضور الفعلي:</span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await adminAPI.markGuestAttendance(eventId, guest._id, true);
+                              toast({
+                                title: "تم التسجيل",
+                                description: "تم تسجيل حضور الضيف",
+                                variant: "default"
+                              });
+                              loadEventGuests();
+                            } catch (error: any) {
+                              toast({
+                                title: "خطأ",
+                                description: error.message || "فشل في تسجيل الحضور",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          className={`p-1 rounded transition-colors ${
+                            guest.actuallyAttended === true
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                          }`}
+                          title="حضر"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await adminAPI.markGuestAttendance(eventId, guest._id, false);
+                              toast({
+                                title: "تم التسجيل",
+                                description: "تم تسجيل عدم حضور الضيف",
+                                variant: "default"
+                              });
+                              loadEventGuests();
+                            } catch (error: any) {
+                              toast({
+                                title: "خطأ",
+                                description: error.message || "فشل في تسجيل الحضور",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          className={`p-1 rounded transition-colors ${
+                            guest.actuallyAttended === false
+                              ? 'bg-red-600 text-white'
+                              : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                          }`}
+                          title="لم يحضر"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -495,6 +854,18 @@ ${event.invitationText}
           </div>
         )}
       </div>
+
+      {/* Reopen Guest List Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showReopenConfirmation}
+        onConfirm={handleConfirmReopenGuestList}
+        onCancel={() => setShowReopenConfirmation(false)}
+        title="إعادة فتح قائمة الضيوف"
+        message="هل أنت متأكد من إعادة فتح قائمة الضيوف؟ سيتمكن المستخدم من إضافة وتعديل وحذف الضيوف بعد إعادة الفتح."
+        confirmText="نعم، إعادة الفتح"
+        cancelText="إلغاء"
+        variant="warning"
+      />
     </div>
   );
 }

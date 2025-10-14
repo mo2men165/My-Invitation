@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { Bell, Calendar, CheckCircle, Clock, User, Check } from 'lucide-react';
+import { Bell, Calendar, CheckCircle, Clock, User, Check, MapPin, Package } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 
 interface AdminNotification {
@@ -12,9 +12,13 @@ interface AdminNotification {
   message: string;
   eventId?: {
     details: {
+      eventName?: string;
       hostName: string;
       eventDate: string;
+      displayName?: string;
+      eventLocation?: string;
     };
+    packageType?: string;
   };
   userId?: {
     firstName: string;
@@ -104,7 +108,37 @@ export default function AdminNotificationsPage() {
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `منذ ${diffInDays} يوم`;
     
-    return date.toLocaleDateString('ar-SA');
+    // Use Gregorian calendar instead of Hijri
+    return date.toLocaleDateString('ar-SA', {
+      calendar: 'gregory',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatEventDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ar-SA', {
+      calendar: 'gregory',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getPackageLabel = (packageType: string) => {
+    switch (packageType) {
+      case 'classic':
+        return 'كلاسيك';
+      case 'premium':
+        return 'بريميوم';
+      case 'vip':
+        return 'VIP';
+      default:
+        return packageType;
+    }
   };
 
   if (loading) {
@@ -171,8 +205,8 @@ export default function AdminNotificationsPage() {
                 {notifications.map((notification) => (
                   <div
                     key={notification._id}
-                    className={`p-6 hover:bg-gray-800/30 transition-all duration-200 ${
-                      !notification.isRead ? 'bg-[#C09B52]/5 border-r-4 border-r-[#C09B52]' : ''
+                    className={`p-6 hover:bg-gray-800/40 transition-all duration-200 ${
+                      !notification.isRead ? 'bg-gradient-to-r from-[#C09B52]/8 to-transparent border-r-4 border-r-[#C09B52] shadow-sm' : ''
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -186,42 +220,75 @@ export default function AdminNotificationsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between">
                             <div className="flex-1 text-right">
-                              <h3 className={`text-lg font-semibold ${
-                                notification.isRead ? 'text-gray-300' : 'text-white'
+                              <h3 className={`text-lg font-bold mb-1 ${
+                                notification.isRead ? 'text-gray-400' : 'text-white'
                               }`}>
                                 {notification.title}
                               </h3>
-                              <p className={`mt-2 ${
-                                notification.isRead ? 'text-gray-500' : 'text-gray-400'
+                              <p className={`mt-2 text-sm leading-relaxed ${
+                                notification.isRead ? 'text-gray-500' : 'text-gray-300'
                               }`}>
                                 {notification.message}
                               </p>
                               
                               {/* Event Details */}
                               {notification.eventId && (
-                                <div className="mt-4 p-4 bg-gray-800/50 border border-gray-600 rounded-lg text-right">
-                                  <div className="text-sm text-gray-400 mb-2">تفاصيل الحدث:</div>
-                                  <div className="text-white font-medium">
-                                    {notification.eventId.details.hostName}
-                                  </div>
-                                  <div className="text-gray-400 text-sm">
-                                    {new Date(notification.eventId.details.eventDate).toLocaleDateString('ar-SA')}
+                                <div className="mt-4 p-4 bg-gradient-to-br from-gray-800/70 to-gray-800/40 border border-gray-600/70 rounded-lg text-right shadow-lg">
+                                  <div className="text-sm text-[#C09B52] mb-3 font-bold uppercase tracking-wide">تفاصيل المناسبة</div>
+                                  
+                                  {notification.eventId.details.eventName && (
+                                    <div className="text-white font-bold text-lg mb-3 leading-snug">
+                                      {notification.eventId.details.eventName}
+                                    </div>
+                                  )}
+                                  
+                                  <div className="space-y-2.5">
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <User className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                                      <span className="text-gray-400">المضيف:</span>
+                                      <span className="text-white font-semibold">{notification.eventId.details.hostName}</span>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Calendar className="w-4 h-4 text-green-400 flex-shrink-0" />
+                                      <span className="text-gray-300 font-medium">{formatEventDate(notification.eventId.details.eventDate)}</span>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <MapPin className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                                      <span className="text-gray-300">{notification.eventId.details.displayName || notification.eventId.details.eventLocation || 'غير محدد'}</span>
+                                    </div>
+                                    
+                                    {notification.eventId.packageType && (
+                                      <div className="flex items-center gap-2 pt-1">
+                                        <Package className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                                        <div className="inline-block px-3 py-1.5 bg-gradient-to-r from-[#C09B52]/30 to-[#C09B52]/20 border border-[#C09B52]/50 rounded-full text-[#C09B52] text-xs font-bold shadow-sm">
+                                          {getPackageLabel(notification.eventId.packageType)}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               )}
                               
                               {/* User Details */}
                               {notification.userId && (
-                                <div className="mt-3 flex items-center text-sm text-gray-500 justify-end">
-                                  <User className="w-4 h-4 ml-1" />
-                                  {notification.userId.firstName} {notification.userId.lastName}
+                                <div className="mt-3 flex items-center text-sm justify-end">
+                                  <User className="w-4 h-4 ml-1 text-blue-400" />
+                                  <span className="text-gray-400 font-medium">
+                                    {notification.userId.firstName} {notification.userId.lastName}
+                                  </span>
                                 </div>
                               )}
                               
                               {/* Time */}
-                              <div className="mt-3 flex items-center text-sm text-gray-500 justify-end">
-                                <Clock className="w-4 h-4 ml-1" />
-                                {formatTimeAgo(notification.createdAt)}
+                              <div className="mt-2 flex items-center text-sm justify-end">
+                                <Clock className="w-4 h-4 ml-1 text-amber-400" />
+                                <span className={`font-medium ${
+                                  notification.isRead ? 'text-gray-500' : 'text-gray-400'
+                                }`}>
+                                  {formatTimeAgo(notification.createdAt)}
+                                </span>
                               </div>
                             </div>
                             
@@ -243,7 +310,10 @@ export default function AdminNotificationsPage() {
                       
                       {/* Unread Indicator */}
                       {!notification.isRead && (
-                        <div className="w-3 h-3 bg-[#C09B52] rounded-full flex-shrink-0"></div>
+                        <div className="relative flex-shrink-0">
+                          <div className="w-3 h-3 bg-[#C09B52] rounded-full"></div>
+                          <div className="absolute inset-0 w-3 h-3 bg-[#C09B52] rounded-full animate-ping opacity-50"></div>
+                        </div>
                       )}
                     </div>
                   </div>

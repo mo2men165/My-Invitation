@@ -375,5 +375,36 @@ export const adminAPI = {
     if (!response.ok) {
       throw new Error(result.error?.message || 'فشل في تحديث رابط الدعوة');
     }
+  },
+
+  // Reopen Guest List (all package types)
+  async reopenGuestList(eventId: string): Promise<{ reopenedAt: string; reopenCount: number }> {
+    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/reopen-guest-list`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في إعادة فتح قائمة الضيوف');
+    }
+    
+    return result.data;
+  },
+
+  // Mark Guest Attendance (VIP packages only)
+  async markGuestAttendance(eventId: string, guestId: string, attended: boolean): Promise<void> {
+    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/guests/${guestId}/attendance`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ attended })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في تسجيل حضور الضيف');
+    }
   }
 };

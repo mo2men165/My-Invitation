@@ -15,35 +15,46 @@ router.get('/webhook', (req: Request, res: Response) => {
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    logger.info('WhatsApp webhook verification attempt:', {
+    logger.info('=== WEBHOOK VERIFICATION: Attempt received ===', {
       mode,
-      token,
-      challenge: challenge ? 'PRESENT' : 'MISSING'
+      tokenReceived: token ? 'YES' : 'NO',
+      tokenMatches: token === process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+      challenge: challenge ? 'PRESENT' : 'MISSING',
+      expectedToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN ? 'SET' : 'NOT_SET',
+      allQueryParams: req.query
     });
 
     // Check if a token and mode is in the query string of the request
     if (mode && token) {
       // Check the mode and token sent is correct
       if (mode === 'subscribe' && token === process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
-        logger.info('WhatsApp webhook verified successfully');
+        logger.info('=== WEBHOOK VERIFICATION: SUCCESS ===', {
+          challenge: challenge?.toString()
+        });
         res.status(200).send(challenge);
       } else {
-        logger.error('WhatsApp webhook verification failed:', {
-          mode,
-          token,
-          expectedToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN ? 'SET' : 'NOT_SET'
+        logger.error('=== WEBHOOK VERIFICATION: FAILED - Token/Mode mismatch ===', {
+          receivedMode: mode,
+          expectedMode: 'subscribe',
+          receivedToken: token,
+          expectedTokenSet: !!process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+          tokenMatch: token === process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN
         });
         res.status(403).json({ error: 'Forbidden' });
       }
     } else {
-      logger.error('WhatsApp webhook verification missing parameters:', {
-        mode,
-        token
+      logger.error('=== WEBHOOK VERIFICATION: FAILED - Missing parameters ===', {
+        hasMode: !!mode,
+        hasToken: !!token,
+        hasChallenge: !!challenge
       });
       res.status(400).json({ error: 'Bad Request' });
     }
   } catch (error: any) {
-    logger.error('WhatsApp webhook verification error:', error);
+    logger.error('=== WEBHOOK VERIFICATION: ERROR ===', {
+      error: error.message,
+      stack: error.stack
+    });
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -56,18 +67,27 @@ router.post('/webhook', async (req: Request, res: Response) => {
   try {
     const webhookData = req.body;
     
-    logger.info('WhatsApp webhook received:', {
+    logger.info('=== WEBHOOK: WhatsApp webhook received ===', {
+      timestamp: new Date().toISOString(),
       type: webhookData.entry?.[0]?.changes?.[0]?.field,
-      entryCount: webhookData.entry?.length || 0
+      entryCount: webhookData.entry?.length || 0,
+      fullWebhookData: JSON.stringify(webhookData, null, 2)
     });
 
     // Process the webhook data
+    logger.info('WEBHOOK: Processing webhook data...');
     await WhatsappService.processWebhook(webhookData);
+    
+    logger.info('WEBHOOK: Webhook processed successfully');
 
     // Always respond with 200 to acknowledge receipt
     res.status(200).json({ status: 'ok' });
   } catch (error: any) {
-    logger.error('WhatsApp webhook processing error:', error);
+    logger.error('=== WEBHOOK: ERROR processing webhook ===', {
+      error: error.message,
+      stack: error.stack,
+      webhookData: JSON.stringify(req.body, null, 2)
+    });
     // Still return 200 to avoid retries
     res.status(200).json({ status: 'error', message: error.message });
   }
@@ -81,29 +101,53 @@ router.post('/send-invitation', async (req: Request, res: Response) => {
   try {
     const { eventId, guestId } = req.body;
 
+    logger.info('=== ROUTE: POST /api/whatsapp/send-invitation ===', {
+      eventId,
+      guestId,
+      userId: req.user?.id,
+      timestamp: new Date().toISOString()
+    });
+
     if (!eventId || !guestId) {
+      logger.error('ROUTE: Missing required parameters', { eventId, guestId });
       return res.status(400).json({
         success: false,
         error: { message: 'Event ID and Guest ID are required' }
       });
     }
 
+    logger.info('ROUTE: Calling WhatsappService.sendInvitation...');
     const result = await WhatsappService.sendInvitation(eventId, guestId);
 
     if (result.success) {
+      logger.info('ROUTE: Invitation sent successfully', {
+        eventId,
+        guestId,
+        messageId: result.data?.messageId
+      });
       return res.json({
         success: true,
         message: 'Invitation sent successfully',
         data: result.data
       });
     } else {
+      logger.error('ROUTE: Invitation failed', {
+        eventId,
+        guestId,
+        error: result.error
+      });
       return res.status(400).json({
         success: false,
         error: { message: result.error }
       });
     }
   } catch (error: any) {
-    logger.error('Error sending invitation:', error);
+    logger.error('=== ROUTE: ERROR in send-invitation ===', {
+      error: error.message,
+      stack: error.stack,
+      eventId: req.body?.eventId,
+      guestId: req.body?.guestId
+    });
     return res.status(500).json({
       success: false,
       error: { message: 'Failed to send invitation' }
@@ -138,6 +182,153 @@ router.post('/send-bulk-invitations', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { message: 'Failed to send bulk invitations' }
+    });
+  }
+});
+
+/**
+ * POST /api/whatsapp/send-event-reminders
+ * Send reminders to all confirmed guests (Premium: 3 days, VIP: 5 days before event)
+ */
+router.post('/send-event-reminders', async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.body;
+
+    if (!eventId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Event ID is required' }
+      });
+    }
+
+    const result = await WhatsappService.sendEventReminders(eventId);
+
+    return res.json({
+      success: result.success,
+      message: `Reminders sent: ${result.sent}, Failed: ${result.failed}`,
+      data: {
+        sent: result.sent,
+        failed: result.failed,
+        results: result.results
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error sending event reminders:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'Failed to send reminders' }
+    });
+  }
+});
+
+/**
+ * POST /api/whatsapp/send-thank-you-messages
+ * Send thank you messages to all attended guests (VIP only - 4 hours after event)
+ */
+router.post('/send-thank-you-messages', async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.body;
+
+    if (!eventId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Event ID is required' }
+      });
+    }
+
+    const result = await WhatsappService.sendThankYouMessages(eventId);
+
+    return res.json({
+      success: result.success,
+      message: `Thank you messages sent: ${result.sent}, Failed: ${result.failed}`,
+      data: {
+        sent: result.sent,
+        failed: result.failed,
+        results: result.results
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error sending thank you messages:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'Failed to send thank you messages' }
+    });
+  }
+});
+
+/**
+ * GET /api/whatsapp/test-config
+ * Test WhatsApp configuration (admin only for security)
+ */
+router.get('/test-config', async (req: Request, res: Response) => {
+  try {
+    logger.info('=== WHATSAPP CONFIG TEST: Starting configuration test ===');
+
+    const config = {
+      hasAccessToken: !!process.env.WHATSAPP_ACCESS_TOKEN,
+      hasPhoneNumberId: !!process.env.WHATSAPP_PHONE_NUMBER_ID,
+      hasBusinessAccountId: !!process.env.WHATSAPP_BUSINESS_ACCOUNT_ID,
+      hasWebhookToken: !!process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+      accessTokenLength: process.env.WHATSAPP_ACCESS_TOKEN?.length || 0,
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || 'NOT_SET',
+      businessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || 'NOT_SET',
+      webhookToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'NOT_SET',
+      apiUrl: `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`
+    };
+
+    logger.info('WHATSAPP CONFIG TEST: Configuration check complete', config);
+
+    // Test API connectivity (without sending message)
+    const testApiConnectivity = async () => {
+      try {
+        const axios = (await import('axios')).default;
+        const response = await axios.get(
+          `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`
+            }
+          }
+        );
+        return { 
+          success: true, 
+          phoneData: response.data 
+        };
+      } catch (error: any) {
+        return { 
+          success: false, 
+          error: error.response?.data || error.message 
+        };
+      }
+    };
+
+    const apiTest = await testApiConnectivity();
+
+    logger.info('WHATSAPP CONFIG TEST: API connectivity test', apiTest);
+
+    return res.json({
+      success: true,
+      message: 'Configuration test complete',
+      config: {
+        hasAccessToken: config.hasAccessToken,
+        hasPhoneNumberId: config.hasPhoneNumberId,
+        hasBusinessAccountId: config.hasBusinessAccountId,
+        hasWebhookToken: config.hasWebhookToken,
+        accessTokenLength: config.accessTokenLength,
+        phoneNumberId: config.phoneNumberId,
+        apiUrl: config.apiUrl
+      },
+      apiConnectivity: apiTest
+    });
+
+  } catch (error: any) {
+    logger.error('=== WHATSAPP CONFIG TEST: ERROR ===', {
+      error: error.message,
+      stack: error.stack
+    });
+    return res.status(500).json({
+      success: false,
+      error: { message: 'Configuration test failed' }
     });
   }
 });
