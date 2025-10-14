@@ -515,14 +515,12 @@ export class WhatsappService {
             {
               type: 'button',
               sub_type: 'quick_reply',
-              index: 0,
-              parameters: []
+              index: '0'
             },
             {
               type: 'button',
               sub_type: 'quick_reply',
-              index: 1,
-              parameters: []
+              index: '1'
             }
           ]
         }
