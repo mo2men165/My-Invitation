@@ -96,27 +96,33 @@ export class WhatsappService {
       const guestPhone = message.from;
       let messageText = '';
 
-      // Extract text from message
-      if (message.text) {
-        messageText = message.text.body;
-        logger.info('WHATSAPP WEBHOOK: Text message extracted', {
-          messageText
-        });
-      } else if (message.interactive) {
-        // Handle button responses
-        if (message.interactive.type === 'button_reply') {
-          messageText = message.interactive.button_reply.title;
-          logger.info('WHATSAPP WEBHOOK: Interactive button response', {
-            buttonId: message.interactive.button_reply.id,
-            buttonTitle: messageText
-          });
-        }
-      } else {
-        logger.warn('WHATSAPP WEBHOOK: Unknown message type', {
-          type: message.type,
-          message: JSON.stringify(message)
+    // Extract text from message
+    if (message.text) {
+      messageText = message.text.body;
+      logger.info('WHATSAPP WEBHOOK: Text message extracted', {
+        messageText
+      });
+    } else if (message.button) {
+      messageText = message.button.text;
+      logger.info('WHATSAPP WEBHOOK: Button response', {
+        payload: message.button.payload,
+        buttonText: messageText
+      });
+    } else if (message.interactive) {
+      // Handle button responses
+      if (message.interactive.type === 'button_reply') {
+        messageText = message.interactive.button_reply.title;
+        logger.info('WHATSAPP WEBHOOK: Interactive button response', {
+          buttonId: message.interactive.button_reply.id,
+          buttonTitle: messageText
         });
       }
+    } else {
+      logger.warn('WHATSAPP WEBHOOK: Unknown message type', {
+        type: message.type,
+        message: JSON.stringify(message)
+      });
+    }
 
       // Convert WhatsApp phone format to our stored format
       const normalizedGuestPhone = this.normalizeWhatsAppPhone(guestPhone);
@@ -189,35 +195,27 @@ export class WhatsappService {
         currentRsvpStatus: guest.rsvpStatus
       });
 
-      // Normalize response
-      const normalizedResponse = response.toLowerCase().trim();
-      
-      logger.info('WHATSAPP RSVP: Response normalized', {
-        original: response,
-        normalized: normalizedResponse
+    // Normalize response
+    const normalizedResponse = response.toLowerCase().trim();
+    
+    logger.info('WHATSAPP RSVP: Response normalized', {
+      original: response,
+      normalized: normalizedResponse
+    });
+
+    let rsvpStatus = null;
+    if (normalizedResponse === 'تأكيد الحضور') {
+      rsvpStatus = 'accepted';
+      logger.info('WHATSAPP RSVP: Acceptance confirmed');
+    } else if (normalizedResponse === 'اعتذار عن الحضور' || normalizedResponse === 'إعتذار عن الحضور') {
+      rsvpStatus = 'declined';
+      logger.info('WHATSAPP RSVP: Decline confirmed');
+    } else {
+      logger.warn('WHATSAPP RSVP: Unrecognized response', {
+        response,
+        normalizedResponse
       });
-
-      // Check for positive responses
-      const positiveResponses = ['نعم', 'yes', 'أوافق', 'موافق', 'سأحضر', 'حاضر', 'تأكيد الحضور'];
-      const negativeResponses = ['لا', 'no', 'معذرة', 'اعتذار', 'لن أحضر', 'إعتذار عن الحضور'];
-
-      let rsvpStatus = null;
-      if (positiveResponses.some(pos => normalizedResponse.includes(pos))) {
-        rsvpStatus = 'accepted';
-        logger.info('WHATSAPP RSVP: Positive response detected', { 
-          matchedKeywords: positiveResponses.filter(pos => normalizedResponse.includes(pos))
-        });
-      } else if (negativeResponses.some(neg => normalizedResponse.includes(neg))) {
-        rsvpStatus = 'declined';
-        logger.info('WHATSAPP RSVP: Negative response detected', { 
-          matchedKeywords: negativeResponses.filter(neg => normalizedResponse.includes(neg))
-        });
-      } else {
-        logger.warn('WHATSAPP RSVP: No recognized RSVP pattern in response', {
-          response,
-          normalizedResponse
-        });
-      }
+    }
 
       if (rsvpStatus) {
         logger.info('WHATSAPP RSVP: Updating database...', {
@@ -321,37 +319,40 @@ export class WhatsappService {
               parameters: [
                 {
                   type: 'text',
-                  text: guest.name
+                  text: guest.name,
+                  parameter_name: 'guest_name'
                 },
                 {
                   type: 'text',
-                  text: event.details.eventName || 'المناسبة'
+                  text: event.details.eventName || 'المناسبة',
+                  parameter_name: 'event_name'
                 },
                 {
                   type: 'text',
-                  text: formattedDate
+                  text: formattedDate,
+                  parameter_name: 'event_date'
                 }
               ]
             },
             {
               type: 'button',
               sub_type: 'url',
-              index: 0,
+              index: '0',
               parameters: [
                 {
                   type: 'text',
-                  text: inviteCardLink
+                  text: inviteCardLink.replace('https://drive.google.com/', '')
                 }
               ]
             },
             {
               type: 'button',
               sub_type: 'url',
-              index: 1,
+              index: '1',
               parameters: [
                 {
                   type: 'text',
-                  text: mapsLink
+                  text: mapsLink.replace('https://maps.google.com/', '')
                 }
               ]
             }
@@ -852,45 +853,50 @@ export class WhatsappService {
               parameters: [
                 {
                   type: 'text',
-                  text: guest.name
+                  text: guest.name,
+                  parameter_name: 'guest_name'
                 },
                 {
                   type: 'text',
-                  text: event.details.eventName || 'المناسبة'
+                  text: event.details.eventName || 'المناسبة',
+                  parameter_name: 'event_name'
                 },
                 {
                   type: 'text',
-                  text: formattedDate
+                  text: formattedDate,
+                  parameter_name: 'event_date'
                 },
                 {
                   type: 'text',
-                  text: `${event.details.startTime} - ${event.details.endTime}`
+                  text: `${event.details.startTime} - ${event.details.endTime}`,
+                  parameter_name: 'event_time'
                 },
                 {
                   type: 'text',
-                  text: event.details.displayName || event.details.eventLocation
+                  text: event.details.displayName || event.details.eventLocation,
+                  parameter_name: 'event_location'
                 }
               ]
             },
             {
               type: 'button',
               sub_type: 'url',
-              index: 0,
+              index: '0',
               parameters: [
                 {
                   type: 'text',
-                  text: inviteCardLink
+                  text: inviteCardLink.replace('https://drive.google.com/', '')
                 }
               ]
             },
             {
               type: 'button',
               sub_type: 'url',
-              index: 1,
+              index: '1',
               parameters: [
                 {
                   type: 'text',
-                  text: mapsLink
+                  text: mapsLink.replace('https://maps.google.com/', '')
                 }
               ]
             }
@@ -965,15 +971,18 @@ export class WhatsappService {
               parameters: [
                 {
                   type: 'text',
-                  text: guest.name
+                  text: guest.name,
+                  parameter_name: 'guest_name'
                 },
                 {
                   type: 'text',
-                  text: event.details.eventName || 'المناسبة'
+                  text: event.details.eventName || 'المناسبة',
+                  parameter_name: 'event_name'
                 },
                 {
                   type: 'text',
-                  text: event.details.hostName
+                  text: event.details.hostName,
+                  parameter_name: 'host_name'
                 }
               ]
             }
