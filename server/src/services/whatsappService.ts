@@ -516,23 +516,11 @@ export class WhatsappService {
               type: 'button',
               sub_type: 'quick_reply',
               index: 0,
-              parameters: [
-                {
-                  type: 'text',
-                  text: 'تأكيد الحضور'
-                }
-              ]
             },
             {
               type: 'button',
               sub_type: 'quick_reply',
-              index: 1,
-              parameters: [
-                {
-                  type: 'text',
-                  text: 'اعتذار عن الحضور'
-                }
-              ]
+              index: 1, 
             }
           ]
         }
