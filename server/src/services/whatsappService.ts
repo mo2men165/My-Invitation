@@ -513,16 +513,17 @@ export class WhatsappService {
               ]
             },
             {
-              type: 'button',
-              sub_type: 'quick_reply',
-              index: 0,
-              parameters: []
-            },
-            {
-              type: 'button',
-              sub_type: 'quick_reply',
-              index: 1,
-              parameters: []
+              type: 'buttons',
+              buttons: [
+                {
+                  type: 'quick_reply',
+                  text: 'تأكيد الحضور'
+                },
+                {
+                  type: 'quick_reply', 
+                  text: 'اعتذار عن الحضور'
+                }
+              ]
             }
           ]
         }
@@ -535,7 +536,12 @@ export class WhatsappService {
         parameters: messageData.template.components[0].parameters.map((p, i) => ({
           index: i,
           value: p.text?.substring(0, 50) + (p.text && p.text.length > 50 ? '...' : '')
-        }))
+        })),
+        buttonCount: messageData.template.components[1]?.buttons?.length || 0,
+        buttons: messageData.template.components[1]?.buttons?.map(b => ({
+          type: b.type,
+          text: b.text
+        })) || []
       });
 
       logger.info('WHATSAPP: Sending message to WhatsApp API...', {
