@@ -10,6 +10,18 @@ export class WhatsappService {
   private static readonly ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 
   /**
+   * Sanitize template parameters to avoid WhatsApp API issues
+   */
+  private static sanitizeTemplateParam(text: string): string {
+    if (!text) return '';
+    return text
+      .replace(/\n/g, ' ')        // Replace newlines with space
+      .replace(/\t/g, ' ')        // Replace tabs with space
+      .replace(/\s{4,}/g, '   ')  // Replace 4+ spaces with 3 spaces
+      .trim();
+  }
+
+  /**
    * Process incoming webhook data from Meta
    */
   static async processWebhook(webhookData: any): Promise<void> {
@@ -547,7 +559,7 @@ export class WhatsappService {
                 },
                 {
                   type: 'text',
-                  text: event.details.invitationText || '',
+                  text: this.sanitizeTemplateParam(event.details.invitationText || ''),
                   parameter_name: 'invitation_text'
                 }
               ]
