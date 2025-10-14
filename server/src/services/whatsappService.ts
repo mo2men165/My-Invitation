@@ -511,6 +511,18 @@ export class WhatsappService {
                   text: event.details.invitationText || ''
                 }
               ]
+            },
+            {
+              type: 'button',
+              sub_type: 'quick_reply',
+              index: 0,
+              parameters: []
+            },
+            {
+              type: 'button',
+              sub_type: 'quick_reply',
+              index: 1,
+              parameters: []
             }
           ]
         }
