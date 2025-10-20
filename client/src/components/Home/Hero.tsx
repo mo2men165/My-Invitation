@@ -189,7 +189,7 @@ export function HeroSection() {
                 }}
               >
                 <Link href="/packages" className="flex items-center">
-                  ابدأ الآن مجاناً
+                  الباقات
                   <ArrowDown className="mr-2 w-5 h-5 group-hover:animate-bounce" />
                 </Link>
               </Button>
