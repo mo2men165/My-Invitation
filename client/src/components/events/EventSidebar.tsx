@@ -48,8 +48,8 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="bg-gradient-to-br from-[#C09B52]/10 via-[#C09B52]/5 to-transparent rounded-2xl border border-[#C09B52]/20 p-6">
-        <h3 className="text-lg font-bold text-white mb-4">إحصائيات المناسبة</h3>
+      <div className="bg-gradient-to-br from-[#C09B52]/10 via-[#C09B52]/5 to-transparent rounded-2xl border border-[#C09B52]/20 p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-bold text-white mb-4">إحصائيات المناسبة</h3>
         
         <div className="space-y-4">
           <div className="flex justify-between items-center">
@@ -91,8 +91,8 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
       </div>
 
       {/* Approval Status Info */}
-      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
-        <h3 className="text-lg font-bold text-white mb-4">حالة الموافقة</h3>
+      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-bold text-white mb-4">حالة الموافقة</h3>
         
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -123,8 +123,8 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
       </div>
 
       {/* Event Timeline */}
-      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
-        <h3 className="text-lg font-bold text-white mb-4">الجدول الزمني</h3>
+      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-bold text-white mb-4">الجدول الزمني</h3>
         
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-sm">
@@ -155,8 +155,8 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
       </div>
 
       {/* Guest Management Info */}
-      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
-        <h3 className="text-lg font-bold text-white mb-4">إدارة الضيوف</h3>
+      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-bold text-white mb-4">إدارة الضيوف</h3>
         
         <div className="space-y-3 text-sm">
           <div className="space-y-2">
@@ -181,8 +181,8 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
 
       {/* Additional Services */}
       {(event.details.additionalCards > 0 || event.details.gateSupervisors || event.details.fastDelivery) && (
-        <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
-          <h3 className="text-lg font-bold text-white mb-4">الخدمات الإضافية</h3>
+        <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-bold text-white mb-4">الخدمات الإضافية</h3>
           
           <div className="space-y-3 text-sm">
             {event.details.additionalCards > 0 && (

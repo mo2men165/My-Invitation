@@ -118,8 +118,8 @@ export const CollaborationManagement: React.FC<CollaborationManagementProps> = (
   return (
     <div className="space-y-6">
       {/* Header & Stats */}
-      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className={`w-12 h-12 rounded-xl p-0.5 ${
               packageType === 'vip' 
@@ -135,9 +135,9 @@ export const CollaborationManagement: React.FC<CollaborationManagementProps> = (
               </div>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">إدارة المتعاونين</h2>
-              <p className="text-gray-400 text-sm">
-                حزمة {packageType === 'vip' ? 'VIP' : 'بريميوم'} • 
+              <h2 className="text-lg sm:text-xl font-bold text-white">إدارة المتعاونين</h2>
+              <p className="text-gray-400 text-xs sm:text-sm">
+                حزمة {packageType === 'vip' ? 'VIP' : 'بريميوم'} •
                 حتى {currentLimit.maxCollaborators} متعاونين
               </p>
             </div>
@@ -146,7 +146,7 @@ export const CollaborationManagement: React.FC<CollaborationManagementProps> = (
           {canAddMore && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#C09B52] to-[#B8935A] hover:from-[#B8935A] hover:to-[#A67C52] text-white font-medium rounded-lg transition-all"
+              className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gradient-to-r from-[#C09B52] to-[#B8935A] hover:from-[#B8935A] hover:to-[#A67C52] text-white font-medium rounded-lg transition-all w-full sm:w-auto"
             >
               <UserPlus className="w-5 h-5" />
               إضافة متعاون
@@ -155,7 +155,7 @@ export const CollaborationManagement: React.FC<CollaborationManagementProps> = (
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-black/20 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>

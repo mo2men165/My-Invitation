@@ -1,10 +1,14 @@
-import React, { memo, useCallback, useMemo, useEffect } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { Calendar, Clock, User, MessageSquare, Plus, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { CartFormData, FormErrors } from '../types';
 import { formatCurrency } from '@/utils/calculations';
 import { TIME_OPTIONS, CART_MODAL_CONSTANTS } from '@/constants/cartModalConstants';
 import { useDebouncedInput } from '../hooks/useDebouncedInput';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { enGB } from 'date-fns/locale';
+
 
 interface EventDetailsFormProps {
   formData: CartFormData;
@@ -26,26 +30,12 @@ const EventDetailsForm = memo<EventDetailsFormProps>(({
   // Use pre-generated time options from constants
   const timeOptions = TIME_OPTIONS;
 
-  // Force Gregorian calendar for date inputs on component mount
-  // This ensures all users see the same calendar type regardless of their browser/system locale
-  // Addresses issue where some users (especially in Islamic countries) see Hijri calendar by default
-  useEffect(() => {
-    const dateInputs = document.querySelectorAll('input[type="date"]');
-    dateInputs.forEach((input) => {
-      // Set attributes to force Gregorian calendar
-      input.setAttribute('lang', 'en-US');
-      input.setAttribute('data-calendar', 'gregorian');
-      
-      // For browsers that support it, try to force locale
-      if ('setAttribute' in input) {
-        try {
-          (input as HTMLInputElement).style.setProperty('-webkit-locale', '"en-US"');
-        } catch (e) {
-          // Ignore errors for browsers that don't support this property
-        }
-      }
-    });
+  const minDate = useMemo(() => {
+    const today = new Date();
+    return new Date(today.getTime() + (CART_MODAL_CONSTANTS.MIN_BOOKING_DAYS * 24 * 60 * 60 * 1000));
   }, []);
+  
+
 
   // Debounced input handlers for better performance
   const { value: hostName, setValue: setHostName } = useDebouncedInput(
@@ -78,10 +68,6 @@ const EventDetailsForm = memo<EventDetailsFormProps>(({
     onInputChange('inviteCount', parseInt(e.target.value));
   }, [onInputChange]);
 
-  const handleEventDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    onInputChange('eventDate', e.target.value);
-  }, [onInputChange]);
-
   const handleStartTimeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStartTime = e.target.value;
     onInputChange('startTime', newStartTime);
@@ -99,11 +85,11 @@ const EventDetailsForm = memo<EventDetailsFormProps>(({
     }
   }, [onInputChange, calculateEndTime, formData.startTime]);
 
-  const getMinDate = useCallback(() => {
-    const today = new Date();
-    const minDate = new Date(today.getTime() + (CART_MODAL_CONSTANTS.MIN_BOOKING_DAYS * 24 * 60 * 60 * 1000));
-    return minDate.toISOString().split('T')[0];
-  }, []);
+  // const getMinDate = useCallback(() => {
+  //   const today = new Date();
+  //   const minDate = new Date(today.getTime() + (CART_MODAL_CONSTANTS.MIN_BOOKING_DAYS * 24 * 60 * 60 * 1000));
+  //   return minDate.toISOString().split('T')[0];
+  // }, []);
 
   const allowsExtraHours = currentPackage?.name !== 'كلاسيكية';
   const extraHourCost = CART_MODAL_CONSTANTS.EXTRA_HOUR_COST;
@@ -216,6 +202,39 @@ const EventDetailsForm = memo<EventDetailsFormProps>(({
             <Calendar className="w-4 h-4 text-[#C09B52]" />
             التاريخ <span className="text-red-400 text-lg">*</span>
           </label>
+          <div style={{ direction: 'ltr' }}>
+            <div className="relative">
+            <DatePicker
+              selected={formData.eventDate ? new Date(formData.eventDate) : null}
+              onChange={(date: Date | null) => {
+                onInputChange('eventDate', date ? date.toISOString().split('T')[0] : '');
+              }}
+              minDate={minDate}
+              disabled={isUpdating}
+              dateFormat="dd-MM-yyyy"
+              locale={enGB}
+              className={`w-full px-4 py-4 bg-gradient-to-r from-white/5 to-white/10 border-2 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#C09B52]/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
+                errors.eventDate ? 'border-red-400 focus:border-red-400' : 'border-white/20 focus:border-[#C09B52]'
+              }`}
+              placeholderText="اختر التاريخ"
+            />
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <Calendar className="w-5 h-5 text-[#C09B52]" />
+              </div>
+            </div>
+          </div>
+          <div className="text-gray-400 text-xs mt-2">
+            يجب حجز المناسبة قبل {CART_MODAL_CONSTANTS.MIN_BOOKING_DAYS} أيام على الأقل
+          </div>
+        </div>
+
+        {/* <div className={`bg-white/[0.02] rounded-2xl border border-white/10 p-5 transition-all duration-300 ${
+          isUpdating ? 'opacity-75' : ''
+        }`}>
+          <label className="text-white font-medium mb-3 flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-[#C09B52]" />
+            التاريخ <span className="text-red-400 text-lg">*</span>
+          </label>
           <div className="relative">
             <Input
               type="date"
@@ -244,7 +263,7 @@ const EventDetailsForm = memo<EventDetailsFormProps>(({
           <div className="text-gray-400 text-xs mt-2">
             يجب حجز المناسبة قبل {CART_MODAL_CONSTANTS.MIN_BOOKING_DAYS} أيام على الأقل
           </div>
-        </div>
+        </div> */}
 
         {/* Start Time */}
         <div className={`bg-white/[0.02] rounded-2xl border border-white/10 p-5 transition-all duration-300 ${

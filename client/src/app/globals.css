@@ -99,8 +99,45 @@ input[type="date"] {
   -webkit-locale: "en-US";
 }
 
-input[type="date"][data-calendar="gregorian"] {
-  /* Additional browser-specific rules to force Gregorian calendar */
-  -webkit-locale: "en-US";
-  locale: "en-US";
+/* React DatePicker Light Theme */
+.react-datepicker {
+  background-color: white !important;
+  border: 1px solid #e5e7eb !important;
+  font-family: inherit !important;
+}
+
+.react-datepicker__header {
+  background-color: #f9fafb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  color: #111827 !important;
+}
+
+.react-datepicker__day {
+  color: #374151 !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: #f3f4f6 !important;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #C09B52 !important;
+  color: white !important;
+}
+
+.react-datepicker__day--disabled {
+  color: #d1d5db !important;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #374151 !important;
+}
+
+.react-datepicker__triangle {
+  display: none !important;
 }

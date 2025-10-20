@@ -36,11 +36,11 @@ export default function PackagesPage() {
 
   // Business logic hook
   const {
-    selectedCategories,
+    selectedCategory,
     filteredDesigns,
     isLoading,
     designMode,
-    toggleCategory,
+    selectCategory,
     setDesignMode
   } = usePackagesLogic();
 
@@ -76,11 +76,11 @@ export default function PackagesPage() {
             {/* Category Filter */}
             <div className="mb-8">
               <h3 className="text-xl font-semibold text-white mb-4 text-center">
-                اختر <span className="text-[#C09B52]">الفئات</span> المطلوبة
+                اختر <span className="text-[#C09B52]">نوع الحدث</span> المطلوب
               </h3>
               <CategoryFilter
-                selectedCategories={selectedCategories}
-                onToggleCategory={toggleCategory}
+                selectedCategory={selectedCategory}
+                onSelectCategory={selectCategory}
                 categories={[
                   { value: 'عيد ميلاد', label: 'عيد ميلاد' },
                   { value: 'حفل تخرج', label: 'حفل تخرج' },
@@ -88,8 +88,8 @@ export default function PackagesPage() {
                 ]}
               />
               <p className="text-gray-400 text-center mt-2 text-sm">
-                {selectedCategories.length === 0 
-                  ? `جميع التصاميم معروضة: ${filteredDesigns.length}` 
+                {selectedCategory === null 
+                  ? 'الرجاء اختيار نوع الحدث لعرض التصاميم المتاحة' 
                   : `عدد التصاميم المعروضة: ${filteredDesigns.length}`
                 }
               </p>

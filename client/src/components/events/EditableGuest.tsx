@@ -114,102 +114,103 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
   };
 
   return (
-    <div className="bg-white/5 rounded-lg p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          {isEditing ? (
-            <div className="space-y-3">
-              {/* Editable Name */}
-              <div>
-                <input
-                  ref={nameInputRef}
-                  type="text"
-                  value={editData.name}
-                  onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
-                  onKeyDown={handleKeyDown}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:outline-none focus:border-[#C09B52] transition-colors"
-                  placeholder="اسم الضيف"
-                />
-              </div>
-
-              {/* Editable Phone */}
-              <div>
-                <PhoneInput
-                  ref={phoneInputRef}
-                  value={editData.phone}
-                  onChange={(value) => {
-                    setEditData(prev => ({ ...prev, phone: value || '' }));
-                    setPhoneError(false);
-                  }}
-                  placeholder="رقم الهاتف"
-                  defaultCountry="SA"
-                  international
-                  countryCallingCodeEditable={false}
-                  countries={ALLOWED_COUNTRY_CODES}
-                  onCountryChange={(country) => {
-                    if (country && !isCountryAllowed(country)) {
-                      onCountryChange?.(country);
-                    }
-                  }}
-                  className="phone-input-custom"
-                />
-                {phoneError && (
-                  <p className="text-red-400 text-xs mt-1">
-                    رقم الهاتف غير صحيح
-                  </p>
-                )}
-              </div>
-
-              {/* Editable Guest Count */}
-              <div>
-                <select
-                  value={editData.numberOfAccompanyingGuests}
-                  onChange={(e) => setEditData(prev => ({ ...prev, numberOfAccompanyingGuests: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:outline-none focus:border-[#C09B52] transition-colors"
-                >
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map(num => (
-                    <option key={num} value={num} className="bg-gray-800">
-                      {num} {num === 1 ? 'شخص' : 'أشخاص'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Edit Actions */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSave}
-                  disabled={isUpdating || !editData.name.trim()}
-                  className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
-                >
-                  {isUpdating ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  حفظ
-                </button>
-                <button
-                  onClick={handleCancel}
-                  disabled={isUpdating}
-                  className="flex items-center gap-1 px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                  إلغاء
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="flex items-center gap-4 mb-2">
+    <div className="bg-white/5 rounded-lg p-4 min-w-0 max-w-full">
+      {isEditing ? (
+        <div className="space-y-3">
+          {/* Editable Name */}
+          <div>
+            <input
+              ref={nameInputRef}
+              type="text"
+              value={editData.name}
+              onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
+              onKeyDown={handleKeyDown}
+              className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:outline-none focus:border-[#C09B52] transition-colors"
+              placeholder="اسم الضيف"
+            />
+          </div>
+  
+          {/* Editable Phone */}
+          <div>
+            <PhoneInput
+              ref={phoneInputRef}
+              value={editData.phone}
+              onChange={(value) => {
+                setEditData(prev => ({ ...prev, phone: value || '' }));
+                setPhoneError(false);
+              }}
+              placeholder="رقم الهاتف"
+              defaultCountry="SA"
+              international
+              countryCallingCodeEditable={false}
+              countries={ALLOWED_COUNTRY_CODES}
+              onCountryChange={(country) => {
+                if (country && !isCountryAllowed(country)) {
+                  onCountryChange?.(country);
+                }
+              }}
+              className="phone-input-custom"
+            />
+            {phoneError && (
+              <p className="text-red-400 text-xs mt-1">
+                رقم الهاتف غير صحيح
+              </p>
+            )}
+          </div>
+  
+          {/* Editable Guest Count */}
+          <div>
+            <select
+              value={editData.numberOfAccompanyingGuests}
+              onChange={(e) => setEditData(prev => ({ ...prev, numberOfAccompanyingGuests: parseInt(e.target.value) }))}
+              className="w-full px-3 py-2 bg-white/10 border border-white/20 text-white rounded-lg focus:outline-none focus:border-[#C09B52] transition-colors"
+            >
+              {Array.from({ length: 10 }, (_, i) => i + 1).map(num => (
+                <option key={num} value={num} className="bg-gray-800">
+                  {num} {num === 1 ? 'شخص' : 'أشخاص'}
+                </option>
+              ))}
+            </select>
+          </div>
+  
+          {/* Edit Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSave}
+              disabled={isUpdating || !editData.name.trim()}
+              className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors"
+            >
+              {isUpdating ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              حفظ
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={isUpdating}
+              className="flex items-center gap-1 px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+              إلغاء
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="min-w-0">
+          {/* Guest Info */}
+          <div className="flex items-start justify-between gap-2 mb-3 min-w-0">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <h5 className="text-white font-medium">{guest.name}</h5>
-                <span className="text-sm text-gray-400">
+                <span className="text-sm text-gray-400 whitespace-nowrap">
                   {guest.numberOfAccompanyingGuests} {guest.numberOfAccompanyingGuests === 1 ? 'شخص' : 'أشخاص'}
                 </span>
               </div>
-              <div className="text-sm text-gray-300">
+              <div className="text-sm text-gray-300 break-all">
                 {guest.phone}
-                <span className="ml-2 text-xs text-gray-400">
+                <span className="ml-2 text-xs text-gray-400 whitespace-nowrap">
                   ({getCountryFromPhone(guest.phone)})
                 </span>
               </div>
@@ -232,123 +233,119 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
                 </div>
               )}
             </div>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {/* Classic Package - No send button for users (admins handle sending) */}
-          {packageType === 'classic' && !isEditing && guest.whatsappMessageSent && (
-            <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
-              <Check className="w-3 h-3" />
-              تم الإرسال
-            </span>
-          )}
-
-          {/* Premium Package - Show send button only if guest list confirmed AND individual invite link is added */}
-          {packageType === 'premium' && !isEditing && userRole === 'owner' && (
-            <div className="flex items-center gap-2">
-              {/* Show RSVP status if guest responded */}
-              {guest.rsvpStatus && guest.rsvpStatus !== 'pending' && (
-                <span className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
-                  guest.rsvpStatus === 'accepted' 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : 'bg-red-500/20 text-red-400'
-                }`}>
-                  {guest.rsvpStatus === 'accepted' ? 'سيحضر' : 'اعتذر'}
-                </span>
-              )}
-              
-              {/* Show send button only if individual link is added */}
-              {guest.individualInviteLink ? (
+            
+            {/* Edit/Delete buttons - Only show on non-mobile or when needed */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {!isVipConfirmed && (
                 <>
-                  {/* WhatsApp API button */}
-                  {onSendWhatsappAPI && (
-                    <button
-                      onClick={() => onSendWhatsappAPI(guest)}
-                      disabled={sendingWhatsapp === guest._id}
-                      className={`flex items-center gap-1 px-2 py-1 text-white text-xs rounded transition-colors ${
-                        sendingWhatsapp === guest._id
-                          ? 'bg-gray-600 cursor-not-allowed'
-                          : 'bg-green-600 hover:bg-green-700'
-                      }`}
-                      title="إرسال دعوة تفاعلية عبر الواتساب"
-                    >
-                      {sendingWhatsapp === guest._id ? (
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Send className="w-3 h-3" />
-                      )}
-                      إرسال
-                    </button>
-                  )}
-                  
-                  {guest.whatsappMessageSent && (
-                    <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
-                      <Check className="w-3 h-3" />
-                      تم الإرسال
-                    </span>
-                  )}
+                  <button
+                    onClick={handleEdit}
+                    className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
+                    title="تعديل بيانات الضيف"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => guest._id && onRemoveGuest(guest._id)}
+                    className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                    title="حذف الضيف"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </>
-              ) : (
-                <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
-                  في انتظار الرابط
-                </span>
               )}
             </div>
-          )}
-
-          {/* VIP Package - Only admins send invitations */}
-          {packageType === 'vip' && !isEditing && userRole === 'owner' && (
-            <div className="flex items-center gap-2">
-              {/* Show RSVP status if guest responded */}
-              {guest.rsvpStatus && guest.rsvpStatus !== 'pending' && (
-                <span className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
-                  guest.rsvpStatus === 'accepted' 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : 'bg-red-500/20 text-red-400'
-                }`}>
-                  {guest.rsvpStatus === 'accepted' ? 'سيحضر' : 'اعتذر'}
-                </span>
-              )}
-              
-              {/* Show if invitation was sent by admin */}
-              {guest.whatsappMessageSent ? (
-                <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
-                  <Check className="w-3 h-3" />
-                  تم الإرسال
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
-                  <Users2 className="w-4 h-4" />
-                  في انتظار الإرسال
-                </span>
-              )}
-            </div>
-          )}
-          
-          {/* Edit button */}
-          {!isVipConfirmed && !isEditing && (
-            <button
-              onClick={handleEdit}
-              className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
-              title="تعديل بيانات الضيف"
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-          )}
-          
-          {/* Delete button */}
-          {!isVipConfirmed && !isEditing && (
-            <button
-              onClick={() => guest._id && onRemoveGuest(guest._id)}
-              className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-              title="حذف الضيف"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
+          </div>
+  
+          {/* Status badges and actions - Full width row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Classic Package */}
+            {packageType === 'classic' && guest.whatsappMessageSent && (
+              <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                <Check className="w-3 h-3" />
+                تم الإرسال
+              </span>
+            )}
+  
+            {/* Premium Package */}
+            {packageType === 'premium' && userRole === 'owner' && (
+              <>
+                {guest.rsvpStatus && guest.rsvpStatus !== 'pending' && (
+                  <span className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                    guest.rsvpStatus === 'accepted' 
+                      ? 'bg-green-500/20 text-green-400' 
+                      : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {guest.rsvpStatus === 'accepted' ? 'سيحضر' : 'اعتذر'}
+                  </span>
+                )}
+                
+                {guest.individualInviteLink ? (
+                  <>
+                    {onSendWhatsappAPI && (
+                      <button
+                        onClick={() => onSendWhatsappAPI(guest)}
+                        disabled={sendingWhatsapp === guest._id}
+                        className={`flex items-center gap-1 px-2 py-1 text-white text-xs rounded transition-colors ${
+                          sendingWhatsapp === guest._id
+                            ? 'bg-gray-600 cursor-not-allowed'
+                            : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                        title="إرسال دعوة تفاعلية عبر الواتساب"
+                      >
+                        {sendingWhatsapp === guest._id ? (
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Send className="w-3 h-3" />
+                        )}
+                        إرسال
+                      </button>
+                    )}
+                    
+                    {guest.whatsappMessageSent && (
+                      <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                        <Check className="w-3 h-3" />
+                        تم الإرسال
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
+                    في انتظار الرابط
+                  </span>
+                )}
+              </>
+            )}
+  
+            {/* VIP Package */}
+            {packageType === 'vip' && userRole === 'owner' && (
+              <>
+                {guest.rsvpStatus && guest.rsvpStatus !== 'pending' && (
+                  <span className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                    guest.rsvpStatus === 'accepted' 
+                      ? 'bg-green-500/20 text-green-400' 
+                      : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {guest.rsvpStatus === 'accepted' ? 'سيحضر' : 'اعتذر'}
+                  </span>
+                )}
+                
+                {guest.whatsappMessageSent ? (
+                  <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                    <Check className="w-3 h-3" />
+                    تم الإرسال
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
+                    <Users2 className="w-4 h-4" />
+                    في انتظار الإرسال
+                  </span>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

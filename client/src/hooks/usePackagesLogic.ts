@@ -6,16 +6,14 @@ import { invitationDesigns } from '@/constants';
 import { useMemoizedFilter, useMemoizedCallback } from '@/utils/memoization';
 
 export interface PackageLogicState {
-  selectedCategories: string[];
+  selectedCategory: string | null;
   filteredDesigns: any[];
   isLoading: boolean;
   designMode: 'regular' | 'custom';
 }
 
 export interface PackageLogicActions {
-  toggleCategory: (category: string) => void;
-  selectAllCategories: () => void;
-  clearCategories: () => void;
+  selectCategory: (category: string) => void;
   getCategoryStats: () => Record<string, number>;
   setDesignMode: (mode: 'regular' | 'custom') => void;
 }
@@ -29,13 +27,13 @@ const categories = [
 export function usePackagesLogic(): PackageLogicState & PackageLogicActions {
   const { isLoading: cartLoading } = useAppSelector((state) => state.cart);
   
-  // Category filter state - start with no categories selected
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  // Category filter state - start with no category selected
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
   // Design mode state - start with regular designs
   const [designMode, setDesignMode] = useState<'regular' | 'custom'>('regular');
 
-  // Filter designs based on selected categories and design mode - memoized for performance
+  // Filter designs based on selected category and design mode - memoized for performance
   const filteredDesigns = useMemoizedFilter(
     invitationDesigns,
     (design) => {
@@ -49,37 +47,27 @@ export function usePackagesLogic(): PackageLogicState & PackageLogicActions {
         return design.isCustom === true;
       }
       
-      // For regular mode, apply category filters
-      if (selectedCategories.length === 0) {
-        return true;
+      // For regular mode, apply category filter
+      // If no category selected, don't show any designs
+      if (selectedCategory === null) {
+        return false;
       }
       
-      return selectedCategories.includes(design.category);
+      return selectedCategory === design.category;
     },
-    [selectedCategories, designMode]
+    [selectedCategory, designMode]
   );
 
-  // Toggle category selection - memoized callback
-  const toggleCategory = useMemoizedCallback((category: string) => {
-    setSelectedCategories(prev => {
-      if (prev.includes(category)) {
-        // Remove category from selection
-        return prev.filter(c => c !== category);
-      } else {
-        // Add category to selection
-        return [...prev, category];
+  // Select category (single selection only) - memoized callback
+  const selectCategory = useMemoizedCallback((category: string) => {
+    setSelectedCategory(prev => {
+      // If clicking the same category, deselect it
+      if (prev === category) {
+        return null;
       }
+      // Otherwise, select the new category
+      return category;
     });
-  }, []);
-
-  // Select all categories
-  const selectAllCategories = useMemoizedCallback(() => {
-    setSelectedCategories(categories.map(cat => cat.value));
-  }, []);
-
-  // Clear all categories
-  const clearCategories = useMemoizedCallback(() => {
-    setSelectedCategories([]);
   }, []);
 
   // Get category statistics
@@ -93,13 +81,11 @@ export function usePackagesLogic(): PackageLogicState & PackageLogicActions {
   }, []);
 
   return {
-    selectedCategories,
+    selectedCategory,
     filteredDesigns,
     isLoading: cartLoading,
     designMode,
-    toggleCategory,
-    selectAllCategories,
-    clearCategories,
+    selectCategory,
     getCategoryStats,
     setDesignMode
   };

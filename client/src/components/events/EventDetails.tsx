@@ -41,12 +41,12 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   formatEventDate
 }) => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 space-y-6 max-w-full overflow-x-hidden">
       {/* Basic Info */}
-      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
-        <h2 className="text-xl font-bold text-white mb-6">تفاصيل المناسبة</h2>
-        
-        <div className="grid md:grid-cols-2 gap-6">
+      <div className="bg-gradient-to-br max-w-full from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-bold text-white mb-6">تفاصيل المناسبة</h2>
+
+        <div className="grid sm:grid-cols-2 gap-6">
           <div className="space-y-4">
             {event.details.eventName && (
               <div className="flex items-center gap-3">
@@ -114,42 +114,42 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
       </div>
 
       {/* Invitation Text */}
-      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
-        <h3 className="text-lg font-bold text-white mb-4">نص الدعوة</h3>
-        <div className="bg-white/5 rounded-xl p-4">
-          <p className="text-gray-300 leading-relaxed">{event.details.invitationText}</p>
+      <div className="bg-gradient-to-br max-w-full from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-bold text-white mb-4">نص الدعوة</h3>
+        <div className="bg-white/5 rounded-xl p-3 sm:p-4">
+          <p className="text-gray-300 leading-relaxed text-sm sm:text-base break-words">{event.details.invitationText}</p>
         </div>
       </div>
 
       {/* Admin Notes */}
       {event.adminNotes && event.adminNotes.trim() && (
-        <div className="bg-gradient-to-br from-red-900/20 to-red-800/10 rounded-2xl border border-red-700/30 p-6">
+        <div className="bg-gradient-to-br max-w-full from-red-900/20 to-red-800/10 rounded-2xl border border-red-700/30 p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-4">
             <MessageSquare className="w-5 h-5 text-red-400" />
-            <h3 className="text-lg font-bold text-white">ملاحظات الإدارة</h3>
+            <h3 className="text-base sm:text-lg font-bold text-white">ملاحظات الإدارة</h3>
           </div>
-          <div className="bg-red-900/20 border border-red-700/30 rounded-xl p-4">
-            <p className="text-red-100 leading-relaxed">{event.adminNotes}</p>
+          <div className="bg-red-900/20 border border-red-700/30 rounded-xl p-3 sm:p-4">
+            <p className="text-red-100 leading-relaxed text-sm sm:text-base break-words">{event.adminNotes}</p>
           </div>
         </div>
       )}
 
       {/* Invitation Card URL */}
       {event.invitationCardUrl && (
-        <div className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 rounded-2xl border border-blue-700/30 p-6">
+        <div className="bg-gradient-to-br max-w-full from-blue-900/20 to-blue-800/10 rounded-2xl border border-blue-700/30 p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-4">
             <ExternalLink className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-bold text-white">بطاقة الدعوة</h3>
+            <h3 className="text-base sm:text-lg font-bold text-white">بطاقة الدعوة</h3>
           </div>
-          <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0 max-w-xs">
+          <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row  sm:items-center sm:justify-between gap-4">
+              <div className="flex-1 ">
                 <p className="text-blue-100 text-sm mb-2">رابط بطاقة الدعوة:</p>
                 <a
                   href={event.invitationCardUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-300 hover:text-blue-200 text-sm block truncate text-left"
+                  className="text-blue-300 hover:text-blue-200 text-sm block break-words text-left"
                   title={event.invitationCardUrl}
                   dir="ltr"
                 >
@@ -160,7 +160,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 href={event.invitationCardUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 <ExternalLink className="w-4 h-4" />
                 عرض البطاقة
@@ -171,24 +171,24 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
       )}
 
       {/* QR Code Reader URL - Scanner app for gate supervisors */}
-      <div className="bg-gradient-to-br from-cyan-900/20 to-cyan-800/10 rounded-2xl border border-cyan-700/30 p-6">
+      <div className="bg-gradient-to-br max-w-full from-cyan-900/20 to-cyan-800/10 rounded-2xl border border-cyan-700/30 p-4 sm:p-6">
         <div className="flex items-center gap-2 mb-4">
           <QrCode className="w-5 h-5 text-cyan-400" />
-          <h3 className="text-lg font-bold text-white">ماسح QR Code</h3>
+          <h3 className="text-base sm:text-lg font-bold text-white">ماسح QR Code</h3>
         </div>
-        <p className="text-cyan-200 text-sm mb-4">
+        <p className="text-cyan-200 text-xs sm:text-sm mb-4 break-words">
           استخدم هذا الرابط لفتح تطبيق الماسح على البوابة لمسح QR codes الخاصة بالضيوف
         </p>
         {event.qrCodeReaderUrl && event.qrCodeReaderUrl.trim() ? (
-          <div className="bg-cyan-900/20 border border-cyan-700/30 rounded-xl p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0 max-w-xs">
+          <div className="bg-cyan-900/20 border border-cyan-700/30 rounded-xl p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row  sm:items-center sm:justify-between gap-4">
+              <div className="flex-1 ">
                 <p className="text-cyan-100 text-sm mb-2">رابط تطبيق الماسح:</p>
                 <a
                   href={event.qrCodeReaderUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-cyan-300 hover:text-cyan-200 text-sm block truncate text-left"
+                  className="text-cyan-300 hover:text-cyan-200 text-sm block break-words text-left"
                   title={event.qrCodeReaderUrl}
                   dir="ltr"
                 >
@@ -199,7 +199,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 href={event.qrCodeReaderUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-4 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2"
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 <ExternalLink className="w-4 h-4" />
                 فتح الماسح

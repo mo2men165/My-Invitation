@@ -337,8 +337,20 @@ export function Header() {
 
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="lg:hidden flex items-center justify-end" ref={mobileMenuRef}>
+          {/* Mobile Menu Button & Cart */}
+          <div className="lg:hidden flex items-center justify-end gap-3" ref={mobileMenuRef}>
+            {/* Mobile Cart Icon */}
+            {isAuthenticated && isInitialized && (
+              <Link href="/cart" className="relative p-2">
+                <ShoppingCart className="w-6 h-6 text-gray-300 hover:text-[#C09B52] transition-colors duration-300" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-[#C09B52] text-black text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-black">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            )}
+            
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2.5 text-gray-300 hover:text-[#C09B52] transition-colors duration-300"
@@ -375,6 +387,19 @@ export function Header() {
                           </Link>
                         );
                       })}
+                      
+                      {/* Events Link */}
+                      {isAuthenticated && (
+                        <Link
+                          href="/events"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`block py-3 px-4 rounded-lg text-lg font-medium transition-all duration-300 hover:bg-gray-800 ${
+                            pathname === '/events' ? 'text-[#C09B52] bg-gray-800/50' : 'text-gray-300 hover:text-[#C09B52]'
+                          }`}
+                        >
+                          الأحداث
+                        </Link>
+                      )}
                     </div>
                   </nav>
 
@@ -435,28 +460,6 @@ export function Header() {
                       <div className="border-t border-gray-800 pt-6">
                         <h3 className="text-gray-400 text-sm font-medium mb-4 px-4">التسوق</h3>
                         <div className="space-y-2">
-                          {/* Cart */}
-                          <Link
-                            href="/cart"
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className="flex items-center justify-between py-3 px-4 rounded-lg text-gray-300 hover:text-[#C09B52] hover:bg-gray-800 transition-all duration-200"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="relative">
-                                <ShoppingCart className="w-5 h-5" />
-                                {cartCount > 0 && (
-                                  <span className="absolute -top-1.5 -right-1.5 bg-[#C09B52] text-black text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                                    {cartCount}
-                                  </span>
-                                )}
-                              </div>
-                              <span>السلة</span>
-                            </div>
-                            <span className="text-sm font-bold text-[#C09B52]">
-                              {cartTotal.toLocaleString('ar-SA')} ر.س
-                            </span>
-                          </Link>
-
                           {/* Wishlist */}
                           <Link
                             href="/wishlist"

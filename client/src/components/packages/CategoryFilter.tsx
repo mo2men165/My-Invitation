@@ -3,14 +3,14 @@
 import React from 'react';
 
 interface CategoryFilterProps {
-  selectedCategories: string[];
-  onToggleCategory: (category: string) => void;
+  selectedCategory: string | null;
+  onSelectCategory: (category: string) => void;
   categories: Array<{ value: string; label: string }>;
 }
 
 export default function CategoryFilter({ 
-  selectedCategories, 
-  onToggleCategory, 
+  selectedCategory, 
+  onSelectCategory, 
   categories 
 }: CategoryFilterProps) {
   return (
@@ -18,9 +18,9 @@ export default function CategoryFilter({
       {categories.map((category) => (
         <button
           key={category.value}
-          onClick={() => onToggleCategory(category.value)}
+          onClick={() => onSelectCategory(category.value)}
           className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-            selectedCategories.includes(category.value)
+            selectedCategory === category.value
               ? 'bg-[#C09B52] text-white shadow-lg transform scale-105'
               : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white'
           }`}

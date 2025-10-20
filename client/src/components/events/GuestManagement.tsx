@@ -67,10 +67,10 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
   const isVipConfirmed = event.packageType === 'vip' && event.guestListConfirmed.isConfirmed;
 
   return (
-    <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-white">قائمة الضيوف</h3>
-        <div className="text-sm text-gray-400">
+    <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
+        <h3 className="text-base sm:text-lg font-bold text-white">قائمة الضيوف</h3>
+        <div className="text-xs sm:text-sm text-gray-400">
           {event.guests.length} ضيف مضاف • {guestStats?.totalInvited || 0} من {event.details?.inviteCount || 0} دعوة
         </div>
       </div>
@@ -208,7 +208,7 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
       {userRole === 'owner' && guests.length > 0 && !event.guestListConfirmed.isConfirmed && (
         <div className="mt-6 pt-6 border-t border-white/10">
           <div className="bg-gradient-to-r from-yellow-900/20 to-yellow-800/10 border border-yellow-700/30 rounded-xl p-4">
-            <div className="flex items-center justify-between flex-col md:flex-row gap-4">
+            <div className="flex items-center justify-between flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <h4 className="text-yellow-400 font-medium mb-1">تأكيد القائمة النهائية</h4>
                 <p className="text-yellow-100 text-sm mb-2">
