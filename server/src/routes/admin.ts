@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { Event } from '../models/Event';
 import { User } from '../models/User';
+import { Order } from '../models/Order';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireAdmin } from '../middleware/auth';
 import { Types } from 'mongoose';
@@ -1203,6 +1204,380 @@ router.put('/users/:userId/role', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { message: 'خطأ في تحديث دور المستخدم' }
+    });
+  }
+});
+
+// ============================================
+// ORDER MANAGEMENT
+// ============================================
+
+/**
+ * GET /api/admin/orders
+ * Get all orders with filtering and pagination
+ */
+router.get('/orders', async (req: Request, res: Response) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      status = '',
+      search = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Build query
+    const query: any = {};
+    if (status) query.status = status;
+    
+    if (search) {
+      query.$or = [
+        { merchantOrderId: { $regex: search, $options: 'i' } },
+        { paymobOrderId: Number(search) || -1 }
+      ];
+    }
+
+    // Build sort object
+    const sort: any = {};
+    sort[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
+
+    const [orders, total] = await Promise.all([
+      Order.find(query)
+        .populate('userId', 'firstName lastName email phone city')
+        .populate('eventsCreated', 'details.eventName details.hostName approvalStatus')
+        .sort(sort)
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Order.countDocuments(query)
+    ]);
+
+    // Format orders for frontend
+    const formattedOrders = orders.map(order => ({
+      id: order._id,
+      merchantOrderId: order.merchantOrderId,
+      paymobOrderId: order.paymobOrderId,
+      paymobTransactionId: order.paymobTransactionId,
+      user: {
+        id: (order.userId as any)?._id,
+        name: `${(order.userId as any)?.firstName} ${(order.userId as any)?.lastName}`,
+        email: (order.userId as any)?.email,
+        phone: (order.userId as any)?.phone,
+        city: (order.userId as any)?.city
+      },
+      totalAmount: order.totalAmount,
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      itemsCount: order.selectedCartItems.length,
+      eventsCreated: order.eventsCreated.length,
+      eventsDetails: (order.eventsCreated as any[])?.map(event => ({
+        id: event._id,
+        name: event.details?.hostName || event.details?.eventName,
+        approvalStatus: event.approvalStatus
+      })) || [],
+      createdAt: order.createdAt,
+      completedAt: order.completedAt,
+      failedAt: order.failedAt,
+      cancelledAt: order.cancelledAt
+    }));
+
+    // Get status counts for statistics
+    const statusCounts = await Order.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$totalAmount' }
+        }
+      }
+    ]);
+
+    const stats = {
+      pending: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
+      totalRevenue: 0
+    };
+
+    statusCounts.forEach(stat => {
+      stats[stat._id as keyof typeof stats] = stat.count;
+      if (stat._id === 'completed') {
+        stats.totalRevenue = stat.totalAmount;
+      }
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        orders: formattedOrders,
+        stats,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          pages: Math.ceil(total / Number(limit))
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error fetching orders:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في جلب الطلبات' }
+    });
+  }
+});
+
+/**
+ * GET /api/admin/orders/:orderId
+ * Get detailed information about a specific order
+ */
+router.get('/orders/:orderId', async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId)
+      .populate('userId', 'firstName lastName email phone city')
+      .populate('eventsCreated')
+      .lean();
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'الطلب غير موجود' }
+      });
+    }
+
+    // Format order details
+    const formattedOrder = {
+      id: order._id,
+      merchantOrderId: order.merchantOrderId,
+      paymobOrderId: order.paymobOrderId,
+      paymobTransactionId: order.paymobTransactionId,
+      user: {
+        id: (order.userId as any)?._id,
+        name: `${(order.userId as any)?.firstName} ${(order.userId as any)?.lastName}`,
+        email: (order.userId as any)?.email,
+        phone: (order.userId as any)?.phone,
+        city: (order.userId as any)?.city
+      },
+      totalAmount: order.totalAmount,
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      selectedCartItems: order.selectedCartItems.map(item => ({
+        cartItemId: item.cartItemId,
+        packageType: item.cartItemData.packageType,
+        eventName: item.cartItemData.details.eventName,
+        hostName: item.cartItemData.details.hostName,
+        eventDate: item.cartItemData.details.eventDate,
+        eventLocation: item.cartItemData.details.eventLocation,
+        inviteCount: item.cartItemData.details.inviteCount,
+        totalPrice: item.cartItemData.totalPrice,
+        isCustomDesign: item.cartItemData.details.isCustomDesign,
+        customDesignNotes: item.cartItemData.details.customDesignNotes
+      })),
+      eventsCreated: (order.eventsCreated as any[])?.map(event => ({
+        id: event._id,
+        eventName: event.details?.eventName,
+        hostName: event.details?.hostName,
+        eventDate: event.details?.eventDate,
+        approvalStatus: event.approvalStatus,
+        status: event.status,
+        packageType: event.packageType,
+        guestCount: event.guests?.length || 0
+      })) || [],
+      createdAt: order.createdAt,
+      completedAt: order.completedAt,
+      failedAt: order.failedAt,
+      cancelledAt: order.cancelledAt
+    };
+
+    return res.json({
+      success: true,
+      data: formattedOrder
+    });
+
+  } catch (error) {
+    logger.error('Error fetching order details:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في جلب تفاصيل الطلب' }
+    });
+  }
+});
+
+/**
+ * POST /api/admin/orders/:orderId/complete
+ * Manually mark order as completed and create events
+ */
+router.post('/orders/:orderId/complete', async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const { transactionId } = req.body;
+    const adminId = req.user!.id;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'الطلب غير موجود' }
+      });
+    }
+
+    if (order.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        error: { message: `الطلب ليس في حالة الانتظار. الحالة الحالية: ${order.status}` }
+      });
+    }
+
+    // Process the order manually using the same logic as webhook
+    const { OrderService } = await import('../services/orderService');
+    const result = await OrderService.processSuccessfulPayment(
+      order.merchantOrderId,
+      transactionId || `ADMIN_MANUAL_${Date.now()}`
+    );
+
+    if (result.success) {
+      logger.info(`Admin ${adminId} manually completed order ${orderId}`, {
+        orderId,
+        adminId,
+        eventsCreated: result.eventsCreated,
+        merchantOrderId: order.merchantOrderId
+      });
+
+      return res.json({
+        success: true,
+        message: 'تم تأكيد الطلب وإنشاء الأحداث بنجاح',
+        data: {
+          eventsCreated: result.eventsCreated,
+          orderId: result.orderId
+        }
+      });
+    } else {
+      logger.error(`Admin ${adminId} failed to complete order ${orderId}: ${result.error}`);
+      return res.status(500).json({
+        success: false,
+        error: { message: result.error || 'فشل في معالجة الطلب' }
+      });
+    }
+
+  } catch (error) {
+    logger.error('Error manually completing order:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تأكيد الطلب' }
+    });
+  }
+});
+
+/**
+ * POST /api/admin/orders/:orderId/fail
+ * Manually mark order as failed
+ */
+router.post('/orders/:orderId/fail', async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user!.id;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'الطلب غير موجود' }
+      });
+    }
+
+    if (order.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        error: { message: `الطلب ليس في حالة الانتظار. الحالة الحالية: ${order.status}` }
+      });
+    }
+
+    order.status = 'failed';
+    order.failedAt = new Date();
+    if (reason) {
+      order.adminNotes = reason;
+    }
+    await order.save();
+
+    logger.info(`Admin ${adminId} manually failed order ${orderId}`, {
+      orderId,
+      adminId,
+      reason,
+      merchantOrderId: order.merchantOrderId
+    });
+
+    return res.json({
+      success: true,
+      message: 'تم تحديد الطلب كفاشل'
+    });
+
+  } catch (error) {
+    logger.error('Error manually failing order:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تحديث حالة الطلب' }
+    });
+  }
+});
+
+/**
+ * POST /api/admin/orders/:orderId/cancel
+ * Manually cancel order
+ */
+router.post('/orders/:orderId/cancel', async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user!.id;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'الطلب غير موجود' }
+      });
+    }
+
+    if (order.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'لا يمكن إلغاء طلب مكتمل' }
+      });
+    }
+
+    order.status = 'cancelled';
+    order.cancelledAt = new Date();
+    if (reason) {
+      order.adminNotes = reason;
+    }
+    await order.save();
+
+    logger.info(`Admin ${adminId} cancelled order ${orderId}`, {
+      orderId,
+      adminId,
+      reason,
+      merchantOrderId: order.merchantOrderId
+    });
+
+    return res.json({
+      success: true,
+      message: 'تم إلغاء الطلب'
+    });
+
+  } catch (error) {
+    logger.error('Error cancelling order:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في إلغاء الطلب' }
     });
   }
 });

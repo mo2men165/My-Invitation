@@ -16,7 +16,8 @@ import {
   Menu,
   X,
   Shield,
-  ChevronRight
+  ChevronRight,
+  ShoppingCart
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -71,6 +72,12 @@ export function AdminSidebar({ children }: AdminSidebarProps) {
       href: '/admin/events',
       icon: Calendar,
       color: 'text-green-400'
+    },
+    {
+      title: 'إدارة الطلبات',
+      href: '/admin/orders',
+      icon: ShoppingCart,
+      color: 'text-purple-400'
     },
     {
       title: 'الإشعارات',

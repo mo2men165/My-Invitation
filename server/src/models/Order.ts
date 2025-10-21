@@ -19,6 +19,7 @@ export interface IOrder extends Document {
   failedAt?: Date;
   cancelledAt?: Date;
   paymobTransactionId?: string;    // Transaction ID from webhook
+  adminNotes?: string;              // Admin notes for manual status changes
 }
 
 const selectedCartItemSchema = new Schema({
@@ -221,6 +222,10 @@ const orderSchema = new Schema<IOrder>({
   },
   paymobTransactionId: {
     type: String
+  },
+  adminNotes: {
+    type: String,
+    maxlength: 1000
   }
 }, { timestamps: true });
 
