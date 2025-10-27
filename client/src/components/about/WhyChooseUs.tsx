@@ -224,7 +224,7 @@ export function WhyChooseUsSection() {
                   <div className="text-gray-400">دعم فني متواصل</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-3xl font-bold text-[#C09B52]">1000+</div>
+                  <div className="text-3xl font-bold text-[#C09B52]">7000+</div>
                   <div className="text-gray-400">مناسبة ناجحة</div>
                 </div>
               </div>

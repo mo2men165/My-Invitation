@@ -12,19 +12,19 @@ export const aboutFeatures = [
 export const counters = [
   {
     icon: BarChart3,
-    number: 7000,
+    number: 500000,
     label: "استخدام الباركود الذكي",
     delay: 0
   },
   {
     icon: Users,
-    number: 10000,
+    number: 8000,
     label: "عميل مسجل",
     delay: 0.2
   },
   {
     icon: Calendar,
-    number: 5000,
+    number: 7000,
     label: "مناسبة منظمة",
     delay: 0.4
   }

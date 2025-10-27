@@ -52,7 +52,7 @@ export default function ContactPage() {
             {/* Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
               <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-                <div className="text-3xl font-bold text-[#C09B52] mb-2">1000+</div>
+                <div className="text-3xl font-bold text-[#C09B52] mb-2">7000+</div>
                 <div className="text-gray-400">مناسبة ناجحة</div>
               </div>
               <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">

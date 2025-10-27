@@ -135,10 +135,10 @@ export const CollaborationManagement: React.FC<CollaborationManagementProps> = (
               </div>
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-bold text-white">إدارة المتعاونين</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-white">حساب فرعي</h2>
               <p className="text-gray-400 text-xs sm:text-sm">
                 حزمة {packageType === 'vip' ? 'VIP' : 'بريميوم'} •
-                حتى {currentLimit.maxCollaborators} متعاونين
+                حتى {currentLimit.maxCollaborators} حساب فرعي
               </p>
             </div>
           </div>
