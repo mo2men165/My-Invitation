@@ -9,14 +9,8 @@ import {
   Phone, 
   MapPin, 
   ArrowUp,
-  Facebook,
-  Instagram,
-  Linkedin,
-  Heart,
-  X,
 } from 'lucide-react';
-import { socialLinks, services, quickLinks } from '@/constants';
-import { compareAPI } from '@/lib/api/compare';
+import { quickLinks, services } from '@/constants';
 
 export function Footer() {
   const ref = useRef(null);
