@@ -222,7 +222,7 @@ export function HeroSection() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8 pt-8 border-t border-gray-700">
               <div className="text-center">
-                <div className="text-3xl font-bold animate-counter" style={{ color: '#C09B52' }}>50K+</div>
+                <div className="text-3xl font-bold animate-counter" style={{ color: '#C09B52' }}>7000K+</div>
                 <div className="text-gray-400 text-sm">مناسبة ناجحة</div>
               </div>
               <div className="text-center">
