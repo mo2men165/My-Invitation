@@ -147,24 +147,17 @@ export class WhatsappService {
         normalized: normalizedGuestPhone
       });
 
-      // Build query with phone and optionally message context for accurate event matching
+      // Build query with phone and message context for accurate event matching
+      // Context (original message ID) is always present in webhook responses
       const query: any = {
         'guests.phone': normalizedGuestPhone,
-        status: 'upcoming'
+        'guests.whatsappMessageId': originalMessageId
       };
       
-      // If we have context (reply to specific message), use it for precise matching
-      if (originalMessageId) {
-        query['guests.whatsappMessageId'] = originalMessageId;
-        logger.info('WHATSAPP WEBHOOK: Using message context for precise event lookup', {
-          originalMessageId,
-          queryingBoth: true
-        });
-      } else {
-        logger.warn('WHATSAPP WEBHOOK: No context ID - using phone only (may be ambiguous if guest in multiple events)', {
-          guestPhone: normalizedGuestPhone
-        });
-      }
+      logger.info('WHATSAPP WEBHOOK: Using message context for precise event lookup', {
+        originalMessageId,
+        guestPhone: normalizedGuestPhone
+      });
       
       logger.info('WHATSAPP WEBHOOK: Looking for event with query...', {
         query: JSON.stringify(query)
@@ -173,10 +166,9 @@ export class WhatsappService {
       const event = await Event.findOne(query);
 
       if (!event) {
-        logger.warn('WHATSAPP WEBHOOK: No upcoming event found for guest phone', {
+        logger.warn('WHATSAPP WEBHOOK: No event found for guest phone and message ID', {
           guestPhone,
           normalizedPhone: normalizedGuestPhone,
-          hadContextId: !!originalMessageId,
           contextId: originalMessageId
         });
         return;
@@ -188,19 +180,16 @@ export class WhatsappService {
         packageType: event.packageType
       });
 
-      // Find the specific guest - match by both phone and message ID if available
-      const guest = originalMessageId
-        ? event.guests.find(g => 
-            g.phone === normalizedGuestPhone && 
-            g.whatsappMessageId === originalMessageId
-          )
-        : event.guests.find(g => g.phone === normalizedGuestPhone);
+      // Find the specific guest - match by both phone and message ID
+      const guest = event.guests.find(g => 
+        g.phone === normalizedGuestPhone && 
+        g.whatsappMessageId === originalMessageId
+      );
         
       if (!guest) {
         logger.warn('WHATSAPP WEBHOOK: Guest not found in event', { 
           guestPhone: normalizedGuestPhone, 
           eventId: event._id,
-          searchedWithMessageId: !!originalMessageId,
           messageId: originalMessageId
         });
         return;
