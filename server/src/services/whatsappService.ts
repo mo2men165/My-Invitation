@@ -372,15 +372,28 @@ export class WhatsappService {
       // Use individual invite image for confirmation message
       const individualImageUrl = guest.individualInviteImage?.secure_url || guest.individualInviteImage?.url || '';
       
-      if (!individualImageUrl) {
-        logger.error('WHATSAPP CONFIRMATION: No individual invite image available', {
-          hasIndividualImage: !!guest.individualInviteImage
+      // Validate image URL - template requires IMAGE header
+      if (!individualImageUrl || !individualImageUrl.startsWith('http')) {
+        logger.error('WHATSAPP CONFIRMATION: Invalid individual invite image URL', {
+          eventId: event._id,
+          guestId: guest._id,
+          imageUrl: individualImageUrl,
+          hasIndividualImage: !!guest.individualInviteImage,
+          hasSecureUrl: !!guest.individualInviteImage?.secure_url,
+          hasUrl: !!guest.individualInviteImage?.url
         });
-      } else {
-        logger.info('WHATSAPP CONFIRMATION: Individual invite image ready', {
-          imageUrl: individualImageUrl
-        });
+        throw new Error('Individual invite image URL is invalid or not accessible');
       }
+
+      // Ensure URL is HTTPS (WhatsApp requires HTTPS for images)
+      const validImageUrl = individualImageUrl.startsWith('https://') 
+        ? individualImageUrl 
+        : individualImageUrl.replace(/^http:\/\//, 'https://');
+
+      logger.info('WHATSAPP CONFIRMATION: Individual invite image validated', {
+        originalUrl: individualImageUrl,
+        validUrl: validImageUrl
+      });
 
       // Format event date
       const eventDate = new Date(event.details.eventDate);
@@ -397,18 +410,18 @@ export class WhatsappService {
             code: 'ar'
           },
           components: [
-            // Add individual invite image as header if available
-            ...(individualImageUrl ? [{
+            // Template requires IMAGE header - always include it
+            {
               type: 'header',
               parameters: [
                 {
                   type: 'image',
                   image: {
-                    link: individualImageUrl
+                    link: validImageUrl
                   }
                 }
               ]
-            }] : []),
+            },
             {
               type: 'body',
               parameters: [
@@ -552,6 +565,28 @@ export class WhatsappService {
 
       // Get event invitation card image URL
       const eventImageUrl = event.invitationCardImage?.secure_url || event.invitationCardImage?.url || '';
+      
+      // Validate image URL - must be HTTPS and non-empty
+      if (!eventImageUrl || !eventImageUrl.startsWith('http')) {
+        logger.error('WHATSAPP: Invalid image URL', {
+          eventId,
+          guestId,
+          imageUrl: eventImageUrl,
+          hasSecureUrl: !!event.invitationCardImage?.secure_url,
+          hasUrl: !!event.invitationCardImage?.url
+        });
+        return { success: false, error: 'Event invitation card image URL is invalid or not accessible' };
+      }
+
+      // Ensure URL is HTTPS (WhatsApp requires HTTPS for images)
+      const validImageUrl = eventImageUrl.startsWith('https://') 
+        ? eventImageUrl 
+        : eventImageUrl.replace(/^http:\/\//, 'https://');
+
+      logger.info('WHATSAPP: Image URL validated', {
+        originalUrl: eventImageUrl,
+        validUrl: validImageUrl
+      });
 
       const messageData = {
         messaging_product: 'whatsapp',
@@ -563,18 +598,18 @@ export class WhatsappService {
             code: 'ar'
           },
           components: [
-            // Add image as header if available
-            ...(eventImageUrl ? [{
+            // Template requires IMAGE header - always include it
+            {
               type: 'header',
               parameters: [
                 {
                   type: 'image',
                   image: {
-                    link: eventImageUrl
+                    link: validImageUrl
                   }
                 }
               ]
-            }] : []),
+            },
             {
               type: 'body',
               parameters: [
@@ -985,15 +1020,28 @@ export class WhatsappService {
       // Use individual invite image for reminder message
       const individualImageUrl = guest.individualInviteImage?.secure_url || guest.individualInviteImage?.url || '';
       
-      if (!individualImageUrl) {
-        logger.warn('WHATSAPP REMINDER: No individual invite image available', {
-          hasIndividualImage: !!guest.individualInviteImage
+      // Validate image URL - template requires IMAGE header
+      if (!individualImageUrl || !individualImageUrl.startsWith('http')) {
+        logger.error('WHATSAPP REMINDER: Invalid individual invite image URL', {
+          eventId,
+          guestId,
+          imageUrl: individualImageUrl,
+          hasIndividualImage: !!guest.individualInviteImage,
+          hasSecureUrl: !!guest.individualInviteImage?.secure_url,
+          hasUrl: !!guest.individualInviteImage?.url
         });
-      } else {
-        logger.info('WHATSAPP REMINDER: Individual invite image ready', {
-          imageUrl: individualImageUrl
-        });
+        return { success: false, error: 'Individual invite image URL is invalid or not accessible' };
       }
+
+      // Ensure URL is HTTPS (WhatsApp requires HTTPS for images)
+      const validImageUrl = individualImageUrl.startsWith('https://') 
+        ? individualImageUrl 
+        : individualImageUrl.replace(/^http:\/\//, 'https://');
+
+      logger.info('WHATSAPP REMINDER: Individual invite image validated', {
+        originalUrl: individualImageUrl,
+        validUrl: validImageUrl
+      });
 
       // Generate Google Maps link
       const mapsLink = event.details.locationCoordinates 
@@ -1014,18 +1062,18 @@ export class WhatsappService {
             code: 'ar'
           },
           components: [
-            // Add individual invite image as header if available
-            ...(individualImageUrl ? [{
+            // Template requires IMAGE header - always include it
+            {
               type: 'header',
               parameters: [
                 {
                   type: 'image',
                   image: {
-                    link: individualImageUrl
+                    link: validImageUrl
                   }
                 }
               ]
-            }] : []),
+            },
             {
               type: 'body',
               parameters: [
