@@ -2,9 +2,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { logger } from '../config/logger';
 import { Readable } from 'stream';
-
-// Type alias for Multer File
-type MulterFile = Express.Multer.File;
+import 'multer';
 
 export interface CloudinaryUploadResult {
   public_id: string;
@@ -204,7 +202,7 @@ export class CloudinaryService {
   /**
    * Validate if a file is a valid image
    */
-  static validateImageFile(file: MulterFile): { valid: boolean; error?: string } {
+  static validateImageFile(file: Express.Multer.File): { valid: boolean; error?: string } {
     const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     const maxSize = 10 * 1024 * 1024; // 10MB
 
