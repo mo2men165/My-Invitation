@@ -19,6 +19,7 @@ export interface User {
   email: string;
   phone: string;
   city: string;
+  customCity?: string;
   role: 'user' | 'admin';
   status: 'active' | 'suspended';
   lastLogin?: string;

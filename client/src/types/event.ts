@@ -1,3 +1,15 @@
+// Cloudinary image object interface
+export interface CloudinaryImage {
+  public_id: string;
+  secure_url: string;
+  url: string;
+  format: string;
+  width: number;
+  height: number;
+  bytes: number;
+  created_at: string;
+}
+
 export interface Guest {
   _id?: string;
   name: string;
@@ -15,12 +27,13 @@ export interface Guest {
     collaboratorName?: string;
     collaboratorEmail?: string;
   };
-  individualInviteLink?: string;
+  individualInviteImage?: CloudinaryImage;
   actuallyAttended?: boolean;
   attendanceMarkedAt?: string;
   attendanceMarkedBy?: string;
   addedAt?: string;
   updatedAt?: string;
+  refundedOnDecline?: boolean;
 }
 
 export interface PackageDetails {

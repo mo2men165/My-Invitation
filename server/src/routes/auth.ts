@@ -56,6 +56,7 @@ router.get('/me', checkJwt, extractUser, async (req: Request, res: Response) => 
         email: user.email,
         phone: user.phone,
         city: user.city,
+        customCity: user.customCity,
         role: user.role,
         status: user.status,
         lastLogin: user.lastLogin,
@@ -128,6 +129,7 @@ router.post('/register', async (req: Request, res: Response) => {
       email: userData.email,
       password: userData.password,
       city: userData.city,
+      customCity: userData.city === 'اخري' ? userData.customCity : undefined, // Only set customCity if city is 'اخري'
       status: 'active' // No verification needed
     });
 
@@ -155,6 +157,7 @@ router.post('/register', async (req: Request, res: Response) => {
         email: user.email,
         phone: user.phone,
         city: user.city,
+        customCity: user.customCity,
         role: user.role,
         status: user.status
       }
@@ -264,6 +267,7 @@ router.post('/login', async (req: Request, res: Response) => {
         email: authenticatedUser.email,
         phone: authenticatedUser.phone,
         city: authenticatedUser.city,
+        customCity: authenticatedUser.customCity,
         role: authenticatedUser.role,
         status: authenticatedUser.status,
         lastLogin: authenticatedUser.lastLogin
@@ -480,7 +484,21 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
       lastName: z.string().min(1, 'الاسم الأخير مطلوب').max(25, 'الاسم الأخير لا يجب أن يتجاوز 25 حرف'),
       email: z.string().email('البريد الإلكتروني غير صحيح'),
       phone: phoneValidationSchema,
-      city: z.enum(['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'])
+      city: z.enum(['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف', 'اخري']),
+      customCity: z.string()
+        .min(2, 'اسم المدينة يجب أن يكون حرفين على الأقل')
+        .max(50, 'اسم المدينة طويل جداً')
+        .trim()
+        .optional()
+    }).refine((data) => {
+      // If city is 'اخري', customCity must be provided
+      if (data.city === 'اخري' && (!data.customCity || data.customCity.trim().length === 0)) {
+        return false;
+      }
+      return true;
+    }, {
+      message: 'يجب إدخال اسم المدينة عند اختيار "أخرى"',
+      path: ['customCity']
     });
 
     const validationResult = profileUpdateSchema.safeParse(req.body);
@@ -499,7 +517,7 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
       });
     }
 
-    const { firstName, lastName, email, phone, city } = validationResult.data;
+    const { firstName, lastName, email, phone, city, customCity } = validationResult.data;
 
     // Normalize the phone number to international format
     const fullPhoneNumber = normalizePhoneNumber(phone);
@@ -550,7 +568,8 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
         name: `${firstName} ${lastName}`, // FIXED: Explicitly set the concatenated name
         email: email.toLowerCase(),
         phone: fullPhoneNumber, // FIXED: Store with +966 prefix
-        city
+        city,
+        customCity: city === 'اخري' ? customCity : undefined // Only set customCity if city is 'اخري'
       },
       { new: true, select: '-password' }
     );
@@ -575,6 +594,7 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
         email: updatedUser.email,
         phone: updatedUser.phone,
         city: updatedUser.city,
+        customCity: updatedUser.customCity,
         role: updatedUser.role,
         status: updatedUser.status,
         lastLogin: updatedUser.lastLogin,

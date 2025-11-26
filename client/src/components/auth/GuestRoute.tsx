@@ -10,7 +10,7 @@ interface GuestRouteProps {
   redirectTo?: string;
 }
 
-export function GuestRoute({ children, redirectTo = '/dashboard' }: GuestRouteProps) {
+export function GuestRoute({ children, redirectTo = '/packages' }: GuestRouteProps) {
   const { isAuthenticated, isInitialized } = useAuth();
   const router = useRouter();
 

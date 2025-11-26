@@ -1,20 +1,45 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useMemo, useEffect } from 'react';
 import { Plus, Minus, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { CartFormData } from '../types';
+import { LocationData } from '@/types/location';
 import { CART_MODAL_CONSTANTS } from '@/constants/cartModalConstants';
+import { SAUDI_CITIES } from '@/types/location';
 
 interface AdditionalServicesProps {
   formData: CartFormData;
   onInputChange: (field: string, value: any) => void;
   packageType: string;
+  locationData: LocationData;
 }
 
 const AdditionalServices = memo<AdditionalServicesProps>(({
   formData,
   onInputChange,
-  packageType
+  packageType,
+  locationData
 }) => {
+  // Check if location is selected and if it's in the main 6 Saudi cities
+  const isLocationSelected = useMemo(() => {
+    return locationData.city && locationData.city.trim() !== '';
+  }, [locationData.city]);
+
+  const isInMainSaudiCities = useMemo(() => {
+    if (!isLocationSelected) return false;
+    return SAUDI_CITIES.includes(locationData.city as typeof SAUDI_CITIES[number]);
+  }, [locationData.city, isLocationSelected]);
+
+  const canAddGateSupervisors = useMemo(() => {
+    return isLocationSelected && isInMainSaudiCities;
+  }, [isLocationSelected, isInMainSaudiCities]);
+
+  // Reset gate supervisors to 0 if location is not in main cities
+  useEffect(() => {
+    if (isLocationSelected && !isInMainSaudiCities && formData.gateSupervisors > 0) {
+      onInputChange('gateSupervisors', 0);
+    }
+  }, [isLocationSelected, isInMainSaudiCities, formData.gateSupervisors, onInputChange]);
+
   const getExtraCardPrice = useCallback((pkgType: string) => {
     return CART_MODAL_CONSTANTS.EXTRA_CARD_PRICES[pkgType as keyof typeof CART_MODAL_CONSTANTS.EXTRA_CARD_PRICES] || CART_MODAL_CONSTANTS.EXTRA_CARD_PRICES.classic;
   }, []);
@@ -81,11 +106,12 @@ const AdditionalServices = memo<AdditionalServicesProps>(({
             variant="outline"
             size="icon"
             onClick={() => handleGateSupervisorsChange(-1)}
-            className="h-8 w-8"
+            disabled={!canAddGateSupervisors}
+            className="h-8 w-8 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Minus className="w-4 h-4" />
           </Button>
-          <span className="text-white min-w-[40px] text-center">
+          <span className={`min-w-[40px] text-center ${canAddGateSupervisors ? 'text-white' : 'text-gray-500'}`}>
             {typeof formData.gateSupervisors === 'number' ? formData.gateSupervisors : 0}
           </span>
           <Button
@@ -93,12 +119,26 @@ const AdditionalServices = memo<AdditionalServicesProps>(({
             variant="outline"
             size="icon"
             onClick={() => handleGateSupervisorsChange(1)}
-            className="h-8 w-8"
+            disabled={!canAddGateSupervisors}
+            className="h-8 w-8 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4" />
           </Button>
         </div>
-        <p className="text-gray-400 text-xs mt-2">متوفر في المدن الرئيسية</p>
+        {!isLocationSelected ? (
+          <p className="text-gray-400 text-xs mt-2">يرجى تحديد موقع المناسبة أولاً</p>
+        ) : !isInMainSaudiCities ? (
+          <p className="text-gray-400 text-xs mt-2">متوفر فقط في المدن الرئيسية: {SAUDI_CITIES.join('، ')}</p>
+        ) : (
+          <p className="text-gray-400 text-xs mt-2">متوفر في المدن الرئيسية</p>
+        )}
+        {packageType === 'vip' && (
+          <div className="mt-2 p-2 bg-[#C09B52]/10 rounded-lg border border-[#C09B52]/20">
+            <p className="text-[#C09B52] text-xs">
+              ℹ️ باقة VIP تتضمن مشرف بوابة واحد بالفعل
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Expedited Delivery */}

@@ -7,12 +7,16 @@ dotenv.config();
 import app, { initializeServices } from './app';
 import { connectDatabase } from './config/database';
 import { connectRedis } from './config/redis';
+import { configureCloudinary } from './config/cloudinary';
 import { logger } from './config/logger';
 
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
+    // Configure Cloudinary
+    configureCloudinary();
+
     // Connect to databases
     await connectDatabase();
     await connectRedis();

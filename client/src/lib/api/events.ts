@@ -9,6 +9,8 @@ export interface Guest {
   whatsappMessageSent: boolean;
   addedAt: string;
   updatedAt: string;
+  refundedOnDecline?: boolean;
+  rsvpStatus?: 'pending' | 'accepted' | 'declined';
 }
 
 export interface EventItem {
@@ -54,6 +56,10 @@ export interface EventItem {
   paymentCompletedAt: string;
   createdAt: string;
   updatedAt: string;
+  refundableSlots?: {
+    total: number;
+    used: number;
+  };
 }
 
 export interface EventStats {

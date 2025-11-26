@@ -25,6 +25,10 @@ interface EventSidebarProps {
     invitationCardUrl?: string;
     qrCodeReaderUrl?: string;
     paymentCompletedAt?: string; // Make optional since it's filtered for collaborators
+    refundableSlots?: {
+      total: number;
+      used: number;
+    };
   };
   totalInvitesForView: number; // Total invites to show (allocated for collaborators)
   approvalStatusDetails: {
@@ -72,6 +76,29 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
             <span className="text-[#C09B52] font-semibold">{guestStats?.remainingInvites || 0}</span>
           </div>
         </div>
+        
+        {/* Refundable Slots Info - Only for Premium and VIP */}
+        {(event.packageType === 'premium' || event.packageType === 'vip') && event.refundableSlots && event.refundableSlots.total > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-gray-300 text-sm">أماكن قابلة للاسترجاع</span>
+              <span className="text-amber-400 font-semibold text-sm">
+                {event.refundableSlots.total - event.refundableSlots.used} / {event.refundableSlots.total}
+              </span>
+            </div>
+            <div className="w-full bg-white/10 rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-amber-500 to-amber-600 h-2 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${Math.min((event.refundableSlots.used / event.refundableSlots.total) * 100, 100)}%` 
+                }}
+              />
+            </div>
+            <p className="text-gray-400 text-xs mt-2">
+              عند اعتذار الضيوف، سيتم إرجاع الأماكن تلقائياً إذا كانت متاحة
+            </p>
+          </div>
+        )}
         
         {/* Progress Bar */}
         <div className="mt-4">

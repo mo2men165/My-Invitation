@@ -131,7 +131,8 @@ const selectedCartItemSchema = new Schema({
       detectedCity: {
         type: String,
         required: true,
-        enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
+        trim: true,
+        maxlength: 100
       },
       googleMapsUrl: {
         type: String,

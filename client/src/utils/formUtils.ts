@@ -40,6 +40,14 @@ export const formUtils = {
     // Sanitize form input
     sanitizeInput: (input: string): string => {
       return input.trim().replace(/\s+/g, ' ');
+    },
+
+    // Get display city - returns customCity if city is 'اخري', otherwise returns city
+    getDisplayCity: (city: string, customCity?: string): string => {
+      if (city === 'اخري' && customCity) {
+        return customCity;
+      }
+      return city;
     }
   };
   

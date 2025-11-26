@@ -33,7 +33,7 @@ export function AdminPendingEvents() {
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [currentEventId, setCurrentEventId] = useState<string>('');
   const [notes, setNotes] = useState('');
-  const [invitationCardUrl, setInvitationCardUrl] = useState('');
+  const [invitationCardImage, setInvitationCardImage] = useState<File | null>(null);
 
   useEffect(() => {
     fetchPendingEvents();
@@ -67,13 +67,31 @@ export function AdminPendingEvents() {
   };
 
   const handleApprove = async (eventId: string) => {
+    if (!invitationCardImage) {
+      alert('يرجى رفع صورة بطاقة الدعوة');
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(invitationCardImage.type)) {
+      alert('نوع الملف غير مدعوم. يرجى رفع صورة (JPG, PNG, WebP)');
+      return;
+    }
+
+    // Validate file size (10MB)
+    if (invitationCardImage.size > 10 * 1024 * 1024) {
+      alert('حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت');
+      return;
+    }
+
     setProcessing(prev => [...prev, eventId]);
     try {
-      await adminAPI.approveEvent(eventId, notes, invitationCardUrl);
+      await adminAPI.approveEvent(eventId, invitationCardImage, notes || undefined);
       setEvents(prev => prev.filter(e => e.id !== eventId));
       setShowApprovalModal(false);
       setNotes('');
-      setInvitationCardUrl('');
+      setInvitationCardImage(null);
     } catch (error) {
       console.error('Error approving event:', error);
     } finally {
@@ -289,16 +307,23 @@ export function AdminPendingEvents() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-2">
-                  رابط بطاقة الدعوة (اختياري)
+                  صورة بطاقة الدعوة (مطلوب)
                 </label>
                 <input
-                  type="url"
-                  value={invitationCardUrl}
-                  onChange={(e) => setInvitationCardUrl(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52]"
-                  placeholder="https://drive.google.com/..."
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setInvitationCardImage(file);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0823D]"
                 />
-                <p className="text-xs text-gray-500 mt-1">يجب أن يكون الرابط من Google Drive</p>
+                <p className="text-xs text-gray-500 mt-1">يجب أن تكون الصورة بصيغة JPG, PNG, أو WebP (حد أقصى 10 ميجابايت)</p>
+                {invitationCardImage && (
+                  <p className="text-xs text-green-400 mt-1">تم اختيار الملف: {invitationCardImage.name}</p>
+                )}
               </div>
             </div>
             
@@ -307,7 +332,7 @@ export function AdminPendingEvents() {
                 onClick={() => {
                   setShowApprovalModal(false);
                   setNotes('');
-                  setInvitationCardUrl('');
+                  setInvitationCardImage(null);
                 }}
                 className="px-4 py-2 text-gray-400 hover:text-white transition-colors duration-200"
               >

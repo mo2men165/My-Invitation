@@ -45,7 +45,16 @@ interface Event {
   approvedAt?: string;
   rejectedAt?: string;
   paymentCompletedAt: string;
-  invitationCardUrl?: string;
+  invitationCardImage?: {
+    public_id: string;
+    secure_url: string;
+    url: string;
+    format: string;
+    width: number;
+    height: number;
+    bytes: number;
+    created_at: string;
+  };
   qrCodeReaderUrl?: string;
   guests?: any[];
   guestListConfirmed?: {
@@ -73,7 +82,8 @@ export default function AdminEventsPage() {
   const [selectedEventForGuests, setSelectedEventForGuests] = useState<string | null>(null);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject' | null>(null);
   const [approvalNotes, setApprovalNotes] = useState('');
-  const [invitationCardUrl, setInvitationCardUrl] = useState('');
+  const [invitationCardImage, setInvitationCardImage] = useState<File | null>(null);
+  const [invitationCardImagePreview, setInvitationCardImagePreview] = useState<string | null>(null);
   const [qrCodeReaderUrl, setQrCodeReaderUrl] = useState('');
   const [processingApproval, setProcessingApproval] = useState(false);
   const { toast } = useToast();
@@ -143,7 +153,8 @@ export default function AdminEventsPage() {
     setSelectedEvent(event);
     setApprovalAction(action);
     setApprovalNotes('');
-    setInvitationCardUrl('');
+    setInvitationCardImage(null);
+    setInvitationCardImagePreview(null);
     setShowApprovalModal(true);
   };
 
@@ -164,27 +175,38 @@ export default function AdminEventsPage() {
       setProcessingApproval(true);
       
       if (approvalAction === 'approve') {
-        // For approval, Google Drive URL is required
-        if (!invitationCardUrl.trim()) {
+        // For approval, invitation card image is required
+        if (!invitationCardImage) {
           toast({
             title: "خطأ",
-            description: "يرجى إدخال رابط بطاقة الدعوة من Google Drive",
+            description: "يرجى رفع صورة بطاقة الدعوة",
             variant: "destructive"
           });
           return;
         }
 
-        // Validate Google Drive URL
-        if (!invitationCardUrl.includes('drive.google.com') && !invitationCardUrl.includes('docs.google.com')) {
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(invitationCardImage.type)) {
           toast({
             title: "خطأ",
-            description: "يجب أن يكون رابط البطاقة من Google Drive",
+            description: "نوع الملف غير مدعوم. يرجى رفع صورة (JPG, PNG, WebP)",
             variant: "destructive"
           });
           return;
         }
 
-        await adminAPI.approveEvent(selectedEvent.id, approvalNotes || undefined, invitationCardUrl, qrCodeReaderUrl.trim() || undefined);
+        // Validate file size (10MB)
+        if (invitationCardImage.size > 10 * 1024 * 1024) {
+          toast({
+            title: "خطأ",
+            description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        await adminAPI.approveEvent(selectedEvent.id, invitationCardImage, approvalNotes || undefined, qrCodeReaderUrl.trim() || undefined);
         toast({
           title: "تم بنجاح",
           description: "تم الموافقة على الحدث وإرسال إشعار للمستخدم",
@@ -210,7 +232,8 @@ export default function AdminEventsPage() {
       setShowApprovalModal(false);
       setApprovalAction(null);
       setApprovalNotes('');
-      setInvitationCardUrl('');
+      setInvitationCardImage(null);
+      setInvitationCardImagePreview(null);
       setQrCodeReaderUrl('');
       fetchEvents(); // Refresh the events list
     } catch (error: any) {
@@ -870,36 +893,30 @@ export default function AdminEventsPage() {
                   </div>
                 </div>
 
-                {/* Invitation Card URL */}
-                {selectedEvent.invitationCardUrl && (
+                {/* Invitation Card Image */}
+                {selectedEvent.invitationCardImage && (
                   <div>
                     <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                      <ExternalLink className="w-5 h-5 text-blue-400" />
+                      <ImageIcon className="w-5 h-5 text-blue-400" />
                       بطاقة الدعوة
                     </h4>
                     <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-5">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-blue-100 text-sm mb-2">رابط بطاقة الدعوة:</p>
-                          <a
-                            href={selectedEvent.invitationCardUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-300 hover:text-blue-200 text-sm block truncate"
-                            title={selectedEvent.invitationCardUrl}
-                            dir="ltr"
-                          >
-                            {selectedEvent.invitationCardUrl}
-                          </a>
+                      <div className="space-y-4">
+                        <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
+                          <img
+                            src={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
+                            alt="Invitation Card"
+                            className="w-full h-auto max-h-96 object-contain"
+                          />
                         </div>
                         <a
-                          href={selectedEvent.invitationCardUrl}
+                          href={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 whitespace-nowrap"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
                         >
                           <ExternalLink className="w-4 h-4" />
-                          عرض البطاقة
+                          فتح الصورة في علامة تبويب جديدة
                         </a>
                       </div>
                     </div>
@@ -976,7 +993,8 @@ export default function AdminEventsPage() {
                       setShowApprovalModal(false);
                       setApprovalAction(null);
                       setApprovalNotes('');
-                      setInvitationCardUrl('');
+                      setInvitationCardImage(null);
+                      setInvitationCardImagePreview(null);
                       setQrCodeReaderUrl('');
                     }}
                     className="p-2 hover:bg-gray-800 rounded-lg transition-colors duration-200"
@@ -1008,18 +1026,46 @@ export default function AdminEventsPage() {
                 {approvalAction === 'approve' && (
                   <div>
                     <label className="text-sm text-gray-400 mb-2 block">
-                      رابط بطاقة الدعوة من Google Drive *
+                      صورة بطاقة الدعوة *
                     </label>
-                    <input
-                      type="url"
-                      value={invitationCardUrl}
-                      onChange={(e) => setInvitationCardUrl(e.target.value)}
-                      placeholder="https://drive.google.com/file/d/..."
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52]"
-                      required
-                    />
+                    <div className="space-y-3">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          setInvitationCardImage(file);
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setInvitationCardImagePreview(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          } else {
+                            setInvitationCardImagePreview(null);
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
+                        required
+                      />
+                      {invitationCardImagePreview && (
+                        <div className="mt-3">
+                          <p className="text-xs text-gray-400 mb-2">معاينة الصورة:</p>
+                          <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
+                            <img
+                              src={invitationCardImagePreview}
+                              alt="Preview"
+                              className="w-full h-auto max-h-64 object-contain"
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            الملف: {invitationCardImage?.name} ({invitationCardImage ? ((invitationCardImage.size / 1024 / 1024).toFixed(2)) : '0.00'} MB)
+                          </p>
+                        </div>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      يجب أن يكون الرابط من Google Drive أو Google Docs
+                      الصيغ المدعومة: JPG, PNG, WebP (الحد الأقصى: 10 ميجابايت)
                     </p>
                   </div>
                 )}
@@ -1061,7 +1107,7 @@ export default function AdminEventsPage() {
                     onClick={processApproval}
                     disabled={processingApproval || 
                       (approvalAction === 'reject' && !approvalNotes.trim()) ||
-                      (approvalAction === 'approve' && !invitationCardUrl.trim())
+                      (approvalAction === 'approve' && !invitationCardImage)
                     }
                     className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
                       approvalAction === 'approve'
@@ -1083,7 +1129,8 @@ export default function AdminEventsPage() {
                       setShowApprovalModal(false);
                       setApprovalAction(null);
                       setApprovalNotes('');
-                      setInvitationCardUrl('');
+                      setInvitationCardImage(null);
+                      setInvitationCardImagePreview(null);
                       setQrCodeReaderUrl('');
                     }}
                     className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200"

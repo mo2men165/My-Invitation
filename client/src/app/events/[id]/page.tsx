@@ -238,7 +238,7 @@ ${event.details.invitationText}
       guestName: guest.name,
       guestPhone: guest.phone,
       packageType: event.packageType,
-      hasIndividualLink: !!guest.individualInviteLink
+      hasIndividualLink: !!guest.individualInviteImage
     });
 
     // Check if package supports WhatsApp integration
@@ -252,8 +252,8 @@ ${event.details.invitationText}
       return;
     }
 
-    // Check if individual invite link is set
-    if (!guest.individualInviteLink) {
+    // Check if individual invite image is set
+    if (!guest.individualInviteImage) {
       console.error('USER FRONTEND: Individual invite link missing', {
         guestId: guest._id,
         guestName: guest.name
@@ -336,8 +336,8 @@ ${event.details.invitationText}
       unsentGuestIds: unsentGuests.map(g => g._id)
     });
 
-    // Check if all guests have individual links
-    const guestsWithoutLinks = unsentGuests.filter(g => !g.individualInviteLink);
+    // Check if all guests have individual images
+    const guestsWithoutLinks = unsentGuests.filter(g => !g.individualInviteImage);
     if (guestsWithoutLinks.length > 0) {
       console.error('USER FRONTEND BULK: Some guests missing individual links', {
         count: guestsWithoutLinks.length,

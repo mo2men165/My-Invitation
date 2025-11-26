@@ -34,7 +34,16 @@ interface Guest {
   rsvpRespondedAt?: string;
   addedAt: string;
   updatedAt: string;
-  individualInviteLink?: string;
+  individualInviteImage?: {
+    public_id: string;
+    secure_url: string;
+    url: string;
+    format: string;
+    width: number;
+    height: number;
+    bytes: number;
+    created_at: string;
+  };
   actuallyAttended?: boolean;
   attendanceMarkedAt?: string;
   attendanceMarkedBy?: string;
@@ -86,9 +95,10 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
   const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState<string | null>(null);
   const [showVipOnly, setShowVipOnly] = useState(false);
-  const [editingLinkForGuest, setEditingLinkForGuest] = useState<string | null>(null);
-  const [inviteLinkInput, setInviteLinkInput] = useState<string>('');
-  const [updatingLink, setUpdatingLink] = useState(false);
+  const [editingImageForGuest, setEditingImageForGuest] = useState<string | null>(null);
+  const [inviteImageFile, setInviteImageFile] = useState<File | null>(null);
+  const [inviteImagePreview, setInviteImagePreview] = useState<string | null>(null);
+  const [updatingImage, setUpdatingImage] = useState(false);
   const [showReopenConfirmation, setShowReopenConfirmation] = useState(false);
   const { toast } = useToast();
 
@@ -134,7 +144,7 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
       guestName: guest.name,
       guestPhone: guest.phone,
       packageType: event.packageType,
-      hasIndividualLink: !!guest.individualInviteLink
+      hasIndividualImage: !!guest.individualInviteImage
     });
 
     setSendingMessage(guest._id);
@@ -250,44 +260,107 @@ ${event.invitationText}
     }
   };
 
-  const handleUpdateInviteLink = async (guest: Guest) => {
+  const handleUpdateInviteImage = async (guest: Guest) => {
     if (!event) return;
 
+    if (!inviteImageFile) {
+      toast({
+        title: "خطأ",
+        description: "يرجى اختيار صورة",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(inviteImageFile.type)) {
+      toast({
+        title: "خطأ",
+        description: "نوع الملف غير مدعوم. يرجى رفع صورة (JPG, PNG, WebP)",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file size (10MB)
+    if (inviteImageFile.size > 10 * 1024 * 1024) {
+      toast({
+        title: "خطأ",
+        description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
-      setUpdatingLink(true);
-      await adminAPI.updateGuestInviteLink(eventId, guest._id, inviteLinkInput);
+      setUpdatingImage(true);
+      await adminAPI.updateGuestInviteImage(eventId, guest._id, inviteImageFile);
       
       // Reload to update UI
       await loadEventGuests();
       
       // Reset editing state
-      setEditingLinkForGuest(null);
-      setInviteLinkInput('');
+      setEditingImageForGuest(null);
+      setInviteImageFile(null);
+      setInviteImagePreview(null);
       
       toast({
         title: "تم التحديث",
-        description: "تم تحديث رابط الدعوة الفردي بنجاح",
+        description: "تم تحديث صورة الدعوة الفردية بنجاح",
         variant: "default"
       });
     } catch (error: any) {
       toast({
-        title: "خطأ في تحديث الرابط",
+        title: "خطأ في تحديث الصورة",
         description: error.message || "حدث خطأ غير متوقع",
         variant: "destructive"
       });
     } finally {
-      setUpdatingLink(false);
+      setUpdatingImage(false);
     }
   };
 
-  const handleStartEditingLink = (guest: Guest) => {
-    setEditingLinkForGuest(guest._id);
-    setInviteLinkInput(guest.individualInviteLink || '');
+  const handleDeleteInviteImage = async (guest: Guest) => {
+    if (!event) return;
+
+    if (!confirm('هل أنت متأكد من حذف صورة الدعوة الفردية؟')) {
+      return;
+    }
+
+    try {
+      setUpdatingImage(true);
+      await adminAPI.updateGuestInviteImage(eventId, guest._id, null);
+      
+      // Reload to update UI
+      await loadEventGuests();
+      
+      toast({
+        title: "تم الحذف",
+        description: "تم حذف صورة الدعوة الفردية بنجاح",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ في حذف الصورة",
+        description: error.message || "حدث خطأ غير متوقع",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingImage(false);
+    }
   };
 
-  const handleCancelEditingLink = () => {
-    setEditingLinkForGuest(null);
-    setInviteLinkInput('');
+  const handleStartEditingImage = (guest: Guest) => {
+    setEditingImageForGuest(guest._id);
+    setInviteImageFile(null);
+    setInviteImagePreview(null);
+  };
+
+  const handleCancelEditingImage = () => {
+    setEditingImageForGuest(null);
+    setInviteImageFile(null);
+    setInviteImagePreview(null);
   };
 
   const handleConfirmReopenGuestList = async () => {
@@ -629,60 +702,103 @@ ${event.invitationText}
                   {/* Individual Invite Link Section (Premium & VIP only) */}
                   {(event.packageType === 'premium' || event.packageType === 'vip') && (
                     <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-600">
-                      {editingLinkForGuest === guest._id ? (
-                        <div className="space-y-2">
-                          <label className="text-xs text-gray-400 block">رابط الدعوة الفردي</label>
-                          <div className="flex items-center space-x-2 ">
-                            <input
-                              type="text"
-                              value={inviteLinkInput}
-                              onChange={(e) => setInviteLinkInput(e.target.value)}
-                              placeholder="أدخل رابط الدعوة الفردي"
-                              className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#C09B52]"
-                            />
+                      {editingImageForGuest === guest._id ? (
+                        <div className="space-y-3">
+                          <label className="text-xs text-gray-400 block">صورة الدعوة الفردية</label>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setInviteImageFile(file);
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setInviteImagePreview(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              } else {
+                                setInviteImagePreview(null);
+                              }
+                            }}
+                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
+                          />
+                          {inviteImagePreview && (
+                            <div className="mt-2">
+                              <p className="text-xs text-gray-400 mb-2">معاينة الصورة:</p>
+                              <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-700">
+                                <img
+                                  src={inviteImagePreview}
+                                  alt="Preview"
+                                  className="w-full h-auto max-h-32 object-contain"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex items-center space-x-2">
                             <button
-                              onClick={() => handleUpdateInviteLink(guest)}
-                              disabled={updatingLink}
-                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={() => handleUpdateInviteImage(guest)}
+                              disabled={updatingImage || !inviteImageFile}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                             >
-                              {updatingLink ? (
+                              {updatingImage ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <Check className="h-4 w-4" />
                               )}
                             </button>
                             <button
-                              onClick={handleCancelEditingLink}
-                              disabled={updatingLink}
-                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                              onClick={handleCancelEditingImage}
+                              disabled={updatingImage}
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm"
                             >
                               <X className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <span className="text-xs text-gray-400 block mb-1">رابط الدعوة الفردي</span>
-                            {guest.individualInviteLink ? (
-                              <a 
-                                href={guest.individualInviteLink} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-400 hover:text-blue-300 underline break-all"
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-400">صورة الدعوة الفردية</span>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleStartEditingImage(guest)}
+                                className="px-3 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600 transition-colors"
                               >
-                                {guest.individualInviteLink}
-                              </a>
-                            ) : (
-                              <span className="text-sm text-gray-500">لم يتم تعيين رابط</span>
-                            )}
+                                {guest.individualInviteImage ? 'تعديل' : 'إضافة'}
+                              </button>
+                              {guest.individualInviteImage && (
+                                <button
+                                  onClick={() => handleDeleteInviteImage(guest)}
+                                  disabled={updatingImage}
+                                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors disabled:opacity-50"
+                                >
+                                  حذف
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <button
-                            onClick={() => handleStartEditingLink(guest)}
-                            className="mr-3 px-3 py-1 bg-gray-700 text-white text-sm rounded hover:bg-gray-600 transition-colors"
-                          >
-                            {guest.individualInviteLink ? 'تعديل' : 'إضافة'}
-                          </button>
+                          {guest.individualInviteImage ? (
+                            <div className="mt-2">
+                              <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-700">
+                                <img
+                                  src={guest.individualInviteImage.secure_url || guest.individualInviteImage.url}
+                                  alt="Invite Card"
+                                  className="w-full h-auto max-h-32 object-contain"
+                                />
+                              </div>
+                              <a
+                                href={guest.individualInviteImage.secure_url || guest.individualInviteImage.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-400 hover:text-blue-300 mt-2 inline-block"
+                              >
+                                فتح الصورة
+                              </a>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-500">لم يتم تعيين صورة</span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -735,7 +851,7 @@ ${event.invitationText}
                     <div className="flex items-center space-x-2  flex-wrap gap-2">
                       {/* Only show send button if guest list is confirmed AND individual invite link is added */}
                       {event.guestListConfirmed?.isConfirmed ? (
-                        guest.individualInviteLink ? (
+                        guest.individualInviteImage ? (
                           <button
                             onClick={() => handleSendWhatsapp(guest)}
                             disabled={sendingMessage === guest._id}

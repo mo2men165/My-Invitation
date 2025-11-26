@@ -356,7 +356,7 @@ const PaymentPageContent: React.FC = () => {
           lastName: user.lastName || '',
           email: user.email || '',
           phone: user.phone || '',
-          city: user.city || 'الرياض'
+          city: (user.city === 'اخري' && user.customCity) ? user.customCity : (user.city || 'الرياض')
         },
         selectedCartItemIds,
         action: 'CALLING_PAYMOB_API_CREATE_ORDER'
@@ -368,7 +368,7 @@ const PaymentPageContent: React.FC = () => {
           lastName: user.lastName || '',
           email: user.email || '',
           phone: user.phone || '',
-          city: user.city || 'الرياض' // Default city if not set
+          city: (user.city === 'اخري' && user.customCity) ? user.customCity : (user.city || 'الرياض') // Default city if not set
         },
         selectedCartItemIds: selectedCartItemIds
       });

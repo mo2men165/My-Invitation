@@ -24,6 +24,7 @@ interface PendingEvent {
     email: string;
     phone: string;
     city: string;
+    customCity?: string;
   };
   eventDetails: {
     hostName: string;
@@ -44,10 +45,22 @@ interface User {
   email: string;
   phone: string;
   city: string;
+  customCity?: string;
   role: string;
   status: string;
   eventCount: number;
   createdAt: string;
+}
+
+interface CloudinaryImage {
+  public_id: string;
+  secure_url: string;
+  url: string;
+  format: string;
+  width: number;
+  height: number;
+  bytes: number;
+  created_at: string;
 }
 
 interface Event {
@@ -67,7 +80,7 @@ interface Event {
   totalPrice: number;
   status: string;
   approvalStatus: string;
-  invitationCardUrl?: string;
+  invitationCardImage?: CloudinaryImage;
   qrCodeReaderUrl?: string;
   adminNotes?: string;
   approvedBy?: string;
@@ -105,12 +118,15 @@ interface PaginatedResponse<T> {
   };
 }
 
-const getAuthHeaders = () => {
+const getAuthHeaders = (includeContentType = true) => {
   const token = localStorage.getItem('access_token');
-  return {
-    'Content-Type': 'application/json',
+  const headers: Record<string, string> = {
     'Authorization': `Bearer ${token}`
   };
+  if (includeContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+  return headers;
 };
 
 export const adminAPI = {
@@ -177,11 +193,16 @@ export const adminAPI = {
   },
 
   // Approve Event
-  async approveEvent(eventId: string, notes?: string, invitationCardUrl?: string, qrCodeReaderUrl?: string): Promise<void> {
+  async approveEvent(eventId: string, invitationCardImage: File, notes?: string, qrCodeReaderUrl?: string): Promise<void> {
+    const formData = new FormData();
+    formData.append('image', invitationCardImage);
+    if (notes) formData.append('notes', notes);
+    if (qrCodeReaderUrl) formData.append('qrCodeReaderUrl', qrCodeReaderUrl);
+
     const response = await fetch(`${API_URL}/api/admin/events/${eventId}/approve`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ notes, invitationCardUrl, qrCodeReaderUrl })
+      headers: getAuthHeaders(false), // Don't include Content-Type, let browser set it with boundary
+      body: formData
     });
     
     const result = await response.json();
@@ -362,18 +383,23 @@ export const adminAPI = {
     }
   },
 
-  // Update Guest Individual Invite Link (premium and VIP only)
-  async updateGuestInviteLink(eventId: string, guestId: string, individualInviteLink: string): Promise<void> {
-    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/guests/${guestId}/invite-link`, {
+  // Update Guest Individual Invite Image (premium and VIP only)
+  async updateGuestInviteImage(eventId: string, guestId: string, individualInviteImage: File | null): Promise<void> {
+    const formData = new FormData();
+    if (individualInviteImage) {
+      formData.append('image', individualInviteImage);
+    }
+
+    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/guests/${guestId}/invite-image`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ individualInviteLink })
+      headers: getAuthHeaders(false), // Don't include Content-Type, let browser set it with boundary
+      body: formData
     });
     
     const result = await response.json();
     
     if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في تحديث رابط الدعوة');
+      throw new Error(result.error?.message || 'فشل في تحديث صورة الدعوة');
     }
   },
 
@@ -406,5 +432,90 @@ export const adminAPI = {
     if (!response.ok) {
       throw new Error(result.error?.message || 'فشل في تسجيل حضور الضيف');
     }
+  },
+
+  // User Cart Management
+  async getUserCart(userId: string): Promise<{
+    user: {
+      id: string;
+      name: string;
+      email: string;
+    };
+    cart: any[];
+  }> {
+    const response = await fetch(`${API_URL}/api/admin/users/${userId}/cart`, {
+      headers: getAuthHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في جلب سلة المستخدم');
+    }
+    
+    return result.data;
+  },
+
+  async updateCartItemPrice(userId: string, cartItemId: string, price: number, reason?: string): Promise<any> {
+    const response = await fetch(`${API_URL}/api/admin/users/${userId}/cart/${cartItemId}/price`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ price, reason })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في تحديث السعر');
+    }
+    
+    return result.data;
+  },
+
+  async applyCartItemDiscount(userId: string, cartItemId: string, percentage: number, reason?: string): Promise<any> {
+    const response = await fetch(`${API_URL}/api/admin/users/${userId}/cart/${cartItemId}/discount`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ percentage, reason })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في تطبيق الخصم');
+    }
+    
+    return result.data;
+  },
+
+  async applyCartDiscountAll(userId: string, percentage: number, reason?: string): Promise<any> {
+    const response = await fetch(`${API_URL}/api/admin/users/${userId}/cart/discount-all`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ percentage, reason })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في تطبيق الخصم');
+    }
+    
+    return result.data;
+  },
+
+  async removeCartItemPriceModification(userId: string, cartItemId: string): Promise<any> {
+    const response = await fetch(`${API_URL}/api/admin/users/${userId}/cart/${cartItemId}/price-modification`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في إعادة السعر الأصلي');
+    }
+    
+    return result.data;
   }
 };

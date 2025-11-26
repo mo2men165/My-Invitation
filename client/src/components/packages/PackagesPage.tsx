@@ -1,5 +1,6 @@
 'use client';
-import React from 'react';
+import React, { useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
 // Hooks
 import { usePackages } from '@/hooks/usePackages';
@@ -7,6 +8,8 @@ import { useWishlist } from '@/hooks/useWishlist';
 import { useCompare } from '@/hooks/useCompare';
 import { useModal } from '@/hooks/useModal';
 import { usePackagesLogic } from '@/hooks/usePackagesLogic';
+import { useAuth } from '@/hooks/useAuth';
+import { PackageData, InvitationDesign } from '@/types';
 
 // Components
 import PageHeader from './PageHeader';
@@ -21,6 +24,8 @@ import ImageModal from './modals/ImageModal';
 import AdditionalServices from './AdditionalServices';
 
 export default function PackagesPage() {
+  const router = useRouter();
+  const { isAuthenticated, isInitialized } = useAuth();
   const { activeTab, setActiveTab, currentPackage, allPackages } = usePackages();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { isInCompare, toggleCompare } = useCompare();
@@ -43,6 +48,23 @@ export default function PackagesPage() {
     selectCategory,
     setDesignMode
   } = usePackagesLogic();
+
+  // Wrapper function to check authentication before opening cart modal
+  const handleAddToCart = useCallback((packageType: keyof PackageData, design: InvitationDesign) => {
+    // Wait for auth to initialize
+    if (!isInitialized) {
+      return;
+    }
+
+    // If not authenticated, redirect to login
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    // If authenticated, open the modal
+    openCartModal(packageType, design);
+  }, [isAuthenticated, isInitialized, router, openCartModal]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
@@ -68,7 +90,7 @@ export default function PackagesPage() {
           /* Custom Design View */
           <CustomDesignView
             packageType={activeTab}
-            onAddToCart={openCartModal}
+            onAddToCart={handleAddToCart}
           />
         ) : (
           /* Regular Design Selection */
@@ -98,7 +120,7 @@ export default function PackagesPage() {
             <DesignGrid
               designs={filteredDesigns}
               packageType={activeTab}
-              onAddToCart={openCartModal}
+              onAddToCart={handleAddToCart}
               onToggleWishlist={toggleWishlist}
               onToggleCompare={toggleCompare}
               onViewImage={openImageModal}

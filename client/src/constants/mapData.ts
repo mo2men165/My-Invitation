@@ -19,11 +19,11 @@ export const DEFAULT_COORDINATES = {
   lng: 46.6753
 };
 
-// Map configuration
+// Map configuration - Allow Gulf countries
 export const MAP_CONFIG = {
   defaultZoom: 11,
   defaultCenter: DEFAULT_COORDINATES,
-  componentRestrictions: { country: 'SA' },
+  componentRestrictions: { country: ['SA', 'AE', 'KW', 'QA', 'BH', 'OM'] }, // Gulf countries
   fields: ['place_id', 'geometry', 'name', 'formatted_address']
 };
 

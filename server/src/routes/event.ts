@@ -24,6 +24,43 @@ const guestSchema = z.object({
 const updateGuestSchema = guestSchema.partial();
 
 /**
+ * Calculate maximum refundable slots based on package type
+ */
+function getMaxRefundableSlots(packageType: 'classic' | 'premium' | 'vip', inviteCount: number): number {
+  if (packageType === 'classic') {
+    return 0; // Classic packages don't have refundable privilege
+  }
+  const percentage = packageType === 'premium' ? 0.20 : 0.30; // 20% for premium, 30% for VIP
+  return Math.floor(inviteCount * percentage);
+}
+
+/**
+ * Calculate effective total invited guests (excluding declined guests that were refunded)
+ */
+function calculateEffectiveTotalInvited(guests: any[]): number {
+  return guests.reduce((sum, guest) => {
+    // If guest declined and was refunded, don't count them
+    if (guest.rsvpStatus === 'declined' && guest.refundedOnDecline) {
+      return sum;
+    }
+    return sum + guest.numberOfAccompanyingGuests;
+  }, 0);
+}
+
+/**
+ * Initialize refundable slots for an event if not already set
+ */
+function initializeRefundableSlots(event: any): void {
+  if (!event.refundableSlots || event.refundableSlots.total === 0) {
+    const total = getMaxRefundableSlots(event.packageType, event.details.inviteCount);
+    event.refundableSlots = {
+      total,
+      used: 0
+    };
+  }
+}
+
+/**
  * GET /api/events
  * Get user's events with filtering options
  */
@@ -126,6 +163,12 @@ router.get('/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Initialize refundable slots if not already set
+    initializeRefundableSlots(event);
+    if (event.isModified('refundableSlots')) {
+      await event.save();
+    }
+
     // Filter data based on user role
     let filteredEvent = event.toObject();
     let filteredGuests = event.guests;
@@ -134,7 +177,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       // Filter out sensitive information for collaborators
       delete filteredEvent.totalPrice;
       delete filteredEvent.paymentCompletedAt;
-      delete filteredEvent.invitationCardUrl;
+      delete filteredEvent.invitationCardImage;
       delete filteredEvent.qrCodeReaderUrl;
       delete filteredEvent.adminNotes;
       delete filteredEvent.approvedBy;
@@ -160,7 +203,8 @@ router.get('/:id', async (req: Request, res: Response) => {
     }
 
     // Calculate guest statistics based on filtered guests
-    const totalInvited = filteredGuests.reduce((sum, guest) => sum + guest.numberOfAccompanyingGuests, 0);
+    // Use effective total (excluding declined refundable guests)
+    const totalInvited = calculateEffectiveTotalInvited(filteredGuests);
     const whatsappSent = filteredGuests.filter(guest => guest.whatsappMessageSent).length;
 
     return res.json({
@@ -269,11 +313,18 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
         });
       }
 
+      // Calculate effective used invites (excluding declined refundable guests added by this collaborator)
+      const collaboratorGuests = event.guests.filter(guest => 
+        guest.addedBy?.type === 'collaborator' && 
+        guest.addedBy?.userId?.toString() === userId
+      );
+      const effectiveUsedInvites = calculateEffectiveTotalInvited(collaboratorGuests);
+      
       // Check if collaborator has reached their allocation limit
-      if (usedInvites + guestData.numberOfAccompanyingGuests > allocatedInvites) {
+      if (effectiveUsedInvites + guestData.numberOfAccompanyingGuests > allocatedInvites) {
         return res.status(400).json({
           success: false,
-          error: { message: `تجاوز العدد المسموح لك. المتبقي: ${allocatedInvites - usedInvites} دعوة` }
+          error: { message: `تجاوز العدد المسموح لك. المتبقي: ${allocatedInvites - effectiveUsedInvites} دعوة` }
         });
       }
     }
@@ -295,8 +346,11 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
       });
     }
 
-    // Check invite count limit
-    const currentInvited = event.guests.reduce((sum, guest) => sum + guest.numberOfAccompanyingGuests, 0);
+    // Initialize refundable slots if not already set
+    initializeRefundableSlots(event);
+
+    // Check invite count limit using effective total (excluding declined guests that were refunded)
+    const currentInvited = calculateEffectiveTotalInvited(event.guests);
     const newTotalInvited = currentInvited + guestData.numberOfAccompanyingGuests;
 
     if (newTotalInvited > event.details.inviteCount) {
@@ -306,7 +360,7 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
       });
     }
 
-    // Add guest with tracking info
+    // Add guest with tracking info (no refundable assignment - will be handled on decline)
     const newGuest = {
       name: guestData.name,
       phone: normalizePhoneNumber(guestData.phone), // Normalize to international format
@@ -354,11 +408,14 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
 
     logger.info(`Guest added to event ${id} for user ${userId}`);
 
+    // Calculate remaining invites using effective total
+    const effectiveTotalInvited = calculateEffectiveTotalInvited(event.guests);
+    
     return res.status(201).json({
       success: true,
       message: 'تم إضافة الضيف بنجاح',
       guest: event.guests[event.guests.length - 1],
-      remainingInvites: event.details.inviteCount - newTotalInvited
+      remainingInvites: event.details.inviteCount - effectiveTotalInvited
     });
 
   } catch (error) {

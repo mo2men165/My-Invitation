@@ -23,7 +23,33 @@ export interface GoogleMapsLocationPickerProps {
   errors?: { location?: string };
 }
 
-// Saudi Arabia city boundaries for validation
+// Gulf countries boundaries for validation
+export const GULF_COUNTRIES_BOUNDARIES = [
+  // Saudi Arabia
+  { minLat: 16, maxLat: 32, minLng: 34, maxLng: 55, name: 'Saudi Arabia' },
+  // UAE
+  { minLat: 22, maxLat: 26, minLng: 51, maxLng: 56, name: 'UAE' },
+  // Kuwait
+  { minLat: 28.5, maxLat: 30.1, minLng: 46.5, maxLng: 48.5, name: 'Kuwait' },
+  // Qatar
+  { minLat: 24.4, maxLat: 26.2, minLng: 50.7, maxLng: 51.7, name: 'Qatar' },
+  // Bahrain
+  { minLat: 25.8, maxLat: 26.3, minLng: 50.4, maxLng: 50.7, name: 'Bahrain' },
+  // Oman
+  { minLat: 16.6, maxLat: 26.4, minLng: 51.9, maxLng: 59.8, name: 'Oman' }
+] as const;
+
+// Gulf countries list for display
+export const GULF_COUNTRIES = [
+  'المملكة العربية السعودية',
+  'الإمارات العربية المتحدة',
+  'الكويت',
+  'قطر',
+  'البحرين',
+  'عُمان'
+] as const;
+
+// Legacy exports for backward compatibility
 export const SAUDI_CITIES = [
   'جدة',
   'الرياض',

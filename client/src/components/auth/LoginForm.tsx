@@ -27,7 +27,7 @@ export function LoginForm() {
       if (user.role === 'admin') {
         router.push('/admin');
       } else {
-        router.push('/dashboard');
+        router.push('/packages');
       }
     }
   }, [isAuthenticated, user, router]);

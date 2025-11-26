@@ -9,12 +9,27 @@ import { Types } from 'mongoose';
 import { NotificationService } from '../services/notificationService';
 import { AdminNotification } from '../models/AdminNotification';
 import { emailService } from '../services/emailService';
+import { uploadSingleImage } from '../config/multer';
+import { CloudinaryService } from '../services/cloudinaryService';
 
 
 const router = Router();
 
 // Apply admin authentication to all routes
 router.use(checkJwt, extractUser, requireAdmin);
+
+/**
+ * Calculate effective total invited guests (excluding declined guests that were refunded)
+ */
+function calculateEffectiveTotalInvited(guests: any[]): number {
+  return guests.reduce((sum, guest) => {
+    // If guest declined and was refunded, don't count them
+    if (guest.rsvpStatus === 'declined' && guest.refundedOnDecline) {
+      return sum;
+    }
+    return sum + guest.numberOfAccompanyingGuests;
+  }, 0);
+}
 
 // ============================================
 // DASHBOARD & STATS
@@ -206,7 +221,7 @@ router.get('/events/pending', async (req: Request, res: Response) => {
         status: event.status,
         approvalStatus: event.approvalStatus,
         adminNotes: event.adminNotes,
-        invitationCardUrl: event.invitationCardUrl,
+        invitationCardImage: event.invitationCardImage,
         qrCodeReaderUrl: event.qrCodeReaderUrl,
         createdAt: event.createdAt,
         updatedAt: event.updatedAt,
@@ -356,7 +371,7 @@ router.get('/events/all', async (req: Request, res: Response) => {
         approvedAt: event.approvedAt,
         rejectedAt: event.rejectedAt,
         paymentCompletedAt: event.paymentCompletedAt,
-        invitationCardUrl: event.invitationCardUrl,
+        invitationCardImage: event.invitationCardImage,
         qrCodeReaderUrl: event.qrCodeReaderUrl,
         createdAt: event.createdAt,
         updatedAt: event.updatedAt,
@@ -401,21 +416,14 @@ router.get('/events/all', async (req: Request, res: Response) => {
 
 /**
  * POST /api/admin/events/:eventId/approve
- * Approve an event
+ * Approve an event with invitation card image upload
  */
-router.post('/events/:eventId/approve', async (req: Request, res: Response) => {
+router.post('/events/:eventId/approve', uploadSingleImage, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
-    const { notes, invitationCardUrl, qrCodeReaderUrl } = req.body;
+    const { notes, qrCodeReaderUrl } = req.body;
     const adminId = req.user!.id;
-
-    // Validate Google Drive URL if provided
-    if (invitationCardUrl && !invitationCardUrl.includes('drive.google.com') && !invitationCardUrl.includes('docs.google.com')) {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'يجب أن يكون رابط البطاقة من Google Drive' }
-      });
-    }
+    const file = req.file;
 
     const event = await Event.findById(eventId).populate('userId', 'email firstName lastName');
     if (!event) {
@@ -432,12 +440,70 @@ router.post('/events/:eventId/approve', async (req: Request, res: Response) => {
       });
     }
 
+    // Validate and upload invitation card image if provided
+    let invitationCardImage = null;
+    if (file) {
+      // Validate the image file
+      const validation = CloudinaryService.validateImageFile(file);
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          error: { message: validation.error || 'صورة غير صالحة' }
+        });
+      }
+
+      try {
+        // Upload to Cloudinary
+        const uploadResult = await CloudinaryService.uploadFile(
+          file.buffer,
+          file.originalname,
+          {
+            folder: `events/${eventId}/invitation-cards`,
+            resource_type: 'image'
+          }
+        );
+
+        invitationCardImage = {
+          public_id: uploadResult.public_id,
+          secure_url: uploadResult.secure_url,
+          url: uploadResult.url,
+          format: uploadResult.format,
+          width: uploadResult.width,
+          height: uploadResult.height,
+          bytes: uploadResult.bytes,
+          created_at: uploadResult.created_at
+        };
+
+        // Delete old image if it exists
+        if (event.invitationCardImage?.public_id) {
+          try {
+            await CloudinaryService.deleteImage(event.invitationCardImage.public_id);
+          } catch (deleteError) {
+            logger.warn('Failed to delete old invitation card image:', deleteError);
+            // Don't fail the request if deletion fails
+          }
+        }
+      } catch (uploadError: any) {
+        logger.error('Error uploading invitation card image:', uploadError);
+        return res.status(500).json({
+          success: false,
+          error: { message: `فشل رفع الصورة: ${uploadError.message}` }
+        });
+      }
+    } else {
+      // If no image provided, return error (image is now required)
+      return res.status(400).json({
+        success: false,
+        error: { message: 'يجب رفع صورة بطاقة الدعوة' }
+      });
+    }
+
     // Update event approval status
     event.approvalStatus = 'approved';
     event.approvedBy = new Types.ObjectId(adminId);
     event.approvedAt = new Date();
     if (notes) event.adminNotes = notes;
-    if (invitationCardUrl) event.invitationCardUrl = invitationCardUrl;
+    if (invitationCardImage) event.invitationCardImage = invitationCardImage;
     if (qrCodeReaderUrl) event.qrCodeReaderUrl = qrCodeReaderUrl;
 
     await event.save();
@@ -450,7 +516,7 @@ router.post('/events/:eventId/approve', async (req: Request, res: Response) => {
         email: user.email,
         eventName: event.details.eventName || event.details.hostName,
         eventDate: event.details.eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory' }),
-        invitationCardUrl: event.invitationCardUrl,
+        invitationCardUrl: event.invitationCardImage?.secure_url || event.invitationCardImage?.url,
         qrCodeReaderUrl: event.qrCodeReaderUrl
       });
       
@@ -637,7 +703,8 @@ router.get('/events/:eventId/guests', async (req: Request, res: Response) => {
     })) || [];
 
     // Calculate guest statistics based on actual guests shown
-    const totalInvited = guestsToShow.reduce((sum, guest) => sum + guest.numberOfAccompanyingGuests, 0);
+    // Use effective total (excluding declined refundable guests)
+    const totalInvited = calculateEffectiveTotalInvited(guestsToShow);
     const whatsappSent = guestsToShow.filter(guest => guest.whatsappMessageSent).length;
     const guestsAddedByOwner = formattedGuests.filter(g => g.addedByInfo.isOwner).length;
     const guestsAddedByCollaborators = formattedGuests.filter(g => g.addedByInfo.isCollaborator).length;
@@ -750,14 +817,14 @@ router.post('/events/:eventId/guests/:guestId/whatsapp', async (req: Request, re
 });
 
 /**
- * PUT /api/admin/events/:eventId/guests/:guestId/invite-link
- * Update individual invite link for a guest (premium and VIP packages only)
+ * PUT /api/admin/events/:eventId/guests/:guestId/invite-image
+ * Update individual invite image for a guest (premium and VIP packages only)
  */
-router.put('/events/:eventId/guests/:guestId/invite-link', async (req: Request, res: Response) => {
+router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, async (req: Request, res: Response) => {
   try {
     const { eventId, guestId } = req.params;
-    const { individualInviteLink } = req.body;
     const adminId = req.user!.id;
+    const file = req.file;
 
     const event = await Event.findById(eventId);
     if (!event) {
@@ -771,7 +838,7 @@ router.put('/events/:eventId/guests/:guestId/invite-link', async (req: Request, 
     if (event.packageType !== 'premium' && event.packageType !== 'vip') {
       return res.status(400).json({
         success: false,
-        error: { message: 'روابط الدعوة الفردية متاحة فقط لباقات Premium و VIP' }
+        error: { message: 'صور الدعوة الفردية متاحة فقط لباقات Premium و VIP' }
       });
     }
 
@@ -783,24 +850,99 @@ router.put('/events/:eventId/guests/:guestId/invite-link', async (req: Request, 
       });
     }
 
-    // Update the individual invite link
-    guest.individualInviteLink = individualInviteLink || undefined;
-    guest.updatedAt = new Date();
-    await event.save();
+    // If no file provided, delete the existing image
+    if (!file) {
+      // Delete old image if it exists
+      if (guest.individualInviteImage?.public_id) {
+        try {
+          await CloudinaryService.deleteImage(guest.individualInviteImage.public_id);
+        } catch (deleteError) {
+          logger.warn('Failed to delete old guest invite image:', deleteError);
+        }
+      }
+      
+      // Remove the image field
+      delete guest.individualInviteImage;
+      guest.updatedAt = new Date();
+      // Mark the guests array as modified so Mongoose saves the change
+      event.markModified('guests');
+      await event.save();
 
-    logger.info(`Admin ${adminId} updated invite link for guest ${guestId} in event ${eventId}`);
+      logger.info(`Admin ${adminId} removed invite image for guest ${guestId} in event ${eventId}`);
 
-    return res.json({
-      success: true,
-      message: 'تم تحديث رابط الدعوة الفردي بنجاح',
-      data: { guest }
-    });
+      return res.json({
+        success: true,
+        message: 'تم حذف صورة الدعوة الفردية بنجاح',
+        data: { guest }
+      });
+    }
+
+    // Validate the image file
+    const validation = CloudinaryService.validateImageFile(file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: { message: validation.error || 'صورة غير صالحة' }
+      });
+    }
+
+    try {
+      // Upload to Cloudinary
+      const uploadResult = await CloudinaryService.uploadFile(
+        file.buffer,
+        file.originalname,
+        {
+          folder: `events/${eventId}/guests/${guestId}/invites`,
+          resource_type: 'image'
+        }
+      );
+
+      const individualInviteImage = {
+        public_id: uploadResult.public_id,
+        secure_url: uploadResult.secure_url,
+        url: uploadResult.url,
+        format: uploadResult.format,
+        width: uploadResult.width,
+        height: uploadResult.height,
+        bytes: uploadResult.bytes,
+        created_at: uploadResult.created_at
+      };
+
+      // Delete old image if it exists
+      if (guest.individualInviteImage?.public_id) {
+        try {
+          await CloudinaryService.deleteImage(guest.individualInviteImage.public_id);
+        } catch (deleteError) {
+          logger.warn('Failed to delete old guest invite image:', deleteError);
+          // Don't fail the request if deletion fails
+        }
+      }
+
+      // Update the individual invite image
+      guest.individualInviteImage = individualInviteImage;
+      guest.updatedAt = new Date();
+      await event.save();
+
+      logger.info(`Admin ${adminId} updated invite image for guest ${guestId} in event ${eventId}`);
+
+      return res.json({
+        success: true,
+        message: 'تم تحديث صورة الدعوة الفردية بنجاح',
+        data: { guest }
+      });
+    } catch (uploadError: any) {
+      logger.error('Error uploading guest invite image:', uploadError);
+      return res.status(500).json({
+        success: false,
+        error: { message: `فشل رفع الصورة: ${uploadError.message}` }
+      });
+    }
 
   } catch (error) {
-    logger.error('Error updating guest invite link:', error);
+    logger.error('Error updating guest invite image:', error);
     return res.status(500).json({
       success: false,
-      error: { message: 'خطأ في تحديث رابط الدعوة' }
+      error: { message: 'خطأ في تحديث صورة الدعوة' }
     });
   }
 });
@@ -1068,7 +1210,7 @@ router.get('/users', async (req: Request, res: Response) => {
 
     // Get event counts and collaboration stats for each user
     const usersWithStats = await Promise.all(
-      users.map(async (user) => {
+      users.map(async (user: any) => {
         const [eventCount, collaboratedEventCount, collaborationsCreated] = await Promise.all([
           Event.countDocuments({ userId: user._id }),
           Event.countDocuments({ 'collaborators.userId': user._id }),
@@ -1078,8 +1220,10 @@ router.get('/users', async (req: Request, res: Response) => {
           })
         ]);
 
+        const { _id, ...userWithoutId } = user;
         return {
-          ...user,
+          ...userWithoutId,
+          id: _id.toString(),
           eventCount,
           collaborationStats: {
             collaboratedIn: collaboratedEventCount,
@@ -1803,6 +1947,376 @@ router.post('/notifications/:id/read', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { message: 'خطأ في تحديث الإشعار' }
+    });
+  }
+});
+
+// ============================================
+// USER CART MANAGEMENT
+// ============================================
+
+/**
+ * GET /api/admin/users/:userId/cart
+ * Get user's cart items (admin only)
+ */
+router.get('/users/:userId/cart', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId || userId === 'undefined') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف المستخدم مطلوب' }
+      });
+    }
+
+    // Validate MongoDB ObjectId format
+    if (!Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف المستخدم غير صحيح' }
+      });
+    }
+
+    const user = await User.findById(userId)
+      .select('cart firstName lastName email')
+      .populate('cart.adminPriceModifiedBy', 'firstName lastName')
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المستخدم غير موجود' }
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email
+        },
+        cart: user.cart || []
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error fetching user cart:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في جلب سلة المستخدم' }
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/users/:userId/cart/:cartItemId/price
+ * Update cart item price manually (admin only)
+ */
+router.put('/users/:userId/cart/:cartItemId/price', async (req: Request, res: Response) => {
+  try {
+    const { userId, cartItemId } = req.params;
+    const { price, reason } = req.body;
+    const adminId = req.user!.id;
+
+    if (typeof price !== 'number' || price < 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'السعر يجب أن يكون رقم موجب' }
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المستخدم غير موجود' }
+      });
+    }
+
+    const cartItem = user.cart.find(item => item._id?.toString() === cartItemId);
+    if (!cartItem) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'العنصر غير موجود في السلة' }
+      });
+    }
+
+    // Store original price if not already stored
+    if (!cartItem.originalPrice) {
+      cartItem.originalPrice = cartItem.totalPrice;
+    }
+
+    // Update price
+    cartItem.adminModifiedPrice = price;
+    cartItem.totalPrice = price;
+    cartItem.adminPriceModifiedAt = new Date();
+    cartItem.adminPriceModifiedBy = new Types.ObjectId(adminId);
+    if (reason) {
+      cartItem.priceModificationReason = reason;
+    }
+    cartItem.updatedAt = new Date();
+
+    await user.save();
+
+    // Invalidate cache
+    const { CacheService } = await import('../services/cacheService');
+    await CacheService.invalidateUserCartCache(userId);
+
+    logger.info(`Admin ${adminId} modified price for cart item ${cartItemId} of user ${userId} to ${price}`);
+
+    return res.json({
+      success: true,
+      message: 'تم تحديث السعر بنجاح',
+      data: {
+        cartItem: cartItem
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error updating cart item price:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تحديث السعر' }
+    });
+  }
+});
+
+/**
+ * POST /api/admin/users/:userId/cart/:cartItemId/discount
+ * Apply percentage discount to cart item (admin only)
+ */
+router.post('/users/:userId/cart/:cartItemId/discount', async (req: Request, res: Response) => {
+  try {
+    const { userId, cartItemId } = req.params;
+    const { percentage, reason } = req.body;
+    const adminId = req.user!.id;
+
+    if (typeof percentage !== 'number' || percentage < 0 || percentage > 100) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'النسبة المئوية يجب أن تكون بين 0 و 100' }
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المستخدم غير موجود' }
+      });
+    }
+
+    const cartItem = user.cart.find(item => item._id?.toString() === cartItemId);
+    if (!cartItem) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'العنصر غير موجود في السلة' }
+      });
+    }
+
+    // Store original price if not already stored
+    if (!cartItem.originalPrice) {
+      cartItem.originalPrice = cartItem.totalPrice;
+    }
+
+    // Calculate discounted price
+    const discountAmount = (cartItem.originalPrice * percentage) / 100;
+    const newPrice = Math.max(0, cartItem.originalPrice - discountAmount);
+
+    // Update price
+    cartItem.adminModifiedPrice = newPrice;
+    cartItem.totalPrice = newPrice;
+    cartItem.adminPriceModifiedAt = new Date();
+    cartItem.adminPriceModifiedBy = new Types.ObjectId(adminId);
+    if (reason) {
+      cartItem.priceModificationReason = reason || `خصم ${percentage}%`;
+    } else {
+      cartItem.priceModificationReason = `خصم ${percentage}%`;
+    }
+    cartItem.updatedAt = new Date();
+
+    await user.save();
+
+    // Invalidate cache
+    const { CacheService } = await import('../services/cacheService');
+    await CacheService.invalidateUserCartCache(userId);
+
+    logger.info(`Admin ${adminId} applied ${percentage}% discount to cart item ${cartItemId} of user ${userId}`);
+
+    return res.json({
+      success: true,
+      message: `تم تطبيق خصم ${percentage}% بنجاح`,
+      data: {
+        cartItem: cartItem,
+        originalPrice: cartItem.originalPrice,
+        discountAmount: discountAmount,
+        newPrice: newPrice
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error applying discount:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تطبيق الخصم' }
+    });
+  }
+});
+
+/**
+ * POST /api/admin/users/:userId/cart/discount-all
+ * Apply percentage discount to all cart items (admin only)
+ */
+router.post('/users/:userId/cart/discount-all', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { percentage, reason } = req.body;
+    const adminId = req.user!.id;
+
+    if (typeof percentage !== 'number' || percentage < 0 || percentage > 100) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'النسبة المئوية يجب أن تكون بين 0 و 100' }
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المستخدم غير موجود' }
+      });
+    }
+
+    if (user.cart.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'السلة فارغة' }
+      });
+    }
+
+    const modifiedItems = [];
+    for (const cartItem of user.cart) {
+      // Store original price if not already stored
+      if (!cartItem.originalPrice) {
+        cartItem.originalPrice = cartItem.totalPrice;
+      }
+
+      // Calculate discounted price
+      const discountAmount = (cartItem.originalPrice * percentage) / 100;
+      const newPrice = Math.max(0, cartItem.originalPrice - discountAmount);
+
+      // Update price
+      cartItem.adminModifiedPrice = newPrice;
+      cartItem.totalPrice = newPrice;
+      cartItem.adminPriceModifiedAt = new Date();
+      cartItem.adminPriceModifiedBy = new Types.ObjectId(adminId);
+      if (reason) {
+        cartItem.priceModificationReason = reason || `خصم ${percentage}%`;
+      } else {
+        cartItem.priceModificationReason = `خصم ${percentage}%`;
+      }
+      cartItem.updatedAt = new Date();
+
+      modifiedItems.push({
+        cartItemId: cartItem._id,
+        originalPrice: cartItem.originalPrice,
+        newPrice: newPrice,
+        discountAmount: discountAmount
+      });
+    }
+
+    await user.save();
+
+    // Invalidate cache
+    const { CacheService } = await import('../services/cacheService');
+    await CacheService.invalidateUserCartCache(userId);
+
+    logger.info(`Admin ${adminId} applied ${percentage}% discount to all cart items of user ${userId}`);
+
+    return res.json({
+      success: true,
+      message: `تم تطبيق خصم ${percentage}% على جميع العناصر بنجاح`,
+      data: {
+        modifiedItems: modifiedItems,
+        totalItems: modifiedItems.length
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error applying discount to all items:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تطبيق الخصم' }
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/users/:userId/cart/:cartItemId/price-modification
+ * Remove admin price modification and restore original price (admin only)
+ */
+router.delete('/users/:userId/cart/:cartItemId/price-modification', async (req: Request, res: Response) => {
+  try {
+    const { userId, cartItemId } = req.params;
+    const adminId = req.user!.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المستخدم غير موجود' }
+      });
+    }
+
+    const cartItem = user.cart.find(item => item._id?.toString() === cartItemId);
+    if (!cartItem) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'العنصر غير موجود في السلة' }
+      });
+    }
+
+    if (!cartItem.originalPrice) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'لا يوجد تعديل سعر لإزالته' }
+      });
+    }
+
+    // Restore original price
+    cartItem.totalPrice = cartItem.originalPrice;
+    cartItem.adminModifiedPrice = undefined;
+    cartItem.adminPriceModifiedAt = undefined;
+    cartItem.adminPriceModifiedBy = undefined;
+    cartItem.priceModificationReason = undefined;
+    cartItem.originalPrice = undefined;
+    cartItem.updatedAt = new Date();
+
+    await user.save();
+
+    // Invalidate cache
+    const { CacheService } = await import('../services/cacheService');
+    await CacheService.invalidateUserCartCache(userId);
+
+    logger.info(`Admin ${adminId} removed price modification for cart item ${cartItemId} of user ${userId}`);
+
+    return res.json({
+      success: true,
+      message: 'تم إعادة السعر الأصلي بنجاح',
+      data: {
+        cartItem: cartItem
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error removing price modification:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في إعادة السعر الأصلي' }
     });
   }
 });

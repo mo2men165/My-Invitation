@@ -20,16 +20,20 @@ export function RegisterForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   
-  const { isLoading, error, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { isLoading, error, isAuthenticated, user } = useAppSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Redirect when authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/dashboard'); // or wherever you want to redirect
+    if (isAuthenticated && user) {
+      if (user.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/packages');
+      }
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, user, router]);
 
   const {
     register,
@@ -42,6 +46,7 @@ export function RegisterForm() {
   });
 
   const watchedPassword = watch('password');
+  const watchedCity = watch('city');
 
   const onSubmit = async (data: RegisterFormData) => {
     dispatch(clearError());
@@ -196,7 +201,13 @@ export function RegisterForm() {
           </Label>
           <div className="relative">
             <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
-            <Select onValueChange={(value) => setValue('city', value as any)}>
+            <Select onValueChange={(value) => {
+              setValue('city', value as any);
+              // Clear customCity when switching away from 'اخري'
+              if (value !== 'اخري') {
+                setValue('customCity', '');
+              }
+            }}>
               <SelectTrigger 
                 dir='rtl' 
                 className={`bg-white/10 mt-4 border-white/20 text-white backdrop-blur-sm focus:border-yellow-500 transition-all h-12 pr-12 ${
@@ -220,6 +231,32 @@ export function RegisterForm() {
           </div>
           {errors.city && (
             <p className="text-sm text-red-300">{errors.city.message}</p>
+          )}
+          
+          {/* Custom City Input - Show when 'اخري' is selected */}
+          {watchedCity === 'اخري' && (
+            <div className="mt-2 space-y-2">
+              <Label htmlFor="customCity" className="text-white font-medium">
+                اسم المدينة <span className="text-red-400">*</span>
+              </Label>
+              <div className="relative">
+                <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Input
+                  id="customCity"
+                  placeholder="أدخل اسم المدينة"
+                  {...register('customCity')}
+                  className={`pl-12 pr-12 bg-white/10 border-white/20 text-white placeholder-gray-400 backdrop-blur-sm focus:border-yellow-500 focus:ring-yellow-500/20 transition-all ${
+                    errors.customCity ? 'border-red-500' : ''
+                  }`}
+                  style={{
+                    '--tw-ring-color': 'rgba(192, 155, 82, 0.2)'
+                  } as React.CSSProperties}
+                />
+              </div>
+              {errors.customCity && (
+                <p className="text-sm text-red-300">{errors.customCity.message}</p>
+              )}
+            </div>
           )}
         </div>
 

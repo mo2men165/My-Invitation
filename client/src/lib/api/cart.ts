@@ -33,6 +33,16 @@ export interface CartItem {
     customDesignNotes?: string;
   };
   totalPrice: number;
+  // Admin price modification fields
+  originalPrice?: number;
+  adminModifiedPrice?: number;
+  adminPriceModifiedAt?: string;
+  adminPriceModifiedBy?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
+  priceModificationReason?: string;
   addedAt?: string;
   updatedAt?: string;
 }

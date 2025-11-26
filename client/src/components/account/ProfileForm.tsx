@@ -13,6 +13,7 @@ interface ProfileFormProps {
     email: string;
     phone: string;
     city: string;
+    customCity?: string;
   };
   onSubmit: (data: {
     firstName: string;
@@ -20,6 +21,7 @@ interface ProfileFormProps {
     email: string;
     phone: string;
     city: string;
+    customCity?: string;
   }) => Promise<boolean>;
   isLoading: boolean;
 }
@@ -35,7 +37,8 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user, onSubmit, isLoading }) 
     lastName: user.lastName,
     email: user.email,
     phone: getDisplayPhone(user.phone), // FIXED: Display without +966
-    city: user.city
+    city: user.city,
+    customCity: user.customCity || ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -46,7 +49,8 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user, onSubmit, isLoading }) 
       lastName: user.lastName,
       email: user.email,
       phone: getDisplayPhone(user.phone), // FIXED: Always strip +966
-      city: user.city
+      city: user.city,
+      customCity: user.customCity || ''
     });
   }, [user]);
 
@@ -80,6 +84,17 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user, onSubmit, isLoading }) 
 
     if (!formData.city) {
       newErrors.city = 'المدينة مطلوبة';
+    }
+
+    // Validate customCity if city is 'اخري'
+    if (formData.city === 'اخري') {
+      if (!formData.customCity || formData.customCity.trim().length === 0) {
+        newErrors.customCity = 'يجب إدخال اسم المدينة';
+      } else if (formData.customCity.length < 2) {
+        newErrors.customCity = 'اسم المدينة يجب أن يكون حرفين على الأقل';
+      } else if (formData.customCity.length > 50) {
+        newErrors.customCity = 'اسم المدينة طويل جداً';
+      }
     }
 
     setErrors(newErrors);
@@ -224,7 +239,15 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user, onSubmit, isLoading }) 
           <select
             id="city"
             value={formData.city}
-            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            onChange={(e) => {
+              const newCity = e.target.value;
+              setFormData({ 
+                ...formData, 
+                city: newCity,
+                // Clear customCity when switching away from 'اخري'
+                customCity: newCity === 'اخري' ? formData.customCity : ''
+              });
+            }}
             className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-[#C09B52]"
           >
             <option value="" className="bg-gray-800">اختر المدينة</option>
@@ -236,6 +259,27 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ user, onSubmit, isLoading }) 
           </select>
           {errors.city && (
             <p className="text-red-400 text-sm">{errors.city}</p>
+          )}
+          
+          {/* Custom City Input - Show when 'اخري' is selected */}
+          {formData.city === 'اخري' && (
+            <div className="mt-2 space-y-2">
+              <Label htmlFor="customCity" className="text-white flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                اسم المدينة <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="customCity"
+                value={formData.customCity}
+                onChange={(e) => setFormData({ ...formData, customCity: e.target.value })}
+                className="bg-white/10 border-white/20 text-white placeholder-gray-400"
+                placeholder="أدخل اسم المدينة"
+                maxLength={50}
+              />
+              {errors.customCity && (
+                <p className="text-red-400 text-sm">{errors.customCity}</p>
+              )}
+            </div>
           )}
         </div>
 

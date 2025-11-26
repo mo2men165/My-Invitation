@@ -256,33 +256,85 @@ export class WhatsappService {
           newStatus: rsvpStatus
         });
 
-        // Update guest RSVP status in database
+        // Handle automatic refunding for declined guests (premium and VIP only)
+        let refundedOnDecline = false;
+        if (rsvpStatus === 'declined' && (event.packageType === 'premium' || event.packageType === 'vip')) {
+          // Initialize refundable slots if not set
+          if (!event.refundableSlots || event.refundableSlots.total === 0) {
+            const percentage = event.packageType === 'premium' ? 0.20 : 0.30;
+            event.refundableSlots = {
+              total: Math.floor(event.details.inviteCount * percentage),
+              used: 0
+            };
+          }
+
+          // Check if we can refund this guest
+          const availableRefundableSlots = event.refundableSlots.total - event.refundableSlots.used;
+          const guestSlots = guest.numberOfAccompanyingGuests;
+
+          if (availableRefundableSlots >= guestSlots) {
+            // Refund the guest slots
+            refundedOnDecline = true;
+            event.refundableSlots.used += guestSlots;
+            logger.info('WHATSAPP RSVP: Guest declined - slots automatically refunded', {
+              guestName: guest.name,
+              numberOfAccompanyingGuests: guestSlots,
+              packageType: event.packageType,
+              refundableSlotsUsed: event.refundableSlots.used,
+              refundableSlotsTotal: event.refundableSlots.total,
+              refundableSlotsRemaining: event.refundableSlots.total - event.refundableSlots.used
+            });
+          } else {
+            logger.info('WHATSAPP RSVP: Guest declined - no refundable slots available', {
+              guestName: guest.name,
+              numberOfAccompanyingGuests: guestSlots,
+              availableRefundableSlots,
+              refundableSlotsUsed: event.refundableSlots.used,
+              refundableSlotsTotal: event.refundableSlots.total
+            });
+          }
+        }
+
+        // Update guest RSVP status and refund status in database
+        const updateData: any = {
+          'guests.$.rsvpStatus': rsvpStatus,
+          'guests.$.rsvpResponse': response,
+          'guests.$.rsvpRespondedAt': new Date()
+        };
+
+        if (rsvpStatus === 'declined') {
+          updateData['guests.$.refundedOnDecline'] = refundedOnDecline;
+        }
+
+        // Update refundable slots if changed
+        if (refundedOnDecline) {
+          updateData['refundableSlots.used'] = event.refundableSlots.used;
+          if (!event.refundableSlots.total) {
+            updateData['refundableSlots.total'] = event.refundableSlots.total;
+          }
+        }
+
         const updateResult = await Event.updateOne(
           { 
             _id: event._id,
             'guests._id': guest._id
           },
           {
-            $set: {
-              'guests.$.rsvpStatus': rsvpStatus,
-              'guests.$.rsvpResponse': response,
-              'guests.$.rsvpRespondedAt': new Date()
-            }
+            $set: updateData
           }
         );
 
         logger.info('WHATSAPP RSVP: Database updated', {
           matched: updateResult.matchedCount,
           modified: updateResult.modifiedCount,
-          rsvpStatus
+          rsvpStatus,
+          refundedOnDecline
         });
 
         // If accepted, send confirmation with links
         if (rsvpStatus === 'accepted') {
           logger.info('WHATSAPP RSVP: Guest accepted - sending confirmation message...');
           await this.sendConfirmationWithLinks(event, guest);
-        } else {
-          logger.info('WHATSAPP RSVP: Guest declined - no further action needed');
         }
       } else {
         logger.warn('WHATSAPP RSVP: Could not determine RSVP status from response');
@@ -317,18 +369,16 @@ export class WhatsappService {
 
       logger.info('WHATSAPP CONFIRMATION: Maps link generated', { mapsLink });
 
-      // Use individual invite link for Premium/VIP, fallback to general invitation card
-      const inviteCardLink = guest.individualInviteLink || event.invitationCardUrl || '';
+      // Use individual invite image for confirmation message
+      const individualImageUrl = guest.individualInviteImage?.secure_url || guest.individualInviteImage?.url || '';
       
-      if (!inviteCardLink) {
-        logger.error('WHATSAPP CONFIRMATION: No invite card link available', {
-          hasIndividualLink: !!guest.individualInviteLink,
-          hasEventCard: !!event.invitationCardUrl
+      if (!individualImageUrl) {
+        logger.error('WHATSAPP CONFIRMATION: No individual invite image available', {
+          hasIndividualImage: !!guest.individualInviteImage
         });
       } else {
-        logger.info('WHATSAPP CONFIRMATION: Invite card link ready', {
-          link: inviteCardLink,
-          source: guest.individualInviteLink ? 'individual' : 'event'
+        logger.info('WHATSAPP CONFIRMATION: Individual invite image ready', {
+          imageUrl: individualImageUrl
         });
       }
 
@@ -336,6 +386,7 @@ export class WhatsappService {
       const eventDate = new Date(event.details.eventDate);
       const formattedDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'long', day: 'numeric' });
 
+      // Send template message with event details and location
       const messageData = {
         messaging_product: 'whatsapp',
         to: guest.phone.replace(/^\+/, ''),
@@ -346,6 +397,18 @@ export class WhatsappService {
             code: 'ar'
           },
           components: [
+            // Add individual invite image as header if available
+            ...(individualImageUrl ? [{
+              type: 'header',
+              parameters: [
+                {
+                  type: 'image',
+                  image: {
+                    link: individualImageUrl
+                  }
+                }
+              ]
+            }] : []),
             {
               type: 'body',
               parameters: [
@@ -373,17 +436,6 @@ export class WhatsappService {
               parameters: [
                 {
                   type: 'text',
-                  text: inviteCardLink.replace('https://drive.google.com/', '')
-                }
-              ]
-            },
-            {
-              type: 'button',
-              sub_type: 'url',
-              index: '1',
-              parameters: [
-                {
-                  type: 'text',
                   text: mapsLink.replace('https://maps.google.com/', '')
                 }
               ]
@@ -403,7 +455,7 @@ export class WhatsappService {
         eventId: event._id,
         guestName: guest.name,
         guestPhone: guest.phone,
-        inviteCardLink
+        individualImageUrl
       });
 
     } catch (error: any) {
@@ -450,7 +502,7 @@ export class WhatsappService {
         guestId,
         guestName: guest.name,
         guestPhone: guest.phone,
-        hasIndividualLink: !!guest.individualInviteLink
+        hasIndividualImage: !!guest.individualInviteImage
       });
 
       // Check package type
@@ -459,19 +511,19 @@ export class WhatsappService {
         return { success: false, error: 'WhatsApp integration not available for classic packages' };
       }
 
-      // For Premium/VIP, ensure individual invite link is set
-      if (!guest.individualInviteLink) {
-        logger.error('WHATSAPP: Individual invite link missing', {
+      // For Premium/VIP, ensure event invitation card image is set (initial invitation uses event image)
+      if (!event.invitationCardImage) {
+        logger.error('WHATSAPP: Event invitation card image missing', {
           eventId,
           guestId,
           guestName: guest.name,
           packageType: event.packageType
         });
-        return { success: false, error: 'Individual invite link not set for guest' };
+        return { success: false, error: 'Event invitation card image not set' };
       }
 
-      logger.info('WHATSAPP: Individual invite link validated', {
-        link: guest.individualInviteLink
+      logger.info('WHATSAPP: Event invitation card image validated', {
+        imageUrl: event.invitationCardImage?.secure_url || event.invitationCardImage?.url
       });
 
       // Format dates
@@ -498,6 +550,9 @@ export class WhatsappService {
         formatted: phoneNumber
       });
 
+      // Get event invitation card image URL
+      const eventImageUrl = event.invitationCardImage?.secure_url || event.invitationCardImage?.url || '';
+
       const messageData = {
         messaging_product: 'whatsapp',
         to: phoneNumber,
@@ -508,6 +563,18 @@ export class WhatsappService {
             code: 'ar'
           },
           components: [
+            // Add image as header if available
+            ...(eventImageUrl ? [{
+              type: 'header',
+              parameters: [
+                {
+                  type: 'image',
+                  image: {
+                    link: eventImageUrl
+                  }
+                }
+              ]
+            }] : []),
             {
               type: 'body',
               parameters: [
@@ -841,6 +908,59 @@ export class WhatsappService {
   }
 
   /**
+   * Send image message via WhatsApp
+   */
+  private static async sendImageMessage(phone: string, imageUrl: string): Promise<any> {
+    try {
+      if (!this.ACCESS_TOKEN) {
+        throw new Error('WHATSAPP_ACCESS_TOKEN not configured');
+      }
+
+      if (!this.PHONE_NUMBER_ID) {
+        throw new Error('WHATSAPP_PHONE_NUMBER_ID not configured');
+      }
+
+      const messageData = {
+        messaging_product: 'whatsapp',
+        to: phone.replace(/^\+/, ''),
+        type: 'image',
+        image: {
+          link: imageUrl
+        }
+      };
+
+      logger.info('WHATSAPP API: Sending image message...', {
+        to: phone,
+        imageUrl: imageUrl.substring(0, 100) + '...'
+      });
+
+      const response = await axios.post(
+        `${this.WHATSAPP_API_URL}/${this.PHONE_NUMBER_ID}/messages`,
+        messageData,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      logger.info('WHATSAPP API: Image message sent successfully', {
+        messageId: response.data.messages?.[0]?.id
+      });
+
+      return response.data;
+    } catch (error: any) {
+      logger.error('WHATSAPP API: ERROR sending image message', {
+        error: error.message,
+        statusCode: error.response?.status,
+        errorData: JSON.stringify(error.response?.data)
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Send reminder message for Premium/VIP packages
    * Premium: 3 days before event
    * VIP: 5 days before event
@@ -862,9 +982,19 @@ export class WhatsappService {
         return { success: false, error: 'Guest not found' };
       }
 
-      // Use individual invite link for Premium/VIP
-      const inviteCardLink = guest.individualInviteLink || event.invitationCardUrl || '';
+      // Use individual invite image for reminder message
+      const individualImageUrl = guest.individualInviteImage?.secure_url || guest.individualInviteImage?.url || '';
       
+      if (!individualImageUrl) {
+        logger.warn('WHATSAPP REMINDER: No individual invite image available', {
+          hasIndividualImage: !!guest.individualInviteImage
+        });
+      } else {
+        logger.info('WHATSAPP REMINDER: Individual invite image ready', {
+          imageUrl: individualImageUrl
+        });
+      }
+
       // Generate Google Maps link
       const mapsLink = event.details.locationCoordinates 
         ? `https://maps.google.com/?q=${event.details.locationCoordinates.lat},${event.details.locationCoordinates.lng}`
@@ -884,6 +1014,18 @@ export class WhatsappService {
             code: 'ar'
           },
           components: [
+            // Add individual invite image as header if available
+            ...(individualImageUrl ? [{
+              type: 'header',
+              parameters: [
+                {
+                  type: 'image',
+                  image: {
+                    link: individualImageUrl
+                  }
+                }
+              ]
+            }] : []),
             {
               type: 'body',
               parameters: [
@@ -918,17 +1060,6 @@ export class WhatsappService {
               type: 'button',
               sub_type: 'url',
               index: '0',
-              parameters: [
-                {
-                  type: 'text',
-                  text: inviteCardLink.replace('https://drive.google.com/', '')
-                }
-              ]
-            },
-            {
-              type: 'button',
-              sub_type: 'url',
-              index: '1',
               parameters: [
                 {
                   type: 'text',

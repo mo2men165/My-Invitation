@@ -9,7 +9,8 @@ const saudiCities = [
   'الدمام',
   'مكة المكرمة',
   'الطائف',
-  'المدينة المنورة'
+  'المدينة المنورة',
+  'اخري'
 ] as const;
 
 // Location coordinate validation
@@ -37,12 +38,26 @@ export const registerSchema = z.object({
   city: z.enum(saudiCities, {
     message: 'يجب اختيار مدينة من القائمة المحددة'
   }),
+  customCity: z.string()
+    .min(2, 'اسم المدينة يجب أن يكون حرفين على الأقل')
+    .max(50, 'اسم المدينة طويل جداً')
+    .trim()
+    .optional(),
   password: z.string()
     .min(8, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل')
     .regex(/^(?=.*[a-z])/, 'كلمة المرور يجب أن تحتوي على حرف صغير واحد على الأقل')
     .regex(/^(?=.*[A-Z])/, 'كلمة المرور يجب أن تحتوي على حرف كبير واحد على الأقل')
     .regex(/^(?=.*\d)/, 'كلمة المرور يجب أن تحتوي على رقم واحد على الأقل')
     .regex(/^(?=.*[!@#$%^&*(),.?":{}|<>])/, 'كلمة المرور يجب أن تحتوي على رمز خاص واحد على الأقل')
+}).refine((data) => {
+  // If city is 'اخري', customCity must be provided
+  if (data.city === 'اخري' && (!data.customCity || data.customCity.trim().length === 0)) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'يجب إدخال اسم المدينة عند اختيار "أخرى"',
+  path: ['customCity']
 });
 
 export const loginSchema = z.object({
@@ -110,9 +125,10 @@ const cartItemDetailsSchema = z.object({
   displayName: z.string().max(200).optional(),
   formattedAddress: z.string().max(500).optional(),
   locationCoordinates: locationCoordinatesSchema,
-  detectedCity: z.enum(saudiCities, {
-    message: 'يجب اختيار مدينة صحيحة من القائمة المحددة'
-  }),
+  detectedCity: z.string()
+    .min(2, 'اسم المدينة يجب أن يكون حرفين على الأقل')
+    .max(100, 'اسم المدينة طويل جداً')
+    .trim(),
   googleMapsUrl: z.string().optional(),
   // Custom design fields
   isCustomDesign: z.boolean().default(false).optional(),
@@ -167,37 +183,40 @@ export const designIdSchema = z.object({
   designId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'معرف التصميم غير صحيح')
 });
 
-// Location validation utility
+// Gulf countries boundaries (approximate)
+const GULF_COUNTRIES_BOUNDARIES = [
+  // Saudi Arabia
+  { minLat: 16, maxLat: 32, minLng: 34, maxLng: 55, name: 'Saudi Arabia' },
+  // UAE
+  { minLat: 22, maxLat: 26, minLng: 51, maxLng: 56, name: 'UAE' },
+  // Kuwait
+  { minLat: 28.5, maxLat: 30.1, minLng: 46.5, maxLng: 48.5, name: 'Kuwait' },
+  // Qatar
+  { minLat: 24.4, maxLat: 26.2, minLng: 50.7, maxLng: 51.7, name: 'Qatar' },
+  // Bahrain
+  { minLat: 25.8, maxLat: 26.3, minLng: 50.4, maxLng: 50.7, name: 'Bahrain' },
+  // Oman
+  { minLat: 16.6, maxLat: 26.4, minLng: 51.9, maxLng: 59.8, name: 'Oman' }
+];
+
+// Location validation utility - Check if coordinates are within Gulf countries
+export const validateGulfCountryBoundary = (lat: number, lng: number): boolean => {
+  return GULF_COUNTRIES_BOUNDARIES.some(country => 
+    lat >= country.minLat && 
+    lat <= country.maxLat && 
+    lng >= country.minLng && 
+    lng <= country.maxLng
+  );
+};
+
+// Legacy function for backward compatibility (now checks Gulf countries)
 export const validateCityBoundary = (lat: number, lng: number): string | null => {
-  const CITY_BOUNDARIES = {
-    'جدة': { lat: 21.4858, lng: 39.1925, radius: 50 },
-    'الرياض': { lat: 24.7136, lng: 46.6753, radius: 60 },
-    'الدمام': { lat: 26.4207, lng: 50.0888, radius: 40 },
-    'مكة المكرمة': { lat: 21.3891, lng: 39.8579, radius: 30 },
-    'الطائف': { lat: 21.2703, lng: 40.4034, radius: 35 },
-    'المدينة المنورة': { lat: 24.5247, lng: 39.5692, radius: 40 }
-  };
-  
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  for (const [cityName, boundary] of Object.entries(CITY_BOUNDARIES)) {
-    const distance = calculateDistance(lat, lng, boundary.lat, boundary.lng);
-    if (distance <= boundary.radius) {
-      return cityName;
-    }
+  // Check if coordinates are within Gulf countries
+  if (validateGulfCountryBoundary(lat, lng)) {
+    // Return a generic indicator that location is valid
+    // The actual city name will be extracted from the place data
+    return 'Gulf Country';
   }
-  
   return null;
 };
 

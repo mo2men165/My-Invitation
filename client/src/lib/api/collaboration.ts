@@ -23,6 +23,7 @@ export interface CollaboratorData {
   email: string;
   phone: string;
   city: string;
+  customCity?: string;
   allocatedInvites: number;
   permissions?: {
     canAddGuests?: boolean;

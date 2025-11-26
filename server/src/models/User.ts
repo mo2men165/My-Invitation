@@ -36,6 +36,12 @@ export interface ICartItem {
     customDesignNotes?: string;
   };
   totalPrice: number;
+  // Admin price modification fields
+  originalPrice?: number;
+  adminModifiedPrice?: number;
+  adminPriceModifiedAt?: Date;
+  adminPriceModifiedBy?: Types.ObjectId;
+  priceModificationReason?: string;
   addedAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +70,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   city: string;
+  customCity?: string;
   role: 'user' | 'admin';
   status: 'active' | 'suspended';
   lastLogin?: Date;
@@ -203,7 +210,8 @@ const cartItemSchema = new Schema<ICartItem>({
     detectedCity: {
       type: String,
       required: true,
-      enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
+      trim: true,
+      maxlength: 100
     },
     googleMapsUrl: {
       type: String,
@@ -224,6 +232,27 @@ const cartItemSchema = new Schema<ICartItem>({
     type: Number,
     required: true,
     min: 0
+  },
+  // Admin price modification fields
+  originalPrice: {
+    type: Number,
+    min: 0
+  },
+  adminModifiedPrice: {
+    type: Number,
+    min: 0
+  },
+  adminPriceModifiedAt: {
+    type: Date
+  },
+  adminPriceModifiedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  priceModificationReason: {
+    type: String,
+    maxlength: 500,
+    trim: true
   },
   addedAt: {
     type: Date,
@@ -357,7 +386,13 @@ const userSchema = new Schema<IUser>({
   city: {
     type: String,
     required: true,
-    enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
+    enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف', 'اخري']
+  },
+  customCity: {
+    type: String,
+    required: false,
+    trim: true,
+    maxlength: 50
   },
   role: {
     type: String,

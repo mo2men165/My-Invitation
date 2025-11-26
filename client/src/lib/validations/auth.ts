@@ -8,7 +8,8 @@ const saudiCities = [
   'الدمام',
   'مكة المكرمة',
   'الطائف',
-  'المدينة المنورة'
+  'المدينة المنورة',
+  'اخري'
 ] as const;
 
 export const registerSchema = z.object({
@@ -30,6 +31,11 @@ export const registerSchema = z.object({
   city: z.enum(saudiCities, {
     message: 'يجب اختيار مدينة من القائمة المحددة'
   }),
+  customCity: z.string()
+    .min(2, 'اسم المدينة يجب أن يكون حرفين على الأقل')
+    .max(50, 'اسم المدينة طويل جداً')
+    .trim()
+    .optional(),
   password: z.string()
     .min(8, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل')
     .regex(/^(?=.*[a-z])/, 'كلمة المرور يجب أن تحتوي على حرف صغير واحد على الأقل')
@@ -40,6 +46,15 @@ export const registerSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "كلمات المرور غير متطابقة",
   path: ["confirmPassword"],
+}).refine((data) => {
+  // If city is 'اخري', customCity must be provided
+  if (data.city === 'اخري' && (!data.customCity || data.customCity.trim().length === 0)) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'يجب إدخال اسم المدينة عند اختيار "أخرى"',
+  path: ['customCity']
 });
 
 export const loginSchema = z.object({

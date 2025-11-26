@@ -5,8 +5,8 @@ import { MapPin, Search, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import {
   GoogleMapsLocationPickerProps,
-  SAUDI_CITIES,
-  CITY_BOUNDARIES,
+  GULF_COUNTRIES_BOUNDARIES,
+  GULF_COUNTRIES,
   DEFAULT_CENTER
 } from '@/types/location';
 
@@ -99,42 +99,53 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
     return R * c;
   }, []);
 
-  // Validate if coordinates are within Saudi Arabia city boundaries
-  const validateCityBoundary = useCallback((lat: number, lng: number): string | null => {
-    for (const [cityName, boundary] of Object.entries(CITY_BOUNDARIES)) {
-      const distance = calculateDistance(lat, lng, boundary.lat, boundary.lng);
-      if (distance <= boundary.radius) {
-        return cityName;
-      }
-    }
-    return null;
-  }, [calculateDistance]);
+  // Validate if coordinates are within Gulf countries boundaries
+  const validateGulfCountryBoundary = useCallback((lat: number, lng: number): boolean => {
+    return GULF_COUNTRIES_BOUNDARIES.some(country => 
+      lat >= country.minLat && 
+      lat <= country.maxLat && 
+      lng >= country.minLng && 
+      lng <= country.maxLng
+    );
+  }, []);
 
-  // Extract city from address components
+  // Extract city from address components (for Gulf countries)
   const extractCityFromPlace = useCallback((place: any): string | null => {
     if (!place.address_components) return null;
 
-    // Try to find city in address components
+    // Try to find city in address components (prioritize locality, then administrative_area_level_1)
     for (const component of place.address_components) {
       if (component.types.includes('locality')) {
         return component.long_name;
       }
+    }
+    
+    // If no locality, try administrative_area_level_1 (state/province)
+    for (const component of place.address_components) {
       if (component.types.includes('administrative_area_level_1')) {
         return component.long_name;
       }
     }
+    
+    // If still no city, try country name as fallback
+    for (const component of place.address_components) {
+      if (component.types.includes('country')) {
+        return component.long_name;
+      }
+    }
+    
     return null;
   }, []);
 
   // Handle location selection from any source
   const handleLocationSelect = useCallback(async (lat: number, lng: number, place?: any) => {
-    // Validate coordinates are in Saudi Arabia
-    const validCity = validateCityBoundary(lat, lng);
+    // Validate coordinates are in Gulf countries
+    const isInGulfCountry = validateGulfCountryBoundary(lat, lng);
 
-    if (!validCity) {
+    if (!isInGulfCountry) {
       toast({
         title: "موقع غير مدعوم",
-        description: `يرجى اختيار موقع داخل إحدى المدن المدعومة: ${SAUDI_CITIES.join('، ')}`,
+        description: `يرجى اختيار موقع داخل إحدى دول الخليج: ${GULF_COUNTRIES.join('، ')}`,
         variant: "destructive",
         duration: 4000
       });
@@ -145,7 +156,7 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
       let placeId = '';
       let displayName = '';
       let formattedAddress = '';
-      let city = validCity;
+      let city = '';
 
       if (place) {
         // Data from autocomplete selection
@@ -153,10 +164,13 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
         displayName = place.name || place.formatted_address || '';
         formattedAddress = place.formatted_address || '';
 
-        // Try to extract more specific city
+        // Extract city from place data
         const extractedCity = extractCityFromPlace(place);
         if (extractedCity) {
           city = extractedCity;
+        } else {
+          // Fallback: use formatted address or display name
+          city = formattedAddress || displayName || 'موقع غير محدد';
         }
       } else {
         // Data from map click or marker drag - need to geocode
@@ -172,18 +186,22 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
             const extractedCity = extractCityFromPlace(geocodedPlace);
             if (extractedCity) {
               city = extractedCity;
+            } else {
+              city = formattedAddress || displayName || 'موقع غير محدد';
             }
           } else {
             // Fallback
             placeId = '';
-            displayName = `موقع في ${validCity}`;
-            formattedAddress = `موقع في ${validCity}`;
+            displayName = `موقع مختار`;
+            formattedAddress = `موقع مختار`;
+            city = 'موقع غير محدد';
           }
         } else {
           // No geocoder available
           placeId = '';
-          displayName = `موقع في ${validCity}`;
-          formattedAddress = `موقع في ${validCity}`;
+          displayName = `موقع مختار`;
+          formattedAddress = `موقع مختار`;
+          city = 'موقع غير محدد';
         }
       }
 
@@ -208,12 +226,13 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
 
       // Fallback - still provide basic data
       const placeId = '';
-      const displayName = `موقع في ${validCity}`;
-      const formattedAddress = `موقع في ${validCity}`;
+      const displayName = `موقع مختار`;
+      const formattedAddress = `موقع مختار`;
+      const fallbackCity = 'موقع غير محدد';
 
-      onLocationSelect(placeId, displayName, validCity, lat, lng, formattedAddress);
+      onLocationSelect(placeId, displayName, fallbackCity, lat, lng, formattedAddress);
     }
-  }, [validateCityBoundary, extractCityFromPlace, onLocationSelect, toast]);
+  }, [validateGulfCountryBoundary, extractCityFromPlace, onLocationSelect, toast]);
 
   // Initialize Google Maps
   useEffect(() => {
@@ -340,7 +359,7 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
 
         // Create PlaceAutocompleteElement
         const placeAutocomplete = new google.maps.places.PlaceAutocompleteElement({
-          componentRestrictions: { country: 'SA' },
+          componentRestrictions: { country: ['SA', 'AE', 'KW', 'QA', 'BH', 'OM'] }, // Gulf countries
         });
 
         placeAutocomplete.setAttribute('placeholder', 'ابحث عن مكان...');
@@ -594,10 +613,10 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
         </div>
       )}
 
-      {/* City Restriction Notice */}
+      {/* Location Restriction Notice */}
       <div className="text-xs text-gray-400 bg-blue-500/10 rounded-lg p-3 border border-blue-500/20">
         <p className="font-medium text-blue-300 mb-1">ملاحظة:</p>
-        <p>يمكن تحديد المواقع في المدن التالية فقط: {SAUDI_CITIES.join('، ')}</p>
+        <p>يمكن تحديد المواقع في دول الخليج فقط: {GULF_COUNTRIES.join('، ')}</p>
         <p className="mt-1">اضغط على الخريطة أو اسحب العلامة لتحديد الموقع</p>
       </div>
 

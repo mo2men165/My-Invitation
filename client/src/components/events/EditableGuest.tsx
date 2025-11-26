@@ -275,12 +275,15 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
                     guest.rsvpStatus === 'accepted' 
                       ? 'bg-green-500/20 text-green-400' 
                       : 'bg-red-500/20 text-red-400'
-                  }`}>
+                  }`} title={guest.rsvpStatus === 'declined' && guest.refundedOnDecline ? 'تم إرجاع الأماكن إلى الحصة المتاحة' : ''}>
                     {guest.rsvpStatus === 'accepted' ? 'سيحضر' : 'اعتذر'}
+                    {guest.rsvpStatus === 'declined' && guest.refundedOnDecline && (
+                      <span className="text-xs opacity-75"> (تم الإرجاع)</span>
+                    )}
                   </span>
                 )}
                 
-                {guest.individualInviteLink ? (
+                {guest.individualInviteImage ? (
                   <>
                     {onSendWhatsappAPI && (
                       <button
@@ -325,8 +328,11 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
                     guest.rsvpStatus === 'accepted' 
                       ? 'bg-green-500/20 text-green-400' 
                       : 'bg-red-500/20 text-red-400'
-                  }`}>
+                  }`} title={guest.rsvpStatus === 'declined' && guest.refundedOnDecline ? 'تم إرجاع الأماكن إلى الحصة المتاحة' : ''}>
                     {guest.rsvpStatus === 'accepted' ? 'سيحضر' : 'اعتذر'}
+                    {guest.rsvpStatus === 'declined' && guest.refundedOnDecline && (
+                      <span className="text-xs opacity-75"> (تم الإرجاع)</span>
+                    )}
                   </span>
                 )}
                 

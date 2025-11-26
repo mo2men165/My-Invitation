@@ -81,7 +81,7 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
         <div className="mb-6">
           {/* Check if all guests have individual invite links */}
           {(() => {
-            const guestsWithoutLinks = guests.filter(g => !g.individualInviteLink);
+            const guestsWithoutLinks = guests.filter(g => !g.individualInviteImage);
             const canSendBulk = guestsWithoutLinks.length === 0;
             
             return canSendBulk ? (

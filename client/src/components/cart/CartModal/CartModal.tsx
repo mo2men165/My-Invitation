@@ -396,6 +396,7 @@ const CartModal = memo<CartModalProps>(({
                   formData={formData}
                   onInputChange={updateFormField}
                   packageType={selectedPackage}
+                  locationData={locationData}
                 />
               </div>
               

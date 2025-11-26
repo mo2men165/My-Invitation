@@ -371,11 +371,68 @@ function CartPageContent() {
 
                           {/* Price */}
                           <div className="flex items-center justify-between pt-2">
-                            <div>
-                              <span className="text-2xl font-bold text-[#C09B52]">
-                                {formatCurrency(item.totalPrice)}
-                              </span>
-                              <p className="text-gray-500 text-sm">شامل جميع الخدمات</p>
+                            <div className="flex-1">
+                              {item.originalPrice && item.originalPrice !== item.totalPrice ? (
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-3 flex-wrap">
+                                    <div>
+                                      <p className="text-xs text-gray-400 mb-1">السعر الحالي</p>
+                                      <span className="text-2xl font-bold text-[#C09B52]">
+                                        {formatCurrency(item.totalPrice)}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-400 mb-1">السعر الأصلي</p>
+                                      <span className="text-lg text-gray-500 line-through">
+                                        {formatCurrency(item.originalPrice)}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-400 mb-1">الخصم</p>
+                                      <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm font-medium rounded-full border border-green-500/30">
+                                        خصم {Math.round(((item.originalPrice - item.totalPrice) / item.originalPrice) * 100)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Admin Modification Info */}
+                                  <div className="bg-gradient-to-r from-green-500/10 via-green-500/5 to-transparent rounded-lg border border-green-500/20 p-3 space-y-1.5">
+                                    {item.priceModificationReason && (
+                                      <div className="flex items-start gap-2">
+                                        <span className="text-xs text-gray-400 min-w-[45px]">السبب:</span>
+                                        <span className="text-xs text-gray-300">{item.priceModificationReason}</span>
+                                      </div>
+                                    )}
+                                    {item.adminPriceModifiedBy && item.adminPriceModifiedAt && (
+                                      <div className="flex items-start gap-2 text-xs text-gray-400">
+                                        <span>معدل بواسطة:</span>
+                                        <span className="text-gray-300">
+                                          {item.adminPriceModifiedBy.firstName} {item.adminPriceModifiedBy.lastName}
+                                        </span>
+                                        <span className="text-gray-500">•</span>
+                                        <span className="text-gray-300">
+                                          {new Date(item.adminPriceModifiedAt).toLocaleDateString('ar-SA', {
+                                            calendar: 'gregory',
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="text-gray-500 text-sm">شامل جميع الخدمات</p>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="text-2xl font-bold text-[#C09B52]">
+                                    {formatCurrency(item.totalPrice)}
+                                  </span>
+                                  <p className="text-gray-500 text-sm">شامل جميع الخدمات</p>
+                                </>
+                              )}
                             </div>
 
                             {/* Added date */}
@@ -413,7 +470,34 @@ function CartPageContent() {
                       </span>
                     </div>
 
-                  
+                    {/* Admin Discounts Summary */}
+                    {cartItems.some(item => item.originalPrice && item.originalPrice !== item.totalPrice) && (
+                      <div className="space-y-2 pt-2 border-t border-white/10">
+                        {(() => {
+                          const originalTotal = cartItems.reduce((sum, item) => sum + (item.originalPrice || item.totalPrice), 0);
+                          const currentTotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
+                          const totalDiscount = originalTotal - currentTotal;
+                          const discountPercent = originalTotal > 0 ? Math.round((totalDiscount / originalTotal) * 100) : 0;
+                          
+                          return (
+                            <>
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="text-gray-400">السعر الأصلي</span>
+                                <span className="text-gray-500 line-through">
+                                  {formatCurrency(originalTotal)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="text-green-400">إجمالي الخصم</span>
+                                <span className="text-green-400 font-medium">
+                                  -{formatCurrency(totalDiscount)} ({discountPercent}%)
+                                </span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
 
                     <div className="border-t border-white/10 pt-4">
                       <div className="flex justify-between items-center">

@@ -7,7 +7,8 @@ export const saudiCities = [
   'الدمام',
   'مكة المكرمة',
   'الطائف',
-  'المدينة المنورة'
+  'المدينة المنورة',
+  'اخري'
 ];
 
 // Password strength checks

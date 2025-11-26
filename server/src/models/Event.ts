@@ -2,6 +2,18 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 import { ALLOWED_PHONE_PATTERN } from '../utils/phoneValidation';
 
+// Cloudinary image object interface
+export interface ICloudinaryImage {
+  public_id: string;
+  secure_url: string;
+  url: string;
+  format: string;
+  width: number;
+  height: number;
+  bytes: number;
+  created_at: string;
+}
+
 export interface IGuest {
   _id?: Types.ObjectId;
   name: string;
@@ -22,12 +34,14 @@ export interface IGuest {
     collaboratorName?: string;
     collaboratorEmail?: string;
   };
-  // Individual invite link for premium and VIP packages (optional)
-  individualInviteLink?: string;
+  // Individual invite image for premium and VIP packages (optional)
+  individualInviteImage?: ICloudinaryImage;
   // Post-event attendance tracking (VIP only)
   actuallyAttended?: boolean;
   attendanceMarkedAt?: Date;
   attendanceMarkedBy?: Types.ObjectId;
+  // Track if this guest's decline was refunded (not if they're refundable)
+  refundedOnDecline?: boolean;
 }
 
 export interface IEvent extends Document {
@@ -97,9 +111,15 @@ export interface IEvent extends Document {
   }[];
   totalAllocatedInvites?: number;
   
+  // Refundable slots tracking for premium and VIP packages
+  refundableSlots?: {
+    total: number; // Total refundable slots (20% for premium, 30% for VIP)
+    used: number; // How many refundable slots have been used (when guests declined and were refunded)
+  };
+  
   createdAt: Date;
   updatedAt: Date;
-  invitationCardUrl: string;
+  invitationCardImage?: ICloudinaryImage;
   qrCodeReaderUrl: string;
 }
 
@@ -168,10 +188,16 @@ const guestSchema = new Schema<IGuest>({
       type: String
     }
   },
-  // Individual invite link for premium and VIP packages (optional)
-  individualInviteLink: {
-    type: String,
-    trim: true
+  // Individual invite image for premium and VIP packages (optional)
+  individualInviteImage: {
+    public_id: { type: String, required: false },
+    secure_url: { type: String, required: false },
+    url: { type: String, required: false },
+    format: { type: String, required: false },
+    width: { type: Number, required: false },
+    height: { type: Number, required: false },
+    bytes: { type: Number, required: false },
+    created_at: { type: String, required: false }
   },
   // Post-event attendance tracking (VIP only)
   actuallyAttended: {
@@ -183,6 +209,11 @@ const guestSchema = new Schema<IGuest>({
   attendanceMarkedBy: {
     type: Schema.Types.ObjectId,
     ref: 'User'
+  },
+  // Track if this guest's decline was refunded
+  refundedOnDecline: {
+    type: Boolean,
+    default: false
   }
 }, { _id: true });
 
@@ -291,7 +322,8 @@ const eventSchema = new Schema<IEvent>({
     },
     detectedCity: {
       type: String,
-      enum: ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']
+      trim: true,
+      maxlength: 100
     },
     googleMapsUrl: {
       type: String,
@@ -358,16 +390,15 @@ const eventSchema = new Schema<IEvent>({
     required: true,
     index: true
   },
-  invitationCardUrl: {
-    type: String,
-    trim: true,
-    validate: {
-      validator: function(url: string) {
-        if (!url) return true; // Optional field
-        return url.includes('drive.google.com') || url.includes('docs.google.com');
-      },
-      message: 'يجب أن يكون الرابط من Google Drive'
-    }
+  invitationCardImage: {
+    public_id: { type: String, required: false },
+    secure_url: { type: String, required: false },
+    url: { type: String, required: false },
+    format: { type: String, required: false },
+    width: { type: Number, required: false },
+    height: { type: Number, required: false },
+    bytes: { type: Number, required: false },
+    created_at: { type: String, required: false }
   },
   qrCodeReaderUrl: {
     type: String,
@@ -452,6 +483,19 @@ const eventSchema = new Schema<IEvent>({
     type: Number,
     default: 0,
     min: 0
+  },
+  // Refundable slots tracking for premium and VIP packages
+  refundableSlots: {
+    total: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    used: {
+      type: Number,
+      default: 0,
+      min: 0
+    }
   }
 },{ timestamps: true});
 
@@ -470,5 +514,26 @@ eventSchema.index({ 'guests.phone': 1 });
 // New indexes for collaboration
 eventSchema.index({ 'collaborators.userId': 1 });
 eventSchema.index({ userId: 1, 'collaborators.userId': 1 });
+
+// Pre-save hook to initialize refundable slots for premium and VIP packages
+eventSchema.pre('save', function(next) {
+  // Only initialize if refundableSlots is not set or total is 0
+  if (!this.refundableSlots || this.refundableSlots.total === 0) {
+    if (this.packageType === 'premium' || this.packageType === 'vip') {
+      const percentage = this.packageType === 'premium' ? 0.20 : 0.30;
+      this.refundableSlots = {
+        total: Math.floor(this.details.inviteCount * percentage),
+        used: 0
+      };
+    } else {
+      // Classic packages don't have refundable slots
+      this.refundableSlots = {
+        total: 0,
+        used: 0
+      };
+    }
+  }
+  next();
+});
 
 export const Event = mongoose.model<IEvent>('Event', eventSchema);

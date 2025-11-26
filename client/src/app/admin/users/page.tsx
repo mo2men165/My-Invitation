@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { Users, Search, UserCheck, UserX, Shield, User, RefreshCw } from 'lucide-react';
+import { Users, Search, UserCheck, UserX, Shield, User, RefreshCw, ShoppingCart } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
+import { AdminUserCart } from '@/components/admin/AdminUserCart';
 
 interface AdminUser {
   id: string;
@@ -13,6 +14,7 @@ interface AdminUser {
   email: string;
   phone: string;
   city: string;
+  customCity?: string;
   role: string;
   status: string;
   eventCount: number;
@@ -33,6 +35,7 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [viewingCart, setViewingCart] = useState<{ userId: string; userName: string; userEmail: string } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -319,7 +322,7 @@ export default function AdminUsersPage() {
                               direction: 'rtl'
                             }}
                           >
-                            {truncateText(`${user.city} • ${user.eventCount} حدث`, 30)}
+                            {truncateText(`${user.city === 'اخري' && user.customCity ? user.customCity : user.city} • ${user.eventCount} حدث`, 30)}
                           </div>
                         </div>
                       </div>
@@ -382,6 +385,18 @@ export default function AdminUsersPage() {
 
                       {/* Actions */}
                       <div className="flex items-center justify-center gap-3">
+                        {/* View Cart Button */}
+                        <button
+                          onClick={() => setViewingCart({
+                            userId: user.id,
+                            userName: `${user.firstName} ${user.lastName}`,
+                            userEmail: user.email
+                          })}
+                          className="p-2.5 rounded-lg bg-[#C09B52] hover:bg-amber-600 text-white transition-colors duration-200"
+                          title="عرض السلة"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                        </button>
                         {user.id !== currentUser?.id && (
                           <>
                             {/* Status Toggle */}
@@ -463,6 +478,16 @@ export default function AdminUsersPage() {
           )}
         </div>
       </div>
+
+      {/* User Cart Modal */}
+      {viewingCart && (
+        <AdminUserCart
+          userId={viewingCart.userId}
+          userName={viewingCart.userName}
+          userEmail={viewingCart.userEmail}
+          onClose={() => setViewingCart(null)}
+        />
+      )}
     </AdminSidebar>
   );
 }
