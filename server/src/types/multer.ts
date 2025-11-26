@@ -1,0 +1,15 @@
+// Shared Multer File type definition
+// This avoids issues with the global Express.Multer.File namespace
+export interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+  stream?: NodeJS.ReadableStream;
+  destination?: string;
+  filename?: string;
+  path?: string;
+}
+
