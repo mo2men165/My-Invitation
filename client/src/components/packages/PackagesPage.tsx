@@ -1,5 +1,5 @@
 'use client';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 // Hooks
@@ -49,6 +49,13 @@ export default function PackagesPage() {
     setDesignMode
   } = usePackagesLogic();
 
+  // Reset design mode to regular when switching to Classic package
+  useEffect(() => {
+    if (activeTab === 'classic' && designMode === 'custom') {
+      setDesignMode('regular');
+    }
+  }, [activeTab, designMode, setDesignMode]);
+
   // Wrapper function to check authentication before opening cart modal
   const handleAddToCart = useCallback((packageType: keyof PackageData, design: InvitationDesign) => {
     // Wait for auth to initialize
@@ -86,8 +93,8 @@ export default function PackagesPage() {
           packageType={activeTab}
         />
         
-        {designMode === 'custom' ? (
-          /* Custom Design View */
+        {designMode === 'custom' && activeTab !== 'classic' ? (
+          /* Custom Design View - Only for Premium/VIP */
           <CustomDesignView
             packageType={activeTab}
             onAddToCart={handleAddToCart}
