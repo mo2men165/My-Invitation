@@ -227,6 +227,24 @@ export const adminAPI = {
     }
   },
 
+  // Update Event Image
+  async updateEventImage(eventId: string, invitationCardImage: File): Promise<void> {
+    const formData = new FormData();
+    formData.append('image', invitationCardImage);
+
+    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/image`, {
+      method: 'PUT',
+      headers: getAuthHeaders(false), // Don't include Content-Type, let browser set it with boundary
+      body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في تحديث صورة الحدث');
+    }
+  },
+
   // Bulk Approve Events
   async bulkApproveEvents(eventIds: string[], notes?: string): Promise<{ approvedCount: number }> {
     const response = await fetch(`${API_URL}/api/admin/events/bulk-approve`, {

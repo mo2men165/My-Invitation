@@ -599,6 +599,104 @@ router.post('/events/:eventId/reject', async (req: Request, res: Response) => {
 });
 
 /**
+ * PUT /api/admin/events/:eventId/image
+ * Update event invitation card image (can create if not exists or update if exists)
+ */
+router.put('/events/:eventId/image', uploadSingleImage, async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const adminId = req.user!.id;
+    const file = req.file;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'الحدث غير موجود' }
+      });
+    }
+
+    // If no file provided, return error
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'يجب رفع صورة' }
+      });
+    }
+
+    // Validate the image file
+    const validation = CloudinaryService.validateImageFile(file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: { message: validation.error || 'صورة غير صالحة' }
+      });
+    }
+
+    try {
+      // Upload to Cloudinary
+      const uploadResult = await CloudinaryService.uploadFile(
+        file.buffer,
+        file.originalname,
+        {
+          folder: `events/${eventId}/invitation-cards`,
+          resource_type: 'image'
+        }
+      );
+
+      const invitationCardImage = {
+        public_id: uploadResult.public_id,
+        secure_url: uploadResult.secure_url,
+        url: uploadResult.url,
+        format: uploadResult.format,
+        width: uploadResult.width,
+        height: uploadResult.height,
+        bytes: uploadResult.bytes,
+        created_at: uploadResult.created_at
+      };
+
+      // Delete old image if it exists
+      if (event.invitationCardImage?.public_id) {
+        try {
+          await CloudinaryService.deleteImage(event.invitationCardImage.public_id);
+        } catch (deleteError) {
+          logger.warn('Failed to delete old invitation card image:', deleteError);
+          // Don't fail the request if deletion fails
+        }
+      }
+
+      // Update event with new image (creates field if not exists, updates if exists)
+      event.invitationCardImage = invitationCardImage;
+      await event.save();
+
+      logger.info(`Event ${eventId} invitation card image updated by admin ${adminId}`);
+
+      return res.json({
+        success: true,
+        message: 'تم تحديث صورة بطاقة الدعوة بنجاح',
+        data: {
+          invitationCardImage
+        }
+      });
+
+    } catch (uploadError: any) {
+      logger.error('Error uploading invitation card image:', uploadError);
+      return res.status(500).json({
+        success: false,
+        error: { message: `فشل رفع الصورة: ${uploadError.message}` }
+      });
+    }
+
+  } catch (error) {
+    logger.error('Error updating event image:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تحديث صورة الحدث' }
+    });
+  }
+});
+
+/**
  * POST /api/admin/events/bulk-approve
  * Bulk approve multiple events
  */

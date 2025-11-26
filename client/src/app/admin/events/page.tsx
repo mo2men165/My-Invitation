@@ -86,6 +86,10 @@ export default function AdminEventsPage() {
   const [invitationCardImagePreview, setInvitationCardImagePreview] = useState<string | null>(null);
   const [qrCodeReaderUrl, setQrCodeReaderUrl] = useState('');
   const [processingApproval, setProcessingApproval] = useState(false);
+  const [editingEventImage, setEditingEventImage] = useState(false);
+  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
+  const [uploadingEventImage, setUploadingEventImage] = useState(false);
   const { toast } = useToast();
 
   const fetchEvents = useCallback(async () => {
@@ -156,6 +160,76 @@ export default function AdminEventsPage() {
     setInvitationCardImage(null);
     setInvitationCardImagePreview(null);
     setShowApprovalModal(true);
+  };
+
+  const handleUpdateEventImage = async () => {
+    if (!selectedEvent || !eventImageFile) return;
+
+    try {
+      setUploadingEventImage(true);
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(eventImageFile.type)) {
+        toast({
+          title: "خطأ",
+          description: "نوع الملف غير مدعوم. يرجى رفع صورة (JPG, PNG, WebP)",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validate file size (10MB)
+      if (eventImageFile.size > 10 * 1024 * 1024) {
+        toast({
+          title: "خطأ",
+          description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      await adminAPI.updateEventImage(selectedEvent.id, eventImageFile);
+      
+      toast({
+        title: "تم بنجاح",
+        description: "تم تحديث صورة بطاقة الدعوة بنجاح",
+        variant: "default"
+      });
+
+      // Refresh events to get updated image
+      const updatedEvents = await adminAPI.getAllEvents({
+        page: currentPage,
+        limit: 10,
+        search: searchTerm,
+        approvalStatus: approvalStatusFilter,
+        status: statusFilter
+      });
+      
+      // Update events list
+      setEvents(updatedEvents.data);
+      setTotalPages(updatedEvents.pagination.pages);
+      
+      // Update selected event if it's still open
+      const updatedEvent = updatedEvents.data.find(e => e.id === selectedEvent.id);
+      if (updatedEvent) {
+        setSelectedEvent(updatedEvent);
+      }
+
+      // Reset state
+      setEventImageFile(null);
+      setEventImagePreview(null);
+      setEditingEventImage(false);
+    } catch (error: any) {
+      console.error('Error updating event image:', error);
+      toast({
+        title: "خطأ",
+        description: error.message || "حدث خطأ أثناء تحديث الصورة",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingEventImage(false);
+    }
   };
 
   const handleViewGuests = (eventId: string) => {
@@ -569,7 +643,12 @@ export default function AdminEventsPage() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-white">تفاصيل الحدث الكاملة</h3>
                   <button
-                    onClick={() => setShowDetailsModal(false)}
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setEditingEventImage(false);
+                      setEventImageFile(null);
+                      setEventImagePreview(null);
+                    }}
                     className="p-2 hover:bg-gray-800 rounded-lg transition-colors duration-200"
                   >
                     <X className="w-5 h-5 text-gray-400" />
@@ -894,13 +973,113 @@ export default function AdminEventsPage() {
                 </div>
 
                 {/* Invitation Card Image */}
-                {selectedEvent.invitationCardImage && (
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <div>
+                  <h4 className="text-lg font-bold text-white mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <ImageIcon className="w-5 h-5 text-blue-400" />
                       بطاقة الدعوة
-                    </h4>
-                    <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-5">
+                    </div>
+                    {!editingEventImage && (
+                      <button
+                        onClick={() => {
+                          setEditingEventImage(true);
+                          setEventImageFile(null);
+                          setEventImagePreview(null);
+                        }}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm flex items-center gap-2"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                        {selectedEvent.invitationCardImage ? 'تعديل الصورة' : 'رفع صورة'}
+                      </button>
+                    )}
+                  </h4>
+                  <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-5">
+                    {editingEventImage ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm text-gray-400 mb-2 block">
+                            {selectedEvent.invitationCardImage ? 'صورة جديدة' : 'صورة بطاقة الدعوة'}
+                          </label>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setEventImageFile(file);
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setEventImagePreview(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              } else {
+                                setEventImagePreview(null);
+                              }
+                            }}
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            الصيغ المدعومة: JPG, PNG, WebP (الحد الأقصى: 10 ميجابايت)
+                          </p>
+                        </div>
+                        {eventImagePreview && (
+                          <div className="mt-3">
+                            <p className="text-xs text-gray-400 mb-2">معاينة الصورة:</p>
+                            <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
+                              <img
+                                src={eventImagePreview}
+                                alt="Preview"
+                                className="w-full h-auto max-h-64 object-contain"
+                              />
+                            </div>
+                            {eventImageFile && (
+                              <p className="text-xs text-gray-500 mt-2">
+                                الملف: {eventImageFile.name} ({(eventImageFile.size / 1024 / 1024).toFixed(2)} MB)
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {selectedEvent.invitationCardImage && !eventImagePreview && (
+                          <div className="mt-3">
+                            <p className="text-xs text-gray-400 mb-2">الصورة الحالية:</p>
+                            <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
+                              <img
+                                src={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
+                                alt="Current Invitation Card"
+                                className="w-full h-auto max-h-64 object-contain"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={handleUpdateEventImage}
+                            disabled={uploadingEventImage || !eventImageFile}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition-colors duration-200 font-medium"
+                          >
+                            {uploadingEventImage ? (
+                              <div className="flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                جاري الرفع...
+                              </div>
+                            ) : (
+                              'حفظ الصورة'
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingEventImage(false);
+                              setEventImageFile(null);
+                              setEventImagePreview(null);
+                            }}
+                            disabled={uploadingEventImage}
+                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-colors duration-200"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </div>
+                    ) : selectedEvent.invitationCardImage ? (
                       <div className="space-y-4">
                         <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
                           <img
@@ -919,9 +1098,15 @@ export default function AdminEventsPage() {
                           فتح الصورة في علامة تبويب جديدة
                         </a>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-400">
+                        <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>لا توجد صورة بطاقة دعوة</p>
+                        <p className="text-sm mt-1">انقر على "رفع صورة" لإضافة صورة</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* QR Code Reader URL */}
                 {selectedEvent.qrCodeReaderUrl && (
