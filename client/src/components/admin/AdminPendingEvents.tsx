@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Check, X, Clock, User, Calendar, MapPin, Users, DollarSign, Eye } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
+import { useToast } from '@/hooks/useToast';
 
 interface PendingEvent {
   id: string;
@@ -33,6 +34,7 @@ export function AdminPendingEvents() {
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [currentEventId, setCurrentEventId] = useState<string>('');
   const [notes, setNotes] = useState('');
+  const { toast } = useToast();
   const [invitationCardImage, setInvitationCardImage] = useState<File | null>(null);
 
   useEffect(() => {
@@ -311,16 +313,41 @@ export function AdminPendingEvents() {
                 </label>
                 <input
                   type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  accept="image/jpeg,image/jpg,image/png"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
+                      // Validate file type
+                      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+                      if (!allowedTypes.includes(file.type)) {
+                        toast({
+                          title: "خطأ",
+                          description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
+                          variant: "destructive"
+                        });
+                        e.target.value = ''; // Clear the input
+                        setInvitationCardImage(null);
+                        return;
+                      }
+                      
+                      // Validate file size (10MB)
+                      if (file.size > 10 * 1024 * 1024) {
+                        toast({
+                          title: "خطأ",
+                          description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
+                          variant: "destructive"
+                        });
+                        e.target.value = ''; // Clear the input
+                        setInvitationCardImage(null);
+                        return;
+                      }
+                      
                       setInvitationCardImage(file);
                     }
                   }}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0823D]"
                 />
-                <p className="text-xs text-gray-500 mt-1">يجب أن تكون الصورة بصيغة JPG, PNG, أو WebP (حد أقصى 10 ميجابايت)</p>
+                <p className="text-xs text-gray-500 mt-1">يجب أن تكون الصورة بصيغة JPEG أو PNG فقط (حد أقصى 10 ميجابايت)</p>
                 {invitationCardImage && (
                   <p className="text-xs text-green-400 mt-1">تم اختيار الملف: {invitationCardImage.name}</p>
                 )}

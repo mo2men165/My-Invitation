@@ -6,14 +6,14 @@ import { MulterFile } from '../types/multer';
 // Configure multer to store files in memory (we'll upload to Cloudinary)
 const storage = multer.memoryStorage();
 
-// File filter to only accept images
+// File filter to only accept JPEG and PNG images
 const fileFilter = (req: any, file: MulterFile, cb: multer.FileFilterCallback) => {
-  const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png'];
   
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error(`Invalid file type. Allowed types: ${allowedMimeTypes.join(', ')}`));
+    cb(new Error('نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط'));
   }
 };
 

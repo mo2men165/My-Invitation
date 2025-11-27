@@ -169,11 +169,11 @@ export default function AdminEventsPage() {
       setUploadingEventImage(true);
 
       // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
       if (!allowedTypes.includes(eventImageFile.type)) {
         toast({
           title: "خطأ",
-          description: "نوع الملف غير مدعوم. يرجى رفع صورة (JPG, PNG, WebP)",
+          description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
           variant: "destructive"
         });
         return;
@@ -1002,24 +1002,52 @@ export default function AdminEventsPage() {
                           </label>
                           <input
                             type="file"
-                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            accept="image/jpeg,image/jpg,image/png"
                             onChange={(e) => {
                               const file = e.target.files?.[0] || null;
-                              setEventImageFile(file);
                               if (file) {
+                                // Validate file type
+                                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+                                if (!allowedTypes.includes(file.type)) {
+                                  toast({
+                                    title: "خطأ",
+                                    description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
+                                    variant: "destructive"
+                                  });
+                                  e.target.value = ''; // Clear the input
+                                  setEventImageFile(null);
+                                  setEventImagePreview(null);
+                                  return;
+                                }
+                                
+                                // Validate file size (10MB)
+                                if (file.size > 10 * 1024 * 1024) {
+                                  toast({
+                                    title: "خطأ",
+                                    description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
+                                    variant: "destructive"
+                                  });
+                                  e.target.value = ''; // Clear the input
+                                  setEventImageFile(null);
+                                  setEventImagePreview(null);
+                                  return;
+                                }
+                                
+                                setEventImageFile(file);
                                 const reader = new FileReader();
                                 reader.onloadend = () => {
                                   setEventImagePreview(reader.result as string);
                                 };
                                 reader.readAsDataURL(file);
                               } else {
+                                setEventImageFile(null);
                                 setEventImagePreview(null);
                               }
                             }}
                             className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
                           />
                           <p className="text-xs text-gray-500 mt-1">
-                            الصيغ المدعومة: JPG, PNG, WebP (الحد الأقصى: 10 ميجابايت)
+                            الصيغ المدعومة: JPEG, PNG فقط (الحد الأقصى: 10 ميجابايت)
                           </p>
                         </div>
                         {eventImagePreview && (
@@ -1216,23 +1244,54 @@ export default function AdminEventsPage() {
                     <div className="space-y-3">
                       <input
                         type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        accept="image/jpeg,image/jpg,image/png"
                         onChange={(e) => {
                           const file = e.target.files?.[0] || null;
-                          setInvitationCardImage(file);
                           if (file) {
+                            // Validate file type
+                            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+                            if (!allowedTypes.includes(file.type)) {
+                              toast({
+                                title: "خطأ",
+                                description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
+                                variant: "destructive"
+                              });
+                              e.target.value = ''; // Clear the input
+                              setInvitationCardImage(null);
+                              setInvitationCardImagePreview(null);
+                              return;
+                            }
+                            
+                            // Validate file size (10MB)
+                            if (file.size > 10 * 1024 * 1024) {
+                              toast({
+                                title: "خطأ",
+                                description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
+                                variant: "destructive"
+                              });
+                              e.target.value = ''; // Clear the input
+                              setInvitationCardImage(null);
+                              setInvitationCardImagePreview(null);
+                              return;
+                            }
+                            
+                            setInvitationCardImage(file);
                             const reader = new FileReader();
                             reader.onloadend = () => {
                               setInvitationCardImagePreview(reader.result as string);
                             };
                             reader.readAsDataURL(file);
                           } else {
+                            setInvitationCardImage(null);
                             setInvitationCardImagePreview(null);
                           }
                         }}
                         className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
                         required
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        الصيغ المدعومة: JPEG, PNG فقط (الحد الأقصى: 10 ميجابايت)
+                      </p>
                       {invitationCardImagePreview && (
                         <div className="mt-3">
                           <p className="text-xs text-gray-400 mb-2">معاينة الصورة:</p>

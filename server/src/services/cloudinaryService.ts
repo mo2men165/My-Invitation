@@ -21,6 +21,7 @@ export interface UploadOptions {
   allowed_formats?: string[];
   max_file_size?: number; // in bytes
   transformation?: any[];
+  targetFormat?: 'png' | 'jpeg'; // Convert uploaded images to this format (default: 'jpeg')
 }
 
 export class CloudinaryService {
@@ -36,15 +37,24 @@ export class CloudinaryService {
       const {
         folder = 'invitations',
         resource_type = 'image',
-        allowed_formats = ['jpg', 'jpeg', 'png', 'webp'],
+        allowed_formats = ['jpg', 'jpeg', 'png'],
         max_file_size = 10 * 1024 * 1024, // 10MB default
-        transformation = []
+        transformation = [],
+        targetFormat = 'jpeg' // Default to JPEG for better compression
       } = options;
 
       // Validate file size
       if (fileBuffer.length > max_file_size) {
         throw new Error(`File size exceeds maximum allowed size of ${max_file_size / 1024 / 1024}MB`);
       }
+
+      // Prepare transformations - force format conversion in transformation array
+      const uploadTransformations = [...transformation];
+      uploadTransformations.push({ format: targetFormat }); // Force format conversion
+
+      // Generate public_id with target format extension
+      const baseFileName = fileName.replace(/\.[^/.]+$/, '');
+      const publicId = `${Date.now()}_${baseFileName}`;
 
       // Create a promise wrapper for the upload
       return new Promise((resolve, reject) => {
@@ -53,9 +63,9 @@ export class CloudinaryService {
             folder,
             resource_type,
             allowed_formats,
-            transformation,
+            transformation: uploadTransformations, // Force format conversion via transformations
             // Generate unique public_id from filename and timestamp
-            public_id: `${Date.now()}_${fileName.replace(/\.[^/.]+$/, '')}`,
+            public_id: publicId,
             overwrite: false,
             invalidate: true
           },
@@ -106,16 +116,25 @@ export class CloudinaryService {
       const {
         folder = 'invitations',
         resource_type = 'image',
-        allowed_formats = ['jpg', 'jpeg', 'png', 'webp'],
-        transformation = []
+        allowed_formats = ['jpg', 'jpeg', 'png'],
+        transformation = [],
+        targetFormat = 'jpeg' // Default to JPEG for better compression
       } = options;
+
+      // Prepare transformations - force format conversion in transformation array
+      const uploadTransformations = [...transformation];
+      uploadTransformations.push({ format: targetFormat }); // Force format conversion
+
+      // Generate public_id with target format extension
+      const baseFileName = filePath.split('/').pop()?.replace(/\.[^/.]+$/, '') || 'image';
+      const publicId = `${Date.now()}_${baseFileName}`;
 
       const result = await cloudinary.uploader.upload(filePath, {
         folder,
         resource_type,
         allowed_formats,
-        transformation,
-        public_id: `${Date.now()}_${filePath.split('/').pop()?.replace(/\.[^/.]+$/, '')}`,
+        transformation: uploadTransformations, // Force format conversion via transformations
+        public_id: publicId,
         overwrite: false,
         invalidate: true
       });
@@ -203,20 +222,20 @@ export class CloudinaryService {
    * Validate if a file is a valid image
    */
   static validateImageFile(file: MulterFile): { valid: boolean; error?: string } {
-    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     const maxSize = 10 * 1024 * 1024; // 10MB
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
       return {
         valid: false,
-        error: `Invalid file type. Allowed types: ${allowedMimeTypes.join(', ')}`
+        error: 'نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط'
       };
     }
 
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: `File size exceeds maximum allowed size of ${maxSize / 1024 / 1024}MB`
+        error: `حجم الملف كبير جداً. الحد الأقصى ${maxSize / 1024 / 1024} ميجابايت`
       };
     }
 

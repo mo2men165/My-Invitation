@@ -273,11 +273,11 @@ ${event.invitationText}
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     if (!allowedTypes.includes(inviteImageFile.type)) {
       toast({
         title: "خطأ",
-        description: "نوع الملف غير مدعوم. يرجى رفع صورة (JPG, PNG, WebP)",
+        description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
         variant: "destructive"
       });
       return;
@@ -707,22 +707,53 @@ ${event.invitationText}
                           <label className="text-xs text-gray-400 block">صورة الدعوة الفردية</label>
                           <input
                             type="file"
-                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            accept="image/jpeg,image/jpg,image/png"
                             onChange={(e) => {
                               const file = e.target.files?.[0] || null;
-                              setInviteImageFile(file);
                               if (file) {
+                                // Validate file type
+                                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+                                if (!allowedTypes.includes(file.type)) {
+                                  toast({
+                                    title: "خطأ",
+                                    description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
+                                    variant: "destructive"
+                                  });
+                                  e.target.value = ''; // Clear the input
+                                  setInviteImageFile(null);
+                                  setInviteImagePreview(null);
+                                  return;
+                                }
+                                
+                                // Validate file size (10MB)
+                                if (file.size > 10 * 1024 * 1024) {
+                                  toast({
+                                    title: "خطأ",
+                                    description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
+                                    variant: "destructive"
+                                  });
+                                  e.target.value = ''; // Clear the input
+                                  setInviteImageFile(null);
+                                  setInviteImagePreview(null);
+                                  return;
+                                }
+                                
+                                setInviteImageFile(file);
                                 const reader = new FileReader();
                                 reader.onloadend = () => {
                                   setInviteImagePreview(reader.result as string);
                                 };
                                 reader.readAsDataURL(file);
                               } else {
+                                setInviteImageFile(null);
                                 setInviteImagePreview(null);
                               }
                             }}
                             className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
                           />
+                          <p className="text-xs text-gray-500 mt-1">
+                            الصيغ المدعومة: JPEG, PNG فقط (الحد الأقصى: 10 ميجابايت)
+                          </p>
                           {inviteImagePreview && (
                             <div className="mt-2">
                               <p className="text-xs text-gray-400 mb-2">معاينة الصورة:</p>
