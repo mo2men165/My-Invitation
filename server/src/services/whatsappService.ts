@@ -78,17 +78,115 @@ export class WhatsappService {
    */
   private static async handleMessageStatus(status: any): Promise<void> {
     try {
-      logger.info('Message status update:', {
+      logger.info('=== WHATSAPP STATUS: Message status update received ===', {
         messageId: status.id,
         status: status.status,
         timestamp: status.timestamp,
-        recipientId: status.recipient_id
+        recipientId: status.recipient_id,
+        errors: status.errors ? JSON.stringify(status.errors) : null
       });
 
-      // Update message status in database if needed
-      // For now, just log it
+      // If message failed, trigger fallback mechanism
+      if (status.status === 'failed') {
+        logger.warn('=== WHATSAPP STATUS: Message delivery FAILED - Triggering fallback ===', {
+          messageId: status.id,
+          recipientId: status.recipient_id,
+          errorCode: status.errors?.[0]?.code,
+          errorMessage: status.errors?.[0]?.message,
+          errorTitle: status.errors?.[0]?.title,
+          errorDetails: status.errors?.[0]?.error_data
+        });
+
+        // Find event and guest by messageId to send fallback
+        await this.triggerFallbackInvitation(status.id, status.recipient_id);
+      } else {
+        logger.info('WHATSAPP STATUS: Message status is not failure, no action needed', {
+          messageId: status.id,
+          status: status.status
+        });
+      }
     } catch (error: any) {
-      logger.error('Error handling message status:', error);
+      logger.error('=== WHATSAPP STATUS: ERROR handling message status ===', {
+        error: error.message,
+        stack: error.stack,
+        status: status
+      });
+    }
+  }
+
+  /**
+   * Trigger fallback invitation when initial message fails
+   */
+  private static async triggerFallbackInvitation(failedMessageId: string, recipientPhone: string): Promise<void> {
+    try {
+      logger.info('=== FALLBACK: Starting fallback invitation process ===', {
+        failedMessageId,
+        recipientPhone
+      });
+
+      // Find event and guest by messageId
+      const event = await Event.findOne({
+        'guests.whatsappMessageId': failedMessageId
+      });
+
+      if (!event) {
+        logger.error('FALLBACK: Event not found for failed message', {
+          failedMessageId,
+          recipientPhone
+        });
+        return;
+      }
+
+      logger.info('FALLBACK: Event found', {
+        eventId: event._id,
+        eventName: event.details.eventName,
+        packageType: event.packageType
+      });
+
+      // Find the specific guest
+      const guest = event.guests.find(g => g.whatsappMessageId === failedMessageId);
+
+      if (!guest) {
+        logger.error('FALLBACK: Guest not found for failed message', {
+          failedMessageId,
+          eventId: event._id,
+          recipientPhone
+        });
+        return;
+      }
+
+      logger.info('FALLBACK: Guest found', {
+        guestId: guest._id,
+        guestName: guest.name,
+        guestPhone: guest.phone
+      });
+
+      // Send fallback invitation using utility template
+      logger.info('FALLBACK: Calling sendInvitationFallback...');
+      const result = await WhatsappService.sendInvitationFallback(event._id.toString(), guest._id?.toString() || '');
+
+      if (result.success) {
+        logger.info('=== FALLBACK: Fallback invitation sent successfully ===', {
+          eventId: event._id,
+          guestId: guest._id,
+          originalFailedMessageId: failedMessageId,
+          newMessageId: result.data?.messageId
+        });
+      } else {
+        logger.error('=== FALLBACK: Fallback invitation failed ===', {
+          eventId: event._id,
+          guestId: guest._id,
+          originalFailedMessageId: failedMessageId,
+          error: result.error
+        });
+      }
+    } catch (error: any) {
+      logger.error('=== FALLBACK: ERROR in triggerFallbackInvitation ===', {
+        error: error.message,
+        stack: error.stack,
+        failedMessageId,
+        recipientPhone
+      });
     }
   }
 
@@ -482,6 +580,131 @@ export class WhatsappService {
   }
 
   /**
+   * Build message data for invitation template
+   * Reusable method that works with any template name (initial_invitation or initial_invitation_utility)
+   */
+  private static buildInvitationMessageData(
+    event: any,
+    guest: any,
+    templateName: string
+  ): { messageData: any; phoneNumber: string; validImageUrl: string } {
+    // Format dates
+    const eventDate = new Date(event.details.eventDate);
+    const hijriDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'islamic' });
+    const gregorianDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'long', day: 'numeric' });
+    const dayOfWeek = eventDate.toLocaleDateString('ar-SA', { weekday: 'long' });
+
+    // Determine event type
+    const eventType = event.details.eventName || 'حفل';
+
+    // Prepare phone number (remove + for WhatsApp API)
+    const phoneNumber = guest.phone.replace(/^\+/, '');
+
+    // Get event invitation card image URL
+    const eventImageUrl = event.invitationCardImage?.secure_url || event.invitationCardImage?.url || '';
+
+    // Ensure URL is HTTPS (WhatsApp requires HTTPS for images)
+    const validImageUrl = eventImageUrl.startsWith('https://') 
+      ? eventImageUrl 
+      : eventImageUrl.replace(/^http:\/\//, 'https://');
+
+    const messageData = {
+      messaging_product: 'whatsapp',
+      to: phoneNumber,
+      type: 'template',
+      template: {
+        name: templateName,
+        language: {
+          code: 'ar'
+        },
+        components: [
+          // Template requires IMAGE header - always include it
+          {
+            type: 'header',
+            parameters: [
+              {
+                type: 'image',
+                image: {
+                  link: validImageUrl
+                }
+              }
+            ]
+          },
+          {
+            type: 'body',
+            parameters: [
+              {
+                type: 'text',
+                text: event.details.hostName,
+                parameter_name: 'host_name'
+              },
+              {
+                type: 'text',
+                text: eventType,
+                parameter_name: 'event_type'
+              },
+              {
+                type: 'text',
+                text: dayOfWeek,
+                parameter_name: 'day_of_week'
+              },
+              {
+                type: 'text',
+                text: hijriDate,
+                parameter_name: 'hijri_date'
+              },
+              {
+                type: 'text',
+                text: gregorianDate,
+                parameter_name: 'gregorian_date'
+              },
+              {
+                type: 'text',
+                text: `${event.details.startTime} - ${event.details.endTime}`,
+                parameter_name: 'event_time'
+              },
+              {
+                type: 'text',
+                text: event.details.displayName || event.details.eventLocation,
+                parameter_name: 'event_location'
+              },
+              {
+                type: 'text',
+                text: this.sanitizeTemplateParam(event.details.invitationText || ''),
+                parameter_name: 'invitation_text'
+              }
+            ]
+          },
+          {
+            type: 'button',
+            sub_type: 'quick_reply',
+            index: '0',
+            parameters: [
+              {
+                type: 'payload',
+                payload: 'تأكيد الحضور'
+              }
+            ]
+          },
+          {
+            type: 'button',
+            sub_type: 'quick_reply',
+            index: '1',
+            parameters: [
+              {
+                type: 'payload',
+                payload: 'اعتذار عن الحضور'
+              }
+            ]
+          }
+        ]
+      }
+    };
+
+    return { messageData, phoneNumber, validImageUrl };
+  }
+
+  /**
    * Send initial invitation message
    */
   static async sendInvitation(eventId: string, guestId: string): Promise<{ success: boolean; data?: any; error?: string }> {
@@ -539,7 +762,23 @@ export class WhatsappService {
         imageUrl: event.invitationCardImage?.secure_url || event.invitationCardImage?.url
       });
 
-      // Format dates
+      // Validate image URL - must be HTTPS and non-empty
+      const eventImageUrl = event.invitationCardImage?.secure_url || event.invitationCardImage?.url || '';
+      if (!eventImageUrl || !eventImageUrl.startsWith('http')) {
+        logger.error('WHATSAPP: Invalid image URL', {
+          eventId,
+          guestId,
+          imageUrl: eventImageUrl,
+          hasSecureUrl: !!event.invitationCardImage?.secure_url,
+          hasUrl: !!event.invitationCardImage?.url
+        });
+        return { success: false, error: 'Event invitation card image URL is invalid or not accessible' };
+      }
+
+      // Build message data using reusable method
+      const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, 'initial_invitation');
+
+      // Format dates for logging
       const eventDate = new Date(event.details.eventDate);
       const hijriDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'islamic' });
       const gregorianDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'long', day: 'numeric' });
@@ -552,145 +791,31 @@ export class WhatsappService {
         dayOfWeek
       });
 
-      // Determine event type based on context (could be enhanced)
-      const eventType = event.details.eventName || 'حفل';
-
-      // Prepare phone number (remove + for WhatsApp API)
-      const phoneNumber = guest.phone.replace(/^\+/, '');
-      
       logger.info('WHATSAPP: Phone number prepared', {
         original: guest.phone,
         formatted: phoneNumber
       });
-
-      // Get event invitation card image URL
-      const eventImageUrl = event.invitationCardImage?.secure_url || event.invitationCardImage?.url || '';
-      
-      // Validate image URL - must be HTTPS and non-empty
-      if (!eventImageUrl || !eventImageUrl.startsWith('http')) {
-        logger.error('WHATSAPP: Invalid image URL', {
-          eventId,
-          guestId,
-          imageUrl: eventImageUrl,
-          hasSecureUrl: !!event.invitationCardImage?.secure_url,
-          hasUrl: !!event.invitationCardImage?.url
-        });
-        return { success: false, error: 'Event invitation card image URL is invalid or not accessible' };
-      }
-
-      // Ensure URL is HTTPS (WhatsApp requires HTTPS for images)
-      const validImageUrl = eventImageUrl.startsWith('https://') 
-        ? eventImageUrl 
-        : eventImageUrl.replace(/^http:\/\//, 'https://');
 
       logger.info('WHATSAPP: Image URL validated', {
         originalUrl: eventImageUrl,
         validUrl: validImageUrl
       });
 
-      const messageData = {
-        messaging_product: 'whatsapp',
-        to: phoneNumber,
-        type: 'template',
-        template: {
-          name: 'initial_invitation',
-          language: {
-            code: 'ar'
-          },
-          components: [
-            // Template requires IMAGE header - always include it
-            {
-              type: 'header',
-              parameters: [
-                {
-                  type: 'image',
-                  image: {
-                    link: validImageUrl
-                  }
-                }
-              ]
-            },
-            {
-              type: 'body',
-              parameters: [
-                {
-                  type: 'text',
-                  text: event.details.hostName,
-                  parameter_name: 'host_name'
-                },
-                {
-                  type: 'text',
-                  text: eventType,
-                  parameter_name: 'event_type'
-                },
-                {
-                  type: 'text',
-                  text: dayOfWeek,
-                  parameter_name: 'day_of_week'
-                },
-                {
-                  type: 'text',
-                  text: hijriDate,
-                  parameter_name: 'hijri_date'
-                },
-                {
-                  type: 'text',
-                  text: gregorianDate,
-                  parameter_name: 'gregorian_date'
-                },
-                {
-                  type: 'text',
-                  text: `${event.details.startTime} - ${event.details.endTime}`,
-                  parameter_name: 'event_time'
-                },
-                {
-                  type: 'text',
-                  text: event.details.displayName || event.details.eventLocation,
-                  parameter_name: 'event_location'
-                },
-                {
-                  type: 'text',
-                  text: this.sanitizeTemplateParam(event.details.invitationText || ''),
-                  parameter_name: 'invitation_text'
-                }
-              ]
-            },
-            {
-              type: 'button',
-              sub_type: 'quick_reply',
-              index: '0',
-              parameters: [
-                {
-                  type: 'payload',
-                  payload: 'تأكيد الحضور'
-                }
-              ]
-            },
-            {
-              type: 'button',
-              sub_type: 'quick_reply',
-              index: '1',
-              parameters: [
-                {
-                  type: 'payload',
-                  payload: 'اعتذار عن الحضور'
-                }
-              ]
-            }
-          ]
-        }
-      };
+      // Find body component (index 1) for logging - FIXED: was logging header (index 0) before
+      const bodyComponent = messageData.template.components.find((c: any) => c.type === 'body');
+      const buttonComponents = messageData.template.components.filter((c: any) => c.type === 'button');
 
       logger.info('WHATSAPP: Message data prepared', {
         template: 'initial_invitation',
         to: phoneNumber,
-        parametersCount: messageData.template.components[0].parameters.length,
-        parameters: messageData.template.components[0].parameters.map((p, i) => ({
+        bodyParametersCount: bodyComponent?.parameters?.length || 0,
+        bodyParameters: bodyComponent?.parameters?.map((p: any, i: number) => ({
           index: i,
+          parameter_name: p.parameter_name,
           value: p.text?.substring(0, 50) + (p.text && p.text.length > 50 ? '...' : '')
-        })),
-        buttonCount: messageData.template.components.filter(c => c.type === 'button').length,
-        buttons: messageData.template.components.filter(c => c.type === 'button').map(b => ({
+        })) || [],
+        buttonCount: buttonComponents.length,
+        buttons: buttonComponents.map((b: any) => ({
           sub_type: b.sub_type,
           index: b.index
         }))
@@ -759,6 +884,198 @@ export class WhatsappService {
         stack: error.stack,
         response: error.response?.data,
         statusCode: error.response?.status
+      });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send fallback invitation message using initial_invitation_utility template
+   * This is triggered when the initial_invitation template fails to deliver
+   */
+  static async sendInvitationFallback(eventId: string, guestId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      logger.info('=== FALLBACK: Starting sendInvitationFallback ===', {
+        eventId,
+        guestId,
+        templateName: 'initial_invitation_utility',
+        timestamp: new Date().toISOString()
+      });
+
+      const event = await Event.findById(eventId);
+      if (!event) {
+        logger.error('FALLBACK: Event not found', { eventId });
+        return { success: false, error: 'Event not found' };
+      }
+
+      logger.info('FALLBACK: Event found', {
+        eventId,
+        packageType: event.packageType,
+        eventName: event.details.eventName,
+        hostName: event.details.hostName
+      });
+
+      const guest = event.guests.find(g => g._id?.toString() === guestId);
+      if (!guest) {
+        logger.error('FALLBACK: Guest not found', { eventId, guestId });
+        return { success: false, error: 'Guest not found' };
+      }
+
+      logger.info('FALLBACK: Guest found', {
+        guestId,
+        guestName: guest.name,
+        guestPhone: guest.phone,
+        hasIndividualImage: !!guest.individualInviteImage
+      });
+
+      // Check package type
+      if (event.packageType === 'classic') {
+        logger.warn('FALLBACK: Classic package - API not available', { eventId });
+        return { success: false, error: 'WhatsApp integration not available for classic packages' };
+      }
+
+      // For Premium/VIP, ensure event invitation card image is set
+      if (!event.invitationCardImage) {
+        logger.error('FALLBACK: Event invitation card image missing', {
+          eventId,
+          guestId,
+          guestName: guest.name,
+          packageType: event.packageType
+        });
+        return { success: false, error: 'Event invitation card image not set' };
+      }
+
+      logger.info('FALLBACK: Event invitation card image validated', {
+        imageUrl: event.invitationCardImage?.secure_url || event.invitationCardImage?.url
+      });
+
+      // Validate image URL - must be HTTPS and non-empty
+      const eventImageUrl = event.invitationCardImage?.secure_url || event.invitationCardImage?.url || '';
+      if (!eventImageUrl || !eventImageUrl.startsWith('http')) {
+        logger.error('FALLBACK: Invalid image URL', {
+          eventId,
+          guestId,
+          imageUrl: eventImageUrl,
+          hasSecureUrl: !!event.invitationCardImage?.secure_url,
+          hasUrl: !!event.invitationCardImage?.url
+        });
+        return { success: false, error: 'Event invitation card image URL is invalid or not accessible' };
+      }
+
+      // Build message data using reusable method with fallback template name
+      const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, 'initial_invitation_utility');
+
+      // Format dates for logging
+      const eventDate = new Date(event.details.eventDate);
+      const hijriDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'islamic' });
+      const gregorianDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'long', day: 'numeric' });
+      const dayOfWeek = eventDate.toLocaleDateString('ar-SA', { weekday: 'long' });
+
+      logger.info('FALLBACK: Date formatting complete', {
+        eventDate: event.details.eventDate,
+        hijriDate,
+        gregorianDate,
+        dayOfWeek
+      });
+
+      logger.info('FALLBACK: Phone number prepared', {
+        original: guest.phone,
+        formatted: phoneNumber
+      });
+
+      logger.info('FALLBACK: Image URL validated', {
+        originalUrl: eventImageUrl,
+        validUrl: validImageUrl
+      });
+
+      // Find body component (index 1) for logging
+      const bodyComponent = messageData.template.components.find((c: any) => c.type === 'body');
+      const buttonComponents = messageData.template.components.filter((c: any) => c.type === 'button');
+
+      logger.info('FALLBACK: Message data prepared', {
+        template: 'initial_invitation_utility',
+        to: phoneNumber,
+        bodyParametersCount: bodyComponent?.parameters?.length || 0,
+        bodyParameters: bodyComponent?.parameters?.map((p: any, i: number) => ({
+          index: i,
+          parameter_name: p.parameter_name,
+          value: p.text?.substring(0, 50) + (p.text && p.text.length > 50 ? '...' : '')
+        })) || [],
+        buttonCount: buttonComponents.length,
+        buttons: buttonComponents.map((b: any) => ({
+          sub_type: b.sub_type,
+          index: b.index
+        }))
+      });
+
+      logger.info('FALLBACK: Sending message to WhatsApp API...', {
+        endpoint: `${this.WHATSAPP_API_URL}/${this.PHONE_NUMBER_ID}/messages`,
+        phoneNumberId: this.PHONE_NUMBER_ID,
+        templateName: 'initial_invitation_utility'
+      });
+
+      const response = await this.sendMessage(messageData);
+      const sentMessageId = response.messages?.[0]?.id;
+
+      logger.info('FALLBACK: Message sent successfully', {
+        messageId: sentMessageId,
+        templateName: 'initial_invitation_utility',
+        response: JSON.stringify(response)
+      });
+
+      // Update database with new message ID (keep the fallback message ID)
+      logger.info('FALLBACK: Updating database with fallback message ID...', {
+        messageId: sentMessageId
+      });
+      
+      const updateResult = await Event.updateOne(
+        { 
+          _id: event._id,
+          'guests._id': guest._id
+        },
+        {
+          $set: {
+            'guests.$.whatsappMessageSent': true,
+            'guests.$.whatsappSentAt': new Date(),
+            'guests.$.whatsappMessageId': sentMessageId,
+            'guests.$.rsvpStatus': 'pending'
+          }
+        }
+      );
+
+      logger.info('FALLBACK: Database updated', {
+        matched: updateResult.matchedCount,
+        modified: updateResult.modifiedCount
+      });
+
+      logger.info('=== FALLBACK: Fallback invitation sent successfully ===', {
+        eventId,
+        guestId,
+        guestName: guest.name,
+        guestPhone: guest.phone,
+        messageId: response.messages?.[0]?.id,
+        packageType: event.packageType,
+        templateName: 'initial_invitation_utility'
+      });
+
+      return { 
+        success: true, 
+        data: { 
+          messageId: response.messages?.[0]?.id,
+          sentAt: new Date(),
+          templateUsed: 'initial_invitation_utility'
+        }
+      };
+
+    } catch (error: any) {
+      logger.error('=== FALLBACK: ERROR in sendInvitationFallback ===', {
+        eventId,
+        guestId,
+        error: error.message,
+        stack: error.stack,
+        response: error.response?.data,
+        statusCode: error.response?.status,
+        templateName: 'initial_invitation_utility'
       });
       return { success: false, error: error.message };
     }
