@@ -86,9 +86,9 @@ export class WhatsappService {
         errors: status.errors ? JSON.stringify(status.errors) : null
       });
 
-      // If message failed, trigger fallback mechanism
+      // If message failed, trigger fallback mechanism (only if not already attempted)
       if (status.status === 'failed') {
-        logger.warn('=== WHATSAPP STATUS: Message delivery FAILED - Triggering fallback ===', {
+        logger.warn('=== WHATSAPP STATUS: Message delivery FAILED ===', {
           messageId: status.id,
           recipientId: status.recipient_id,
           errorCode: status.errors?.[0]?.code,
@@ -97,7 +97,28 @@ export class WhatsappService {
           errorDetails: status.errors?.[0]?.error_data
         });
 
-        // Find event and guest by messageId to send fallback
+        // Check if this is already a fallback attempt by checking if fallback was attempted
+        const event = await Event.findOne({
+          'guests.whatsappMessageId': status.id
+        });
+
+        if (event) {
+          const guest = event.guests.find(g => g.whatsappMessageId === status.id);
+          if (guest?.fallbackAttempted) {
+            logger.warn('=== WHATSAPP STATUS: Failed message is already a fallback attempt - STOPPING ===', {
+              messageId: status.id,
+              recipientId: status.recipient_id,
+              eventId: event._id,
+              guestId: guest._id,
+              guestName: guest.name,
+              message: 'Both initial_invitation and initial_invitation_utility templates failed. No further attempts.'
+            });
+            return;
+          }
+        }
+
+        // Only trigger fallback if this is the initial message (not already a fallback)
+        logger.info('WHATSAPP STATUS: This is initial message failure - triggering fallback...');
         await this.triggerFallbackInvitation(status.id, status.recipient_id);
       } else {
         logger.info('WHATSAPP STATUS: Message status is not failure, no action needed', {
@@ -116,6 +137,7 @@ export class WhatsappService {
 
   /**
    * Trigger fallback invitation when initial message fails
+   * Only attempts fallback once to prevent infinite loops
    */
   private static async triggerFallbackInvitation(failedMessageId: string, recipientPhone: string): Promise<void> {
     try {
@@ -158,8 +180,38 @@ export class WhatsappService {
       logger.info('FALLBACK: Guest found', {
         guestId: guest._id,
         guestName: guest.name,
-        guestPhone: guest.phone
+        guestPhone: guest.phone,
+        fallbackAttempted: guest.fallbackAttempted || false
       });
+
+      // CRITICAL: Check if fallback was already attempted to prevent infinite loops
+      if (guest.fallbackAttempted) {
+        logger.warn('=== FALLBACK: Fallback already attempted - STOPPING to prevent infinite loop ===', {
+          eventId: event._id,
+          guestId: guest._id,
+          guestName: guest.name,
+          failedMessageId,
+          recipientPhone,
+          message: 'Both initial_invitation and initial_invitation_utility templates failed. No further attempts will be made.'
+        });
+        return;
+      }
+
+      // Mark fallback as attempted BEFORE sending to prevent race conditions
+      logger.info('FALLBACK: Marking fallback as attempted in database...');
+      await Event.updateOne(
+        {
+          _id: event._id,
+          'guests._id': guest._id
+        },
+        {
+          $set: {
+            'guests.$.fallbackAttempted': true
+          }
+        }
+      );
+
+      logger.info('FALLBACK: Fallback flag set, proceeding with fallback send...');
 
       // Send fallback invitation using utility template
       logger.info('FALLBACK: Calling sendInvitationFallback...');
@@ -170,14 +222,16 @@ export class WhatsappService {
           eventId: event._id,
           guestId: guest._id,
           originalFailedMessageId: failedMessageId,
-          newMessageId: result.data?.messageId
+          newMessageId: result.data?.messageId,
+          templateUsed: 'initial_invitation_utility'
         });
       } else {
-        logger.error('=== FALLBACK: Fallback invitation failed ===', {
+        logger.error('=== FALLBACK: Fallback invitation failed - No further attempts will be made ===', {
           eventId: event._id,
           guestId: guest._id,
           originalFailedMessageId: failedMessageId,
-          error: result.error
+          error: result.error,
+          message: 'Both initial_invitation and initial_invitation_utility templates failed. Guest will not receive invitation via WhatsApp.'
         });
       }
     } catch (error: any) {

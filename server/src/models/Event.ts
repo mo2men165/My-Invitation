@@ -42,6 +42,8 @@ export interface IGuest {
   attendanceMarkedBy?: Types.ObjectId;
   // Track if this guest's decline was refunded (not if they're refundable)
   refundedOnDecline?: boolean;
+  // Track if fallback invitation was already attempted (prevents infinite loops)
+  fallbackAttempted?: boolean;
 }
 
 export interface IEvent extends Document {
@@ -212,6 +214,11 @@ const guestSchema = new Schema<IGuest>({
   },
   // Track if this guest's decline was refunded
   refundedOnDecline: {
+    type: Boolean,
+    default: false
+  },
+  // Track if fallback invitation was already attempted (prevents infinite loops)
+  fallbackAttempted: {
     type: Boolean,
     default: false
   }
