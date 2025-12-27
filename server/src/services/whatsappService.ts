@@ -636,6 +636,7 @@ export class WhatsappService {
   /**
    * Build message data for invitation template
    * Reusable method that works with any template name (initial_invitation or initial_invitation_utility)
+   * Note: initial_invitation_utility template uses 7 parameters (excludes invitation_text)
    */
   private static buildInvitationMessageData(
     event: any,
@@ -662,6 +663,55 @@ export class WhatsappService {
       ? eventImageUrl 
       : eventImageUrl.replace(/^http:\/\//, 'https://');
 
+    // Build body parameters - utility template excludes invitation_text
+    const isUtilityTemplate = templateName === 'initial_invitation_utility';
+    const bodyParameters: any[] = [
+      {
+        type: 'text',
+        text: event.details.hostName,
+        parameter_name: 'host_name'
+      },
+      {
+        type: 'text',
+        text: eventType,
+        parameter_name: 'event_type'
+      },
+      {
+        type: 'text',
+        text: dayOfWeek,
+        parameter_name: 'day_of_week'
+      },
+      {
+        type: 'text',
+        text: hijriDate,
+        parameter_name: 'hijri_date'
+      },
+      {
+        type: 'text',
+        text: gregorianDate,
+        parameter_name: 'gregorian_date'
+      },
+      {
+        type: 'text',
+        text: `${event.details.startTime} - ${event.details.endTime}`,
+        parameter_name: 'event_time'
+      },
+      {
+        type: 'text',
+        text: event.details.displayName || event.details.eventLocation,
+        parameter_name: 'event_location'
+      }
+    ];
+
+    // Only add invitation_text for non-utility templates (initial_invitation has 8 params)
+    if (!isUtilityTemplate) {
+      bodyParameters.push({
+        type: 'text',
+        text: this.sanitizeTemplateParam(event.details.invitationText || ''),
+        parameter_name: 'invitation_text'
+      });
+    }
+
     const messageData = {
       messaging_product: 'whatsapp',
       to: phoneNumber,
@@ -686,48 +736,7 @@ export class WhatsappService {
           },
           {
             type: 'body',
-            parameters: [
-              {
-                type: 'text',
-                text: event.details.hostName,
-                parameter_name: 'host_name'
-              },
-              {
-                type: 'text',
-                text: eventType,
-                parameter_name: 'event_type'
-              },
-              {
-                type: 'text',
-                text: dayOfWeek,
-                parameter_name: 'day_of_week'
-              },
-              {
-                type: 'text',
-                text: hijriDate,
-                parameter_name: 'hijri_date'
-              },
-              {
-                type: 'text',
-                text: gregorianDate,
-                parameter_name: 'gregorian_date'
-              },
-              {
-                type: 'text',
-                text: `${event.details.startTime} - ${event.details.endTime}`,
-                parameter_name: 'event_time'
-              },
-              {
-                type: 'text',
-                text: event.details.displayName || event.details.eventLocation,
-                parameter_name: 'event_location'
-              },
-              {
-                type: 'text',
-                text: this.sanitizeTemplateParam(event.details.invitationText || ''),
-                parameter_name: 'invitation_text'
-              }
-            ]
+            parameters: bodyParameters
           },
           {
             type: 'button',
