@@ -184,7 +184,7 @@ export class WhatsappService {
         fallbackAttempted: guest.fallbackAttempted || false
       });
 
-      // CRITICAL: Check if fallback was already attempted to prevent infinite loops
+      // CRITICAL: Check if fallback was already attempted - only proceed if flag is false
       if (guest.fallbackAttempted) {
         logger.warn('=== FALLBACK: Fallback already attempted - STOPPING to prevent infinite loop ===', {
           eventId: event._id,
@@ -192,13 +192,20 @@ export class WhatsappService {
           guestName: guest.name,
           failedMessageId,
           recipientPhone,
-          message: 'Both initial_invitation and initial_invitation_utility templates failed. No further attempts will be made.'
+          message: 'Fallback was already attempted for this initial message failure. No further attempts will be made.'
         });
         return;
       }
 
+      // Verify flag is false before proceeding (double-check after database query)
+      logger.info('FALLBACK: Verifying fallbackAttempted flag is false before proceeding...');
+      if (guest.fallbackAttempted) {
+        logger.warn('FALLBACK: Flag check failed - fallback already attempted, stopping');
+        return;
+      }
+
       // Mark fallback as attempted BEFORE sending to prevent race conditions
-      logger.info('FALLBACK: Marking fallback as attempted in database...');
+      logger.info('FALLBACK: Flag is false - marking fallback as attempted in database...');
       await Event.updateOne(
         {
           _id: event._id,
@@ -211,7 +218,7 @@ export class WhatsappService {
         }
       );
 
-      logger.info('FALLBACK: Fallback flag set, proceeding with fallback send...');
+      logger.info('FALLBACK: Fallback flag set to true, proceeding with fallback send...');
 
       // Send fallback invitation using utility template
       logger.info('FALLBACK: Calling sendInvitationFallback...');
@@ -837,6 +844,21 @@ export class WhatsappService {
         });
         return { success: false, error: 'Event invitation card image URL is invalid or not accessible' };
       }
+
+      // Reset fallbackAttempted flag to false when sending initial invitation
+      // This allows retrying the initial template and attempting fallback again if needed
+      logger.info('WHATSAPP: Resetting fallbackAttempted flag to false for new initial invitation attempt...');
+      await Event.updateOne(
+        {
+          _id: event._id,
+          'guests._id': guest._id
+        },
+        {
+          $set: {
+            'guests.$.fallbackAttempted': false
+          }
+        }
+      );
 
       // Build message data using reusable method
       const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, 'initial_invitation');
