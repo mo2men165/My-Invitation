@@ -5,78 +5,28 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Heart, Eye, Download } from 'lucide-react';
 import { invitationSliderData } from '@/constants';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export function InvitationSlider() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
-  const invitations = [
-    {
-      id: 1,
-      title: "دعوة زفاف أنيقة",
-      category: "زفاف",
-      image: "/Design - Front.webp",
-      likes: 1250,
-      views: 5400
-    },
-    {
-      id: 2,
-      title: "دعوة استقبال مولود جديد",
-      category: "استقبال مولود", 
-      image: "/ستوري اعلان قدوم مولود جديد بيج و بنفسجي برسومات كرتونيه.webp",
-      likes: 980,
-      views: 3200
-    },
-    {
-      id: 3,
-      title: "دعوة حفل تخرج ذهبية",
-      category: "تخرج",
-      image: "/IMG-20250609-WA0009.webp", 
-      likes: 750,
-      views: 2800
-    },
-    {
-      id: 4,
-      title: "دعوة تخرج كلاسيكية",
-      category: "تخرج",
-      image: "/WhatsApp Image 2025-07-01 at 19.06.42_1c7b3a03 (1) (1).webp",
-      likes: 650,
-      views: 2100
-    },
-    {
-      id: 5,
-      title: "دعوة حفل تخرج أنيقة",
-      category: "تخرج",
-      image: "/Gold Black Elegant Graduation Party Invitation.webp",
-      likes: 920,
-      views: 4100
-    },
-    {
-      id: 6,
-      title: "دعوة تخرج رمادية ذهبية",
-      category: "تخرج",
-      image: "/دعوة حفل تخرج رمادي وذهبي عصرية.webp",
-      likes: 840,
-      views: 3500
-    }
-  ];
-
   useEffect(() => {
     if (isAutoPlaying) {
       const timer = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % invitations.length);
+        setCurrentSlide((prev) => (prev + 1) % invitationSliderData.length);
       }, 4000);
       return () => clearInterval(timer);
     }
-  }, [isAutoPlaying, invitations.length]);
+  }, [isAutoPlaying]);
 
   const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % invitations.length);
+    setCurrentSlide((prev) => (prev + 1) % invitationSliderData.length);
     setIsAutoPlaying(false);
   };
 
   const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + invitations.length) % invitations.length);
+    setCurrentSlide((prev) => (prev - 1 + invitationSliderData.length) % invitationSliderData.length);
     setIsAutoPlaying(false);
   };
 
@@ -169,7 +119,7 @@ export function InvitationSlider() {
                     })`
                   }}
                 >
-                  <div className="relative group cursor-pointer">
+                  <Link href="/packages" className="relative group cursor-pointer block">
                     {/* Image Card */}
                     <motion.div 
                       className="w-64 lg:w-80 h-80 lg:h-96 rounded-3xl shadow-2xl overflow-hidden relative bg-white"
@@ -236,7 +186,7 @@ export function InvitationSlider() {
                         transition={{ duration: 2, repeat: Infinity }}
                       />
                     )}
-                  </div>
+                  </Link>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -262,7 +212,7 @@ export function InvitationSlider() {
 
         {/* Dots Indicator */}
         <div className="flex justify-center mt-12 space-x-3 ">
-          {invitations.map((_, index) => (
+          {invitationSliderData.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}

@@ -1072,15 +1072,16 @@ router.get('/order/:merchantOrderId', async (req: Request, res: Response) => {
 router.get('/paymob/status/:transactionId', async (req: Request, res: Response) => {
   try {
     const { transactionId } = req.params;
+    const transactionIdString = Array.isArray(transactionId) ? transactionId[0] : transactionId;
     
-    if (!transactionId) {
+    if (!transactionIdString) {
       return res.status(400).json({
         success: false,
         error: { message: 'معرف المعاملة مطلوب' }
       });
     }
 
-    const status = await paymobService.getPaymentStatus(transactionId);
+    const status = await paymobService.getPaymentStatus(transactionIdString);
     
     return res.json(status);
   } catch (error: any) {

@@ -19,8 +19,8 @@ const addCollaboratorSchema = z.object({
   name: z.string().min(2, 'الاسم يجب أن يكون على الأقل حرفين').max(100, 'الاسم طويل جداً'),
   email: z.string().email('البريد الإلكتروني غير صحيح').max(255),
   phone: phoneValidationSchema,
-  city: z.enum(['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف']).refine(
-    (val) => ['المدينة المنورة', 'جدة', 'الرياض', 'الدمام', 'مكة المكرمة', 'الطائف'].includes(val),
+  city: z.enum(['الرياض', 'جدة', 'الدمام', 'المدينة المنورة', 'مكة المكرمة', 'القصيم']).refine(
+    (val) => ['الرياض', 'جدة', 'الدمام', 'المدينة المنورة', 'مكة المكرمة', 'القصيم'].includes(val),
     { message: 'المدينة غير مدعومة' }
   ),
   allocatedInvites: z.number().min(1, 'يجب تخصيص دعوة واحدة على الأقل').max(500, 'تجاوز الحد الأقصى للدعوات'),
@@ -50,6 +50,7 @@ router.post('/events/:eventId/collaborators', async (req: Request, res: Response
   try {
     const userId = req.user!.id;
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
 
     // Validate request body
     const validationResult = addCollaboratorSchema.safeParse(req.body);
@@ -65,7 +66,7 @@ router.post('/events/:eventId/collaborators', async (req: Request, res: Response
 
     // Add collaborator
     const result = await collaborationService.addCollaborator(
-      eventId,
+      eventIdString,
       userId,
       collaboratorData
     );
@@ -108,9 +109,10 @@ router.get('/events/:eventId/collaborators', async (req: Request, res: Response)
   try {
     const userId = req.user!.id;
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
 
     const event = await Event.findOne({
-      _id: new Types.ObjectId(eventId),
+      _id: new Types.ObjectId(eventIdString),
       userId: new Types.ObjectId(userId)
     }).populate('collaborators.userId', 'firstName lastName name email phone');
 
@@ -156,6 +158,8 @@ router.patch('/events/:eventId/collaborators/:collaboratorId', async (req: Reque
   try {
     const userId = req.user!.id;
     const { eventId, collaboratorId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
+    const collaboratorIdString = Array.isArray(collaboratorId) ? collaboratorId[0] : collaboratorId;
 
     // Validate request body
     const validationResult = updatePermissionsSchema.safeParse(req.body);
@@ -170,9 +174,9 @@ router.patch('/events/:eventId/collaborators/:collaboratorId', async (req: Reque
     const { permissions, allocatedInvites } = validationResult.data;
 
     const result = await collaborationService.updateCollaboratorPermissions(
-      eventId,
+      eventIdString,
       userId,
-      collaboratorId,
+      collaboratorIdString,
       permissions || {},
       allocatedInvites
     );
@@ -206,11 +210,13 @@ router.delete('/events/:eventId/collaborators/:collaboratorId', async (req: Requ
   try {
     const userId = req.user!.id;
     const { eventId, collaboratorId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
+    const collaboratorIdString = Array.isArray(collaboratorId) ? collaboratorId[0] : collaboratorId;
 
     const result = await collaborationService.removeCollaborator(
-      eventId,
+      eventIdString,
       userId,
-      collaboratorId
+      collaboratorIdString
     );
 
     if (!result.success) {
@@ -301,10 +307,11 @@ router.get('/events/:eventId/permissions', async (req: Request, res: Response) =
   try {
     const userId = req.user!.id;
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
 
     // Check if user owns the event
     const ownedEvent = await Event.findOne({
-      _id: new Types.ObjectId(eventId),
+      _id: new Types.ObjectId(eventIdString),
       userId: new Types.ObjectId(userId)
     });
 
@@ -326,7 +333,7 @@ router.get('/events/:eventId/permissions', async (req: Request, res: Response) =
 
     // Check if user is a collaborator
     const collaboratedEvent = await Event.findOne({
-      _id: new Types.ObjectId(eventId),
+      _id: new Types.ObjectId(eventIdString),
       'collaborators.userId': new Types.ObjectId(userId)
     });
 

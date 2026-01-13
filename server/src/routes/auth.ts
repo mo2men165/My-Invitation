@@ -401,7 +401,8 @@ router.get('/verify-reset-token/:token', async (req: Request, res: Response) => 
       });
     }
 
-    const result = await passwordResetService.verifyResetToken(token);
+    const tokenString = Array.isArray(token) ? token[0] : token;
+    const result = await passwordResetService.verifyResetToken(tokenString);
 
     return res.json({
       success: true,

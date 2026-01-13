@@ -74,5 +74,53 @@ export const invitationSliderData = [
     image: "/birthday invites/Design - Front.webp",
     likes: 2100,
     views: 7800
+  },
+  {
+    id: 4,
+    title: "دعوة زفاف بيج ووردي",
+    category: "زفاف",
+    image: "/wedding invites/دعوة حضور حفل زفاف ناعمة لون بيج ووردي.webp",
+    likes: 1150,
+    views: 4800
+  },
+  {
+    id: 5,
+    title: "دعوة تخرج رمادية ذهبية",
+    category: "تخرج",
+    image: "/graduation invites/دعوة حفل تخرج رمادي وذهبي عصرية.webp",
+    likes: 920,
+    views: 4100
+  },
+  {
+    id: 6,
+    title: "دعوة استقبال مولود",
+    category: "استقبال مولود",
+    image: "/ستوري اعلان قدوم مولود جديد بيج و بنفسجي برسومات كرتونيه.webp",
+    likes: 980,
+    views: 3500
+  },
+  {
+    id: 7,
+    title: "دعوة زفاف كلاسيكية",
+    category: "زفاف",
+    image: "/wedding invites/دعوة حفل زفاف بلون أبيض و أخضر wedding invitation (2).webp",
+    likes: 1050,
+    views: 4600
+  },
+  {
+    id: 8,
+    title: "دعوة تخرج وردي وبنفسجي",
+    category: "تخرج",
+    image: "/graduation invites/دعوة وردي وبنفسجي لطيف حفل تخرج.webp",
+    likes: 880,
+    views: 3700
+  },
+  {
+    id: 9,
+    title: "دعوة زفاف بيج وبني",
+    category: "زفاف",
+    image: "/wedding invites/دعوة بيج و بني بسيطة لحفل زفاف.webp",
+    likes: 1100,
+    views: 4200
   }
 ];

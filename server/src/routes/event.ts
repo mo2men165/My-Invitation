@@ -119,10 +119,11 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
 
     // First check if user owns the event
     let event = await Event.findOne({
-      _id: new Types.ObjectId(id),
+      _id: new Types.ObjectId(idString),
       userId: new Types.ObjectId(userId)
     }).populate('designId', 'title images');
 
@@ -133,7 +134,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     // If not owner, check if user is a collaborator
     if (!event) {
       event = await Event.findOne({
-        _id: new Types.ObjectId(id),
+        _id: new Types.ObjectId(idString),
         'collaborators.userId': new Types.ObjectId(userId)
       }).populate('designId', 'title images');
 
@@ -244,6 +245,7 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
 
     // Validate request body
     const validationResult = guestSchema.safeParse(req.body);
@@ -259,7 +261,7 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
 
     // Check if user owns the event
     let event = await Event.findOne({
-      _id: new Types.ObjectId(id),
+      _id: new Types.ObjectId(idString),
       userId: new Types.ObjectId(userId)
     });
 
@@ -271,7 +273,7 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
     if (!event) {
       // Check if user is a collaborator
       event = await Event.findOne({
-        _id: new Types.ObjectId(id),
+        _id: new Types.ObjectId(idString),
         'collaborators.userId': new Types.ObjectId(userId)
       });
 
@@ -394,7 +396,7 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
       await User.updateOne(
         { 
           _id: new Types.ObjectId(userId),
-          'collaboratedEvents.eventId': new Types.ObjectId(id)
+          'collaboratedEvents.eventId': new Types.ObjectId(idString)
         },
         {
           $inc: {
@@ -435,6 +437,7 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id, guestId } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
 
     // Validate request body
     const validationResult = updateGuestSchema.safeParse(req.body);
@@ -450,7 +453,7 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
 
     // Check if user owns the event
     let event = await Event.findOne({
-      _id: new Types.ObjectId(id),
+      _id: new Types.ObjectId(idString),
       userId: new Types.ObjectId(userId)
     });
 
@@ -460,7 +463,7 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
     // If not owner, check if user is a collaborator
     if (!event) {
       event = await Event.findOne({
-        _id: new Types.ObjectId(id),
+        _id: new Types.ObjectId(idString),
         'collaborators.userId': new Types.ObjectId(userId)
       });
 
@@ -553,9 +556,10 @@ router.post('/:id/guests/confirm', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
 
     const event = await Event.findOne({
-      _id: new Types.ObjectId(id),
+      _id: new Types.ObjectId(idString),
       userId: new Types.ObjectId(userId)
     });
 
@@ -631,10 +635,11 @@ router.delete('/:id/guests/:guestId', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id, guestId } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
 
     // Check if user owns the event
     let event = await Event.findOne({
-      _id: new Types.ObjectId(id),
+      _id: new Types.ObjectId(idString),
       userId: new Types.ObjectId(userId)
     });
 
@@ -644,7 +649,7 @@ router.delete('/:id/guests/:guestId', async (req: Request, res: Response) => {
     // If not owner, check if user is a collaborator
     if (!event) {
       event = await Event.findOne({
-        _id: new Types.ObjectId(id),
+        _id: new Types.ObjectId(idString),
         'collaborators.userId': new Types.ObjectId(userId)
       });
 
@@ -715,10 +720,11 @@ router.post('/:id/guests/:guestId/whatsapp', async (req: Request, res: Response)
   try {
     const userId = req.user!.id;
     const { id, guestId } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
 
     // Check if user owns the event
     let event = await Event.findOne({
-      _id: new Types.ObjectId(id),
+      _id: new Types.ObjectId(idString),
       userId: new Types.ObjectId(userId)
     });
 
@@ -728,7 +734,7 @@ router.post('/:id/guests/:guestId/whatsapp', async (req: Request, res: Response)
     // If not owner, check if user is a collaborator
     if (!event) {
       event = await Event.findOne({
-        _id: new Types.ObjectId(id),
+        _id: new Types.ObjectId(idString),
         'collaborators.userId': new Types.ObjectId(userId)
       });
 
@@ -783,6 +789,7 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
     const { status } = req.body;
 
     // Only allow manual cancellation
@@ -795,7 +802,7 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 
     const event = await Event.findOneAndUpdate(
       { 
-        _id: new Types.ObjectId(id), 
+        _id: new Types.ObjectId(idString), 
         userId: new Types.ObjectId(userId),
         status: 'upcoming' // Only allow cancelling upcoming events
       },

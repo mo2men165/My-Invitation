@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { Button } from '@/components/ui/Button';
+import Link from 'next/link';
 
 interface CartActionsProps {
   onAddToCart: () => void;
@@ -8,6 +9,9 @@ interface CartActionsProps {
   isEditMode?: boolean;
   hasErrors?: boolean;
   errorCount?: number;
+  termsAccepted?: boolean;
+  onTermsChange?: (accepted: boolean) => void;
+  termsError?: string;
 }
 
 const CartActions = memo<CartActionsProps>(({
@@ -16,15 +20,52 @@ const CartActions = memo<CartActionsProps>(({
   isLoading = false,
   isEditMode = false,
   hasErrors = false,
-  errorCount = 0
+  errorCount = 0,
+  termsAccepted = false,
+  onTermsChange,
+  termsError
 }) => {
   return (
     <div className="space-y-4">
+      {/* Terms and Conditions Checkbox */}
+      {!isEditMode && (
+        <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-xl border border-white/10 p-4">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => onTermsChange?.(e.target.checked)}
+              className="mt-1 w-5 h-5 rounded border-gray-400 bg-gray-800 text-[#C09B52] focus:ring-2 focus:ring-[#C09B52] focus:ring-offset-2 focus:ring-offset-gray-900 cursor-pointer transition-all"
+            />
+            <div className="flex-1">
+              <span className="text-gray-300 text-sm leading-relaxed group-hover:text-white transition-colors">
+                أوافق على{' '}
+                <Link 
+                  href="/terms" 
+                  target="_blank"
+                  className="text-[#C09B52] hover:text-[#B8935A] underline font-medium transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  الشروط والأحكام
+                </Link>
+                {' '}وقبول جميع البنود المذكورة
+              </span>
+              {termsError && (
+                <p className="text-red-400 text-xs mt-1 flex items-center gap-1">
+                  <span className="w-1 h-1 bg-red-400 rounded-full"></span>
+                  {termsError}
+                </p>
+              )}
+            </div>
+          </label>
+        </div>
+      )}
+
       {/* Submit Button */}
       <Button
         type="button"
         onClick={onAddToCart}
-        disabled={isLoading || hasErrors}
+        disabled={isLoading || hasErrors || (!isEditMode && !termsAccepted)}
         className="w-full py-4 bg-gradient-to-r from-[#C09B52] to-[#B8935A] text-white font-bold text-lg rounded-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity"></div>

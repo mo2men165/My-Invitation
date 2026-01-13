@@ -6,6 +6,7 @@ import { logger } from '../config/logger';
 import { Types } from 'mongoose';
 import { CacheService } from './cacheService';
 import { NotificationService } from './notificationService';
+import { BillService } from './billService';
 
 export class OrderService {
   /**
@@ -313,6 +314,20 @@ export class OrderService {
         eventsCreated: createdEvents.length,
         totalAmount: order.totalAmount
       });
+
+      // Create bill for this order (don't await to avoid blocking)
+      BillService.createBillFromOrder((order._id as Types.ObjectId).toString())
+        .then((bill) => {
+          if (bill) {
+            logger.info(`Bill created successfully for order ${order._id}:`, {
+              billId: bill._id,
+              billNumber: bill.billNumber
+            });
+          }
+        })
+        .catch((billError) => {
+          logger.error(`Failed to create bill for order ${order._id}:`, billError);
+        });
 
       return {
         success: true,

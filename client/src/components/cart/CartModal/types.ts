@@ -32,6 +32,8 @@ export interface CartFormData {
   // Custom design fields
   isCustomDesign?: boolean;
   customDesignNotes?: string;
+  // Terms acceptance
+  termsAccepted: boolean;
 }
 
 export interface LocationData {

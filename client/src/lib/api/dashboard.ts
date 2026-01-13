@@ -69,6 +69,110 @@ class DashboardAPI {
 
     return result;
   }
+
+  async getBills(params?: { limit?: number; page?: number }): Promise<DashboardApiResponse<{
+    bills: Bill[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }>> {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const response = await fetch(`${API_BASE_URL}/api/dashboard/bills?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في جلب الفواتير');
+    }
+
+    return result;
+  }
+
+  async getBillById(billId: string): Promise<DashboardApiResponse<Bill>> {
+    const response = await fetch(`${API_BASE_URL}/api/dashboard/bills/${billId}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في جلب الفاتورة');
+    }
+
+    return result;
+  }
+}
+
+export interface PricingBreakdown {
+  basePrice: number;
+  additionalCards: {
+    count: number;
+    pricePerCard: number;
+    total: number;
+  };
+  gateSupervisors: {
+    count: number;
+    pricePerSupervisor: number;
+    total: number;
+  };
+  fastDelivery: {
+    enabled: boolean;
+    price: number;
+  };
+  extraHours: {
+    count: number;
+    pricePerHour: number;
+    total: number;
+  };
+  totalAdditionalCosts: number;
+  totalPrice: number;
+}
+
+export interface BillEvent {
+  eventId: string;
+  eventName?: string;
+  hostName: string;
+  eventDate: string;
+  eventLocation: string;
+  simpleLocation?: string;
+  packageType: string;
+  inviteCount: number;
+  price: number;
+  pricingBreakdown?: PricingBreakdown;
+  eventDetails?: any;
+}
+
+export interface Bill {
+  _id: string;
+  userId: string;
+  orderId: string;
+  billNumber: string;
+  paymentId: string;
+  totalAmount: number;
+  paymentMethod: string;
+  transactionId?: string;
+  paymentDate: string;
+  events: BillEvent[];
+  user: {
+    name: string;
+    email: string;
+    phone: string;
+    city: string;
+  };
+  emailSent: boolean;
+  emailSentAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const dashboardAPI = new DashboardAPI();

@@ -57,7 +57,7 @@ const PaymentResultContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -367,10 +367,53 @@ const PaymentResultContent: React.FC = () => {
               </div>
 
               {orderData.status === 'completed' && (
-                <div className="flex justify-between items-center py-3">
-                  <span className="text-gray-300">المناسبات المنشأة</span>
-                  <span className="text-green-400 font-bold">{orderData.eventsCreated}</span>
-                </div>
+                <>
+                  <div className="flex justify-between items-center py-3 border-b border-white/10">
+                    <span className="text-gray-300">المناسبات المنشأة</span>
+                    <span className="text-green-400 font-bold">{orderData.eventsCreated}</span>
+                  </div>
+                  
+                  {/* Bill Email Notification */}
+                  {user?.email && user.email.trim() && (
+                    <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                      <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-blue-300 text-sm">
+                            سيتم إرسال فاتورة مفصلة إلى بريدك الإلكتروني: <span className="font-semibold">{user.email}</span>
+                          </p>
+                          <Link 
+                            href="/dashboard?tab=bills"
+                            className="inline-flex items-center gap-1 mt-2 text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+                          >
+                            عرض جميع الفواتير
+                            <ArrowRight className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {(!user?.email || !user.email.trim()) && (
+                    <div className="mt-4 p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-amber-300 text-sm">
+                            لم يتم العثور على بريد إلكتروني مسجل. يمكنك عرض جميع فواتيرك من لوحة التحكم.
+                          </p>
+                          <Link 
+                            href="/dashboard?tab=bills"
+                            className="inline-flex items-center gap-1 mt-2 text-amber-400 hover:text-amber-300 text-sm font-medium transition-colors"
+                          >
+                            عرض جميع الفواتير
+                            <ArrowRight className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

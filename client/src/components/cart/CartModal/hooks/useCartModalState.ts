@@ -17,6 +17,7 @@ const initialFormData: CartFormData = {
   fastDelivery: false,
   isCustomDesign: false,
   customDesignNotes: '',
+  termsAccepted: false,
 };
 
 const initialLocationData: LocationData = {
@@ -69,6 +70,11 @@ export const useCartModalState = (editItem?: any) => {
 
       if (prevErrors.invitationText && formData.invitationText?.trim()) {
         delete newErrors.invitationText;
+        hasChanges = true;
+      }
+
+      if (prevErrors.termsAccepted && formData.termsAccepted) {
+        delete newErrors.termsAccepted;
         hasChanges = true;
       }
 
@@ -184,6 +190,11 @@ export const useCartModalState = (editItem?: any) => {
 
     if (!formData.invitationText?.trim()) {
       newErrors.invitationText = 'نص الدعوة مطلوب';
+      isValid = false;
+    }
+
+    if (!formData.termsAccepted) {
+      newErrors.termsAccepted = 'يجب الموافقة على الشروط والأحكام للمتابعة';
       isValid = false;
     }
 

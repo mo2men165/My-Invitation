@@ -26,103 +26,94 @@ export function TermsSection() {
 
   const sections = [
     {
-      id: 'acceptance',
-      title: 'القبول والشروط',
+      id: 'general',
+      title: 'الشروط والأحكام',
       icon: CheckCircle,
       content: (
         <div className="space-y-3">
           <p className="text-gray-300 leading-relaxed">
-            باستخدامك لمنصة My Invitation، فإنك توافق على الالتزام بهذه الشروط والأحكام.
+            يلتزم المستخدم بتقديم معلومات صحيحة ومحدثة.
           </p>
           <p className="text-gray-300 leading-relaxed">
-            نحن نحتفظ بالحق في تحديث هذه الشروط في أي وقت.
+            يتحمل المستخدم مسؤولية الحفاظ على سرية بيانات حسابه.
+          </p>
+          <p className="text-gray-300 leading-relaxed">
+            يحق للمنصة تعليق أو إلغاء الحساب في حال إساءة الاستخدام أو مخالفة الشروط.
           </p>
         </div>
       )
     },
     {
-      id: 'account',
-      title: 'مسؤوليات الحساب',
-      icon: AlertCircle,
-      content: (
-        <ul className="list-disc mr-6 space-y-2 text-gray-300">
-          <li>المعلومات المقدمة يجب أن تكون دقيقة</li>
-          <li>أنت مسؤول عن أمان حسابك</li>
-          <li>الحد الأدنى للعمر 18 عاماً</li>
-          <li>أنت مسؤول عن جميع الأنشطة في حسابك</li>
-        </ul>
-      )
-    },
-    {
-      id: 'payment',
-      title: 'شروط الدفع',
+      id: 'booking',
+      title: 'تأكيد الحجز',
       icon: Info,
       content: (
-        <ul className="list-disc mr-6 space-y-2 text-gray-300">
-          <li>الأسعار بالريال السعودي وتشمل الضريبة المضافة</li>
-          <li>الدفع مقدم قبل تقديم الخدمة</li>
-          <li>لا يتم استرداد المبلغ بعد تنفيذ الخدمة إلا في حالات محددة</li>
-        </ul>
-      )
-    },
-    {
-      id: 'conduct',
-      title: 'سلوك المستخدم',
-      icon: Ban,
-      content: (
         <div className="space-y-3">
-          <p className="text-gray-300 font-semibold">يُمنع:</p>
-          <ul className="list-disc mr-6 space-y-2 text-gray-300">
-            <li>استخدام المنصة لأغراض غير قانونية</li>
-            <li>إرسال محتوى مسيء</li>
-            <li>محاولة اختراق المنصة</li>
-            <li>انتهاك حقوق الملكية الفكرية</li>
-          </ul>
+          <p className="text-gray-300 leading-relaxed">
+            يتم تأكيد الحجز بعد إتمام عملية الدفع بنجاح.
+          </p>
         </div>
       )
     },
     {
-      id: 'property',
+      id: 'cancellation',
+      title: 'سياسة الإلغاء والاسترجاع',
+      icon: AlertCircle,
+      content: (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-gray-300 font-semibold">في حال إلغاء المناسبة أو الفعالية من قبل العميل:</p>
+            <ul className="list-disc mr-6 space-y-2 text-gray-300">
+              <li>
+                <strong>بعد 48 ساعة من إتمام الطلب والشراء:</strong> يتم إرجاع 50% من تكلفة المناسبة المدفوعة.
+              </li>
+              <li>
+                <strong>وحتى 96 ساعة من إتمام الطلب والشراء:</strong> يتم إرجاع 25% من تكلفة المناسبة المدفوعة.
+              </li>
+              <li>
+                <strong>بعد مضي 96 ساعة من إتمام الطلب والشراء:</strong> لا يتم إرجاع أي مبلغ من تكلفة المناسبة المدفوعة.
+              </li>
+            </ul>
+          </div>
+          <p className="text-gray-300 leading-relaxed">
+            المنصة غير مسؤولة عن أي خسائر أو أضرار ناتجة عن إلغاء أو تأجيل المناسبة أو الفعالية سوى حدود نسبة الاسترجاع المذكورة.
+          </p>
+        </div>
+      )
+    },
+    {
+      id: 'technical',
+      title: 'المسؤولية التقنية',
+      icon: AlertCircle,
+      content: (
+        <div className="space-y-3">
+          <p className="text-gray-300 leading-relaxed">
+            لا تتحمل المنصة مسؤولية أي أعطال تقنية خارجة عن السيطرة المعقولة.
+          </p>
+        </div>
+      )
+    },
+    {
+      id: 'intellectual',
       title: 'الملكية الفكرية',
       icon: FileText,
       content: (
         <div className="space-y-3">
-          <p className="text-gray-300">
-            جميع حقوق المنصة والتصاميم مملوكة لمنصة My Invitation.
-          </p>
-          <p className="text-gray-300">
-            يُمنع نسخ أو بيع التصاميم لأطراف ثالثة.
+          <p className="text-gray-300 leading-relaxed">
+            جميع المحتويات والعلامات التجارية والتصاميم على المنصة مملوكة لها أو مرخصة، ولا يجوز استخدامها دون إذن مسبق.
           </p>
         </div>
       )
     },
     {
-      id: 'liability',
-      title: 'حدود المسؤولية',
-      icon: AlertCircle,
+      id: 'privacy',
+      title: 'الخصوصية',
+      icon: CheckCircle,
       content: (
         <div className="space-y-3">
-          <p className="text-gray-300">
-            المنصة تعمل "كما هي" ولا نضمن عدم وجود أخطاء.
+          <p className="text-gray-300 leading-relaxed">
+            يتم التعامل مع بيانات المستخدمين وفق سياسة الخصوصية المعتمدة، ولن يتم مشاركة البيانات مع أطراف ثالثة إلا بما يقتضيه القانون أو تقديم الخدمة.
           </p>
-          <p className="text-gray-300">
-            مسؤوليتنا محدودة بالمبلغ المدفوع.
-          </p>
-        </div>
-      )
-    },
-    {
-      id: 'termination',
-      title: 'إنهاء الخدمة',
-      icon: Ban,
-      content: (
-        <div className="space-y-3">
-          <p className="text-gray-300">نحتفظ بالحق في إلغاء حسابك في حالة:</p>
-          <ul className="list-disc mr-6 space-y-2 text-gray-300">
-            <li>انتهاك الشروط</li>
-            <li>استخدام غير قانوني</li>
-            <li>عدم دفع المستحقات</li>
-          </ul>
         </div>
       )
     }

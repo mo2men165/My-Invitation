@@ -51,21 +51,21 @@ export const GULF_COUNTRIES = [
 
 // Legacy exports for backward compatibility
 export const SAUDI_CITIES = [
-  'جدة',
   'الرياض',
+  'جدة',
   'الدمام',
+  'المدينة المنورة',
   'مكة المكرمة',
-  'الطائف',
-  'المدينة المنورة'
+  'القصيم'
 ] as const;
 
 export const CITY_BOUNDARIES = {
-  'جدة': { lat: 21.4858, lng: 39.1925, radius: 50 },
   'الرياض': { lat: 24.7136, lng: 46.6753, radius: 60 },
+  'جدة': { lat: 21.4858, lng: 39.1925, radius: 50 },
   'الدمام': { lat: 26.4207, lng: 50.0888, radius: 40 },
+  'المدينة المنورة': { lat: 24.5247, lng: 39.5692, radius: 40 },
   'مكة المكرمة': { lat: 21.3891, lng: 39.8579, radius: 30 },
-  'الطائف': { lat: 21.2703, lng: 40.4034, radius: 35 },
-  'المدينة المنورة': { lat: 24.5247, lng: 39.5692, radius: 40 }
+  'القصيم': { lat: 26.3260, lng: 43.9750, radius: 50 }
 } as const;
 
 export const DEFAULT_CENTER = {

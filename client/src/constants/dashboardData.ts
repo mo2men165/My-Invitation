@@ -1,5 +1,5 @@
 // client/src/constants/dashboardData.ts - Dashboard related constants
-import { Plus, Calendar, Settings, Download, Users, Heart, BarChart3, CreditCard } from 'lucide-react';
+import { Plus, Calendar, Settings, Download, Users, Heart, BarChart3, CreditCard, FileText } from 'lucide-react';
 
 // Quick Actions data
 export const quickActions = [
@@ -17,6 +17,13 @@ export const quickActions = [
     icon: Calendar,
     color: 'from-blue-500 to-cyan-500',
     href: '/events'
+  },
+  {
+    title: 'الفواتير',
+    description: 'عرض جميع فواتيرك',
+    icon: FileText,
+    color: 'from-green-500 to-emerald-500',
+    href: '/dashboard?tab=bills'
   },
   {
     title: 'إعدادات الحساب',

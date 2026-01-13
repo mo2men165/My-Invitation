@@ -421,11 +421,12 @@ router.get('/events/all', async (req: Request, res: Response) => {
 router.post('/events/:eventId/approve', uploadSingleImage, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const { notes, qrCodeReaderUrl } = req.body;
     const adminId = req.user!.id;
     const file = req.file;
 
-    const event = await Event.findById(eventId).populate('userId', 'email firstName lastName');
+    const event = await Event.findById(eventIdString).populate('userId', 'email firstName lastName');
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -549,6 +550,7 @@ router.post('/events/:eventId/approve', uploadSingleImage, async (req: Request, 
 router.post('/events/:eventId/reject', async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const { notes } = req.body;
     const adminId = req.user!.id;
 
@@ -559,7 +561,7 @@ router.post('/events/:eventId/reject', async (req: Request, res: Response) => {
       });
     }
 
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventIdString);
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -605,10 +607,11 @@ router.post('/events/:eventId/reject', async (req: Request, res: Response) => {
 router.put('/events/:eventId/image', uploadSingleImage, async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const adminId = req.user!.id;
     const file = req.file;
 
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventIdString);
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -756,8 +759,9 @@ router.post('/events/bulk-approve', async (req: Request, res: Response) => {
 router.get('/events/:eventId/guests', async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
 
-    const event = await Event.findById(eventId)
+    const event = await Event.findById(eventIdString)
       .populate('userId', 'firstName lastName email phone')
       .populate('collaborators.userId', 'firstName lastName email')
       .lean();
@@ -875,9 +879,10 @@ router.get('/events/:eventId/guests', async (req: Request, res: Response) => {
 router.post('/events/:eventId/guests/:guestId/whatsapp', async (req: Request, res: Response) => {
   try {
     const { eventId, guestId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const adminId = req.user!.id;
 
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventIdString);
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -921,10 +926,11 @@ router.post('/events/:eventId/guests/:guestId/whatsapp', async (req: Request, re
 router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, async (req: Request, res: Response) => {
   try {
     const { eventId, guestId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const adminId = req.user!.id;
     const file = req.file;
 
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventIdString);
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -1052,9 +1058,10 @@ router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, a
 router.post('/events/:eventId/reopen-guest-list', async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const adminId = req.user!.id;
 
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventIdString);
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -1110,6 +1117,7 @@ router.post('/events/:eventId/reopen-guest-list', async (req: Request, res: Resp
 router.put('/events/:eventId/guests/:guestId/attendance', async (req: Request, res: Response) => {
   try {
     const { eventId, guestId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const { attended } = req.body;
     const adminId = req.user!.id;
 
@@ -1120,7 +1128,7 @@ router.put('/events/:eventId/guests/:guestId/attendance', async (req: Request, r
       });
     }
 
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventIdString);
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -1176,9 +1184,10 @@ router.put('/events/:eventId/guests/:guestId/attendance', async (req: Request, r
 router.post('/events/:eventId/send-reminders', async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const adminId = req.user!.id;
 
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventIdString);
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -1196,7 +1205,7 @@ router.post('/events/:eventId/send-reminders', async (req: Request, res: Respons
 
     // Import WhatsappService
     const { WhatsappService } = await import('../services/whatsappService');
-    const result = await WhatsappService.sendEventReminders(eventId);
+    const result = await WhatsappService.sendEventReminders(eventIdString);
 
     logger.info(`Admin ${adminId} triggered reminders for event ${eventId}`, result);
 
@@ -1222,9 +1231,10 @@ router.post('/events/:eventId/send-reminders', async (req: Request, res: Respons
 router.post('/events/:eventId/send-thank-you', async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const adminId = req.user!.id;
 
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventIdString);
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -1242,7 +1252,7 @@ router.post('/events/:eventId/send-thank-you', async (req: Request, res: Respons
 
     // Import WhatsappService
     const { WhatsappService } = await import('../services/whatsappService');
-    const result = await WhatsappService.sendThankYouMessages(eventId);
+    const result = await WhatsappService.sendThankYouMessages(eventIdString);
 
     logger.info(`Admin ${adminId} triggered thank you messages for event ${eventId}`, result);
 
@@ -1361,6 +1371,7 @@ router.get('/users', async (req: Request, res: Response) => {
 router.put('/users/:userId/status', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const userIdString = Array.isArray(userId) ? userId[0] : userId;
     const { status } = req.body;
     const adminId = req.user!.id;
 
@@ -1371,7 +1382,7 @@ router.put('/users/:userId/status', async (req: Request, res: Response) => {
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userIdString);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -1413,6 +1424,7 @@ router.put('/users/:userId/status', async (req: Request, res: Response) => {
 router.put('/users/:userId/role', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const userIdString = Array.isArray(userId) ? userId[0] : userId;
     const { role } = req.body;
     const adminId = req.user!.id;
 
@@ -1423,7 +1435,7 @@ router.put('/users/:userId/role', async (req: Request, res: Response) => {
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userIdString);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -1582,8 +1594,9 @@ router.get('/orders', async (req: Request, res: Response) => {
 router.get('/orders/:orderId', async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
+    const orderIdString = Array.isArray(orderId) ? orderId[0] : orderId;
 
-    const order = await Order.findById(orderId)
+    const order = await Order.findById(orderIdString)
       .populate('userId', 'firstName lastName email phone city')
       .populate('eventsCreated')
       .lean();
@@ -1660,10 +1673,11 @@ router.get('/orders/:orderId', async (req: Request, res: Response) => {
 router.post('/orders/:orderId/complete', async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
+    const orderIdString = Array.isArray(orderId) ? orderId[0] : orderId;
     const { transactionId } = req.body;
     const adminId = req.user!.id;
 
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderIdString);
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -1725,10 +1739,11 @@ router.post('/orders/:orderId/complete', async (req: Request, res: Response) => 
 router.post('/orders/:orderId/fail', async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
+    const orderIdString = Array.isArray(orderId) ? orderId[0] : orderId;
     const { reason } = req.body;
     const adminId = req.user!.id;
 
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderIdString);
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -1778,10 +1793,11 @@ router.post('/orders/:orderId/fail', async (req: Request, res: Response) => {
 router.post('/orders/:orderId/cancel', async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
+    const orderIdString = Array.isArray(orderId) ? orderId[0] : orderId;
     const { reason } = req.body;
     const adminId = req.user!.id;
 
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderIdString);
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -2031,9 +2047,10 @@ router.get('/notifications', async (req: Request, res: Response) => {
 router.post('/notifications/:id/read', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
     const adminId = req.user!.id;
 
-    await NotificationService.markAsRead(id, adminId);
+    await NotificationService.markAsRead(idString, adminId);
 
     return res.json({
       success: true,
@@ -2060,8 +2077,9 @@ router.post('/notifications/:id/read', async (req: Request, res: Response) => {
 router.get('/users/:userId/cart', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const userIdString = Array.isArray(userId) ? userId[0] : userId;
 
-    if (!userId || userId === 'undefined') {
+    if (!userIdString || userIdString === 'undefined') {
       return res.status(400).json({
         success: false,
         error: { message: 'معرف المستخدم مطلوب' }
@@ -2069,14 +2087,14 @@ router.get('/users/:userId/cart', async (req: Request, res: Response) => {
     }
 
     // Validate MongoDB ObjectId format
-    if (!Types.ObjectId.isValid(userId)) {
+    if (!Types.ObjectId.isValid(userIdString)) {
       return res.status(400).json({
         success: false,
         error: { message: 'معرف المستخدم غير صحيح' }
       });
     }
 
-    const user = await User.findById(userId)
+    const user = await User.findById(userIdString)
       .select('cart firstName lastName email')
       .populate('cart.adminPriceModifiedBy', 'firstName lastName')
       .lean();
@@ -2116,6 +2134,7 @@ router.get('/users/:userId/cart', async (req: Request, res: Response) => {
 router.put('/users/:userId/cart/:cartItemId/price', async (req: Request, res: Response) => {
   try {
     const { userId, cartItemId } = req.params;
+    const userIdString = Array.isArray(userId) ? userId[0] : userId;
     const { price, reason } = req.body;
     const adminId = req.user!.id;
 
@@ -2126,7 +2145,7 @@ router.put('/users/:userId/cart/:cartItemId/price', async (req: Request, res: Re
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userIdString);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -2161,7 +2180,7 @@ router.put('/users/:userId/cart/:cartItemId/price', async (req: Request, res: Re
 
     // Invalidate cache
     const { CacheService } = await import('../services/cacheService');
-    await CacheService.invalidateUserCartCache(userId);
+    await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} modified price for cart item ${cartItemId} of user ${userId} to ${price}`);
 
@@ -2189,6 +2208,7 @@ router.put('/users/:userId/cart/:cartItemId/price', async (req: Request, res: Re
 router.post('/users/:userId/cart/:cartItemId/discount', async (req: Request, res: Response) => {
   try {
     const { userId, cartItemId } = req.params;
+    const userIdString = Array.isArray(userId) ? userId[0] : userId;
     const { percentage, reason } = req.body;
     const adminId = req.user!.id;
 
@@ -2199,7 +2219,7 @@ router.post('/users/:userId/cart/:cartItemId/discount', async (req: Request, res
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userIdString);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -2240,7 +2260,7 @@ router.post('/users/:userId/cart/:cartItemId/discount', async (req: Request, res
 
     // Invalidate cache
     const { CacheService } = await import('../services/cacheService');
-    await CacheService.invalidateUserCartCache(userId);
+    await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} applied ${percentage}% discount to cart item ${cartItemId} of user ${userId}`);
 
@@ -2271,6 +2291,7 @@ router.post('/users/:userId/cart/:cartItemId/discount', async (req: Request, res
 router.post('/users/:userId/cart/discount-all', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const userIdString = Array.isArray(userId) ? userId[0] : userId;
     const { percentage, reason } = req.body;
     const adminId = req.user!.id;
 
@@ -2281,7 +2302,7 @@ router.post('/users/:userId/cart/discount-all', async (req: Request, res: Respon
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userIdString);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -2331,7 +2352,7 @@ router.post('/users/:userId/cart/discount-all', async (req: Request, res: Respon
 
     // Invalidate cache
     const { CacheService } = await import('../services/cacheService');
-    await CacheService.invalidateUserCartCache(userId);
+    await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} applied ${percentage}% discount to all cart items of user ${userId}`);
 
@@ -2360,9 +2381,10 @@ router.post('/users/:userId/cart/discount-all', async (req: Request, res: Respon
 router.delete('/users/:userId/cart/:cartItemId/price-modification', async (req: Request, res: Response) => {
   try {
     const { userId, cartItemId } = req.params;
+    const userIdString = Array.isArray(userId) ? userId[0] : userId;
     const adminId = req.user!.id;
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userIdString);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -2398,7 +2420,7 @@ router.delete('/users/:userId/cart/:cartItemId/price-modification', async (req: 
 
     // Invalidate cache
     const { CacheService } = await import('../services/cacheService');
-    await CacheService.invalidateUserCartCache(userId);
+    await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} removed price modification for cart item ${cartItemId} of user ${userId}`);
 

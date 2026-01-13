@@ -915,6 +915,52 @@ async sendEventApprovalEmail(data: EventApprovalEmailData): Promise<boolean> {
   }
 
   /**
+   * Send bill email to user (customer)
+   */
+  async sendBillEmailToUser(data: BillEmailData): Promise<boolean> {
+    try {
+      logger.info('Sending bill email to user', { 
+        email: data.user.email,
+        paymentId: data.paymentId,
+        totalAmount: data.totalAmount 
+      });
+
+      const template = this.createBillEmailTemplate(data);
+      const recipients = [new Recipient(data.user.email, data.user.name)];
+
+      const emailParams = new EmailParams()
+        .setFrom(this.sender)
+        .setTo(recipients)
+        .setSubject(template.subject)
+        .setHtml(template.html)
+        .setText(template.text);
+
+      const response = await this.mailerSend.email.send(emailParams);
+
+      if (response?.statusCode && response.statusCode >= 400) {
+        throw new Error(`MailerSend API error: ${response.statusCode}`);
+      }
+
+      logger.info('Bill email sent successfully to user', { 
+        email: data.user.email,
+        paymentId: data.paymentId,
+        totalAmount: data.totalAmount 
+      });
+      return true;
+
+    } catch (error: any) {
+      logger.error('Failed to send bill email to user', {
+        email: data.user.email,
+        paymentId: data.paymentId,
+        totalAmount: data.totalAmount,
+        error: error.message
+      });
+      // Don't throw error - email sending failure shouldn't block the process
+      return false;
+    }
+  }
+
+  /**
    * Send event details email to support team
    */
   async sendEventDetailsEmail(data: EventDetailsEmailData): Promise<boolean> {

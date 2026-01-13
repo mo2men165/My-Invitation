@@ -2,6 +2,8 @@
 import { useState, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { useToast } from '@/hooks/useToast';
+import { logout } from '@/store/authSlice';
+import { useRouter } from 'next/navigation';
 
 interface UpdateProfileData {
   firstName: string;
@@ -19,11 +21,13 @@ interface ChangePasswordData {
 
 export const useAccountSettings = () => {
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const { user, isLoading } = useAppSelector((state) => state.auth);
   const { toast } = useToast();
   
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const updateProfile = useCallback(async (data: UpdateProfileData) => {
     setIsUpdatingProfile(true);
@@ -122,12 +126,63 @@ export const useAccountSettings = () => {
     }
   }, [toast]);
 
+  const deleteAccount = useCallback(async () => {
+    setIsDeletingAccount(true);
+    
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/account`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        }
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في حذف الحساب');
+      }
+
+      // Clear auth state and redirect to home
+      dispatch(logout());
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      
+      toast({
+        title: "تم حذف الحساب",
+        description: "تم حذف حسابك بنجاح",
+        variant: "default",
+        duration: 3000
+      });
+
+      // Redirect to home after a short delay
+      setTimeout(() => {
+        router.push('/');
+      }, 1000);
+
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "خطأ في حذف الحساب",
+        description: error.message || "حدث خطأ غير متوقع",
+        variant: "destructive",
+        duration: 3000
+      });
+      return false;
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }, [dispatch, toast, router]);
+
   return {
     user,
     isLoading,
     isUpdatingProfile,
     isChangingPassword,
+    isDeletingAccount,
     updateProfile,
-    changePassword
+    changePassword,
+    deleteAccount
   };
 };

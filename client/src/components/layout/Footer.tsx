@@ -165,6 +165,16 @@ export function Footer() {
                     </span>
                   </motion.div>
                 </div>
+
+                {/* Company Information */}
+                <div className="space-y-2 mt-6 pt-6 border-t border-gray-800">
+                  <p className="text-gray-300 text-sm">
+                    شركة أساس التواصل
+                  </p>
+                  <p className="text-gray-400 text-xs" dir="ltr">
+                    السجل التجاري 4030467059
+                  </p>
+                </div>
               </div>
             </motion.div>
 
@@ -251,15 +261,39 @@ export function Footer() {
         >
           <div className="flex flex-col lg:flex-row justify-between items-center space-y-6 lg:space-y-0">
             
-            {/* Copyright */}
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-gray-400">
-                <span>&copy; منصة  MY INVITATION.</span>
-                <span>جميع الحقوق محفوظة.</span>
+            {/* Copyright and Legal Links */}
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2 text-gray-400">
+                  <span>&copy; منصة  MY INVITATION.</span>
+                  <span>جميع الحقوق محفوظة.</span>
+                </div>
+              </div>
+              
+              {/* Legal Links */}
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <Link 
+                  href="/privacy" 
+                  className="text-gray-400 hover:text-[#C09B52] transition-colors duration-300"
+                >
+                  سياسة الخصوصية
+                </Link>
+                <span className="text-gray-600">|</span>
+                <Link 
+                  href="/terms" 
+                  className="text-gray-400 hover:text-[#C09B52] transition-colors duration-300"
+                >
+                  الشروط والأحكام
+                </Link>
+                <span className="text-gray-600">|</span>
+                <Link 
+                  href="/data-deletion" 
+                  className="text-gray-400 hover:text-[#C09B52] transition-colors duration-300"
+                >
+                  حذف البيانات
+                </Link>
               </div>
             </div>
-
-            
 
             {/* Back to Top */}
             <motion.button

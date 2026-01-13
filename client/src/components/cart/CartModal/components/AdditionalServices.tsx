@@ -130,7 +130,7 @@ const AdditionalServices = memo<AdditionalServicesProps>(({
         ) : !isInMainSaudiCities ? (
           <p className="text-gray-400 text-xs mt-2">متوفر فقط في المدن الرئيسية: {SAUDI_CITIES.join('، ')}</p>
         ) : (
-          <p className="text-gray-400 text-xs mt-2">متوفر في المدن الرئيسية</p>
+          <p className="text-gray-400 text-xs mt-2">متوفر في الرياض - جدة - الدمام - المدينة المنوره - مكة المكرمة - القصيم</p>
         )}
         {packageType === 'vip' && (
           <div className="mt-2 p-2 bg-[#C09B52]/10 rounded-lg border border-[#C09B52]/20">

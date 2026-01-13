@@ -96,6 +96,7 @@ const CartModal = memo<CartModalProps>(({
       updateFormField('fastDelivery', editItem.details.fastDelivery || false);
       updateFormField('isCustomDesign', editItem.details.isCustomDesign || false);
       updateFormField('customDesignNotes', editItem.details.customDesignNotes || '');
+      updateFormField('termsAccepted', true); // Auto-check when editing
 
       if (editItem.details.locationCoordinates) {
         updateLocation(
@@ -414,6 +415,9 @@ const CartModal = memo<CartModalProps>(({
                 isEditMode={state.isEditMode}
                 hasErrors={errorCount > 0}
                 errorCount={errorCount}
+                termsAccepted={formData.termsAccepted}
+                onTermsChange={(accepted) => updateFormField('termsAccepted', accepted)}
+                termsError={errors.termsAccepted}
               />
             </div>
           </div>

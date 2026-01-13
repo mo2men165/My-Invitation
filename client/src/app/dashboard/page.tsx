@@ -1,6 +1,7 @@
 // src/app/dashboard/page.tsx
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { RecentOrders } from '@/components/dashboard/RecentOrders';
 import { QuickActions } from '@/components/dashboard/QuickActions';
@@ -9,6 +10,9 @@ import { CollaborationDashboard } from '@/components/collaboration/Collaboration
 import { InstantRouteGuard } from '@/components/auth/InstantRouteGuard';
 import { DashboardSkeleton } from '@/components/ui/SkeletonLoader';
 import { useAuth } from '@/hooks/useAuth';
+import { useAccountSettings } from '@/hooks/useAccountSettings';
+import DeleteAccountButton from '@/components/account/DeleteAccountButton';
+import { UserBills } from '@/components/dashboard/UserBills';
 
 // If you need metadata, you can use generateMetadata instead
 // export async function generateMetadata(): Promise<Metadata> {
@@ -20,6 +24,9 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { deleteAccount, isDeletingAccount } = useAccountSettings();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab');
 
   return (
     <InstantRouteGuard 
@@ -47,20 +54,32 @@ export default function DashboardPage() {
           <DashboardStats />
 
           {/* Main Content Grid */}
-          <div className="grid lg:grid-cols-3 gap-8 mt-12">
-            
-            {/* Left Column - Main Content */}
-            <div className="lg:col-span-2 space-y-8">
-              <RecentOrders />
-              <QuickActions />
+          {tab === 'bills' ? (
+            <div className="mt-12">
+              <UserBills />
             </div>
+          ) : (
+            <div className="grid lg:grid-cols-3 gap-8 mt-12">
+              
+              {/* Left Column - Main Content */}
+              <div className="lg:col-span-2 space-y-8">
+                <RecentOrders />
+                <QuickActions />
+              </div>
 
-            {/* Right Column - Sidebar */}
-            <div className="space-y-8">
-              <CollaborationDashboard />
+              {/* Right Column - Sidebar */}
+              <div className="space-y-8">
+                <CollaborationDashboard />
+                
+                {/* Delete Account Section */}
+                <DeleteAccountButton 
+                  onDelete={deleteAccount}
+                  isDeleting={isDeletingAccount}
+                />
+              </div>
+
             </div>
-
-          </div>
+          )}
         </div>
       </div>
     </InstantRouteGuard>

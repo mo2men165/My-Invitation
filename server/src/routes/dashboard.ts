@@ -3,6 +3,7 @@ import { Event } from '../models/Event';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { Types } from 'mongoose';
+import { BillService } from '../services/billService';
 
 const router = Router();
 
@@ -194,6 +195,79 @@ router.get('/recent-orders', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { message: 'خطأ في جلب الطلبات الحديثة' }
+    });
+  }
+});
+
+/**
+ * GET /api/dashboard/bills
+ * Get user's bills
+ */
+router.get('/bills', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { limit = 20, page = 1 } = req.query;
+
+    const result = await BillService.getUserBills(
+      userId,
+      Number(limit),
+      Number(page)
+    );
+
+    logger.info(`Bills retrieved for user ${userId}, count: ${result.bills.length}`);
+
+    return res.json({
+      success: true,
+      data: {
+        bills: result.bills,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: result.total,
+          totalPages: Math.ceil(result.total / Number(limit))
+        }
+      }
+    });
+
+  } catch (error: any) {
+    logger.error('Error fetching bills:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في جلب الفواتير' }
+    });
+  }
+});
+
+/**
+ * GET /api/dashboard/bills/:billId
+ * Get a specific bill by ID
+ */
+router.get('/bills/:billId', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const billId = Array.isArray(req.params.billId) ? req.params.billId[0] : req.params.billId;
+
+    const bill = await BillService.getBillById(billId, userId);
+
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'الفاتورة غير موجودة' }
+      });
+    }
+
+    logger.info(`Bill retrieved for user ${userId}, billId: ${billId}`);
+
+    return res.json({
+      success: true,
+      data: bill
+    });
+
+  } catch (error: any) {
+    logger.error('Error fetching bill:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في جلب الفاتورة' }
     });
   }
 });
