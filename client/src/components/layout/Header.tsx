@@ -245,11 +245,11 @@ export function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`relative text-[18px] font-medium transition-all duration-300 hover:text-[#C09B52] group py-2 px-5 ${
+                  className={`relative text-[18px] font-medium transition-all duration-300 hover:text-[#C09B52] group py-2 px-5 whitespace-nowrap ${
                     isActive ? 'text-[#C09B52]' : 'text-gray-300'
                   } ${index > 0 ? 'mr-8' : ''}`}
                 >
-                  <span className="relative z-10">{link.label}</span>
+                  <span className="relative z-10 whitespace-nowrap">{link.label}</span>
                   {/* Animated underline */}
                   <span className={`absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-[#C09B52] to-[#C09B52] transform transition-all duration-300 ${
                     isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
