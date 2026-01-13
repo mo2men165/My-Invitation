@@ -87,8 +87,27 @@
 - **Smart cart** for saving selected designs
 - **Automatic calculation** of prices with discounts
 - **Additional services** available for selection
-- **Secure payment** with instant confirmation
-- **Detailed invoices** in Arabic
+- **Secure payment** with Paymob integration
+- **Detailed invoices and bills** in Arabic
+- **Bill management** with viewing and downloading capabilities
+- **Order tracking** and payment status
+
+### 💰 Billing System
+- **Automated bill generation** after successful payment
+- **Detailed bills** with event information and pricing breakdown
+- **Email delivery** of bills to users
+- **Bill history** and viewing in dashboard
+- **Unique bill numbers** for tracking
+- **Multiple events per bill** support
+
+### 🤝 Collaboration Feature
+- **Multi-user event management** (Premium & VIP packages)
+- **Invite collaborators** to manage events together
+- **Permission management** (add, edit, delete guests, view full event)
+- **Allocate invites** to collaborators
+- **Up to 2 collaborators** for Premium package
+- **Up to 10 collaborators** for VIP package
+- **Collaborator dashboard** to view shared events
 
 ### 👥 Guest Management
 - **Comprehensive guest list** with ability to add companions
@@ -96,6 +115,8 @@
 - **WhatsApp reminders** sending
 - **Detailed statistics** about attendance and interaction
 - **Data export** in various formats
+- **Guest list confirmation** for VIP packages
+- **Bulk operations** for guest management
 
 ### 📍 Location Services
 - **Google Maps integration** for event location identification
@@ -103,12 +124,32 @@
 - **Precise location identification** with coordinates
 - **Distance calculation** and transportation
 
+### 📱 WhatsApp Integration
+- **WhatsApp Business API** integration
+- **Automated invitation sending** via WhatsApp
+- **Bulk invitation sending**
+- **Event reminders** via WhatsApp
+- **Thank you messages** for attendees
+- **Webhook support** for delivery status
+- **Template message support**
+
+### 👨‍💼 Admin Dashboard
+- **Comprehensive admin panel** for platform management
+- **User management** with search and filtering
+- **Event approval system** with notes and status tracking
+- **Orders and bills management**
+- **System statistics** and analytics
+- **Collaboration analytics** and monitoring
+- **Notification management**
+- **User activity tracking**
+
 ### 🔐 Security & Protection
 - **Advanced authentication** with JWT
 - **Complete encryption** of all sensitive data
 - **Protection against** common security attacks
 - **Comprehensive logging** of all operations
-- **Automatic backups** of data
+- **Rate limiting** for API protection
+- **Input validation** and sanitization
 
 ## 🛠️ Technology Stack
 
@@ -139,6 +180,8 @@
 - **Google Maps API** - Maps services
 - **Cloudinary** - Image management
 - **MailerSend** - Email sending
+- **Paymob** - Payment gateway
+- **WhatsApp Business API** - WhatsApp messaging
 - **Sentry** - Error monitoring
 - **Railway** - Application hosting
 
@@ -156,13 +199,19 @@ my-invitation/
 │   │   │   ├── compare/            # Compare page
 │   │   │   ├── contact/            # Contact page
 │   │   │   ├── dashboard/          # User dashboard
+│   │   │   │   └── bills/          # Bills management
 │   │   │   ├── events/             # Events page
 │   │   │   ├── login/              # Login page
 │   │   │   ├── packages/           # Packages page
 │   │   │   ├── payment/            # Payment page
 │   │   │   ├── register/           # Register page
 │   │   │   ├── settings/           # Settings page
-│   │   │   └── wishlist/           # Wishlist page
+│   │   │   ├── wishlist/           # Wishlist page
+│   │   │   ├── forgot-password/    # Password reset
+│   │   │   ├── reset-password/     # Reset password
+│   │   │   ├── privacy/            # Privacy policy
+│   │   │   ├── terms/              # Terms of service
+│   │   │   └── data-deletion/      # Data deletion
 │   │   ├── components/             # React components
 │   │   │   ├── about/              # About page components
 │   │   │   ├── account/            # Account components
@@ -175,6 +224,7 @@ my-invitation/
 │   │   │   ├── Home/               # Home page components
 │   │   │   ├── layout/             # Layout components
 │   │   │   ├── packages/           # Packages components
+│   │   │   ├── collaboration/      # Collaboration components
 │   │   │   ├── ui/                 # UI components
 │   │   │   └── wishlist/           # Wishlist components
 │   │   ├── constants/              # Constants and data
@@ -286,8 +336,24 @@ AUTH0_CLIENT_SECRET=your-auth0-client-secret
 
 # Email settings
 MAILERSEND_API_KEY=your-mailersend-api-key
-FROM_EMAIL=noreply@myinvitation.com
-FROM_NAME=My Invitation
+MAILERSEND_FROM_EMAIL=noreply@myinvitation.com
+MAILERSEND_FROM_NAME=My Invitation
+
+# Payment settings (Paymob)
+PAYMOB_API_KEY=your-paymob-api-key
+PAYMOB_PUBLIC_KEY=your-paymob-public-key
+PAYMOB_SECRET_KEY=your-paymob-secret-key
+PAYMOB_INTEGRATION_ID=your-paymob-integration-id
+PAYMOB_IFRAME_ID=your-paymob-iframe-id
+PAYMOB_WEBHOOK_URL=http://localhost:5000/api/payment/paymob/webhook
+PAYMOB_RETURN_URL=http://localhost:3000/payment/result
+PAYMOB_CANCEL_URL=http://localhost:3000/payment/result?reason=cancelled
+
+# WhatsApp settings
+WHATSAPP_ACCESS_TOKEN=your-whatsapp-access-token
+WHATSAPP_PHONE_NUMBER_ID=your-whatsapp-phone-number-id
+WHATSAPP_BUSINESS_ACCOUNT_ID=your-whatsapp-business-account-id
+WHATSAPP_WEBHOOK_VERIFY_TOKEN=your-whatsapp-webhook-verify-token
 
 # Google Maps settings
 GOOGLE_MAPS_API_KEY=your-google-maps-api-key
@@ -398,14 +464,63 @@ DELETE /api/cart/clear            # Clear entire cart
 GET /api/payment/summary          # Payment summary
 POST /api/payment/process         # Process successful payment
 POST /api/payment/failed          # Handle payment failure
+POST /api/payment/paymob/webhook  # Paymob webhook
+```
+
+### Dashboard
+```http
+GET /api/dashboard/stats          # User dashboard statistics
+GET /api/dashboard/recent-orders  # Recent orders
+GET /api/dashboard/bills          # User bills list
+GET /api/dashboard/bills/:billId  # Get specific bill
+```
+
+### Collaboration
+```http
+POST /api/collaboration/events/:eventId/collaborators      # Add collaborator
+GET /api/collaboration/events/:eventId/collaborators       # Get collaborators
+PATCH /api/collaboration/events/:eventId/collaborators/:id # Update collaborator
+DELETE /api/collaboration/events/:eventId/collaborators/:id # Remove collaborator
+GET /api/collaboration/my-events                           # Get user's collaborated events
+GET /api/collaboration/stats                               # Collaboration statistics
+```
+
+### WhatsApp
+```http
+GET /api/whatsapp/webhook              # Webhook verification
+POST /api/whatsapp/webhook             # Webhook handler
+POST /api/whatsapp/send-invitation     # Send invitation via WhatsApp
+POST /api/whatsapp/send-bulk-invitations # Send bulk invitations
+POST /api/whatsapp/send-event-reminders # Send event reminders
+POST /api/whatsapp/send-thank-you-messages # Send thank you messages
+```
+
+### Wishlist & Compare
+```http
+GET /api/wishlist                     # Get user wishlist
+POST /api/wishlist                    # Add to wishlist
+DELETE /api/wishlist/:id              # Remove from wishlist
+GET /api/compare                      # Get comparison list
+POST /api/compare                     # Add to comparison
+DELETE /api/compare/:id               # Remove from comparison
+```
+
+### Contact
+```http
+POST /api/contact                     # Submit contact form
 ```
 
 ### Admin Dashboard
 ```http
-GET /api/admin/events             # Get all events
-PATCH /api/admin/events/:id/approve # Approve event
-PATCH /api/admin/events/:id/reject # Reject event
-GET /api/admin/stats              # System statistics
+GET /api/admin/stats                  # System statistics
+GET /api/admin/events                 # Get all events
+GET /api/admin/events/:id             # Get specific event details
+PATCH /api/admin/events/:id/approve   # Approve event
+PATCH /api/admin/events/:id/reject    # Reject event
+GET /api/admin/users                  # Get all users
+PATCH /api/admin/users/:id            # Update user
+GET /api/admin/orders                 # Get all orders
+GET /api/admin/collaboration/analytics # Collaboration analytics
 ```
 
 ## 🗄️ Database Schema
@@ -420,12 +535,28 @@ interface IUser {
   email: string;
   password: string;
   city: string;
+  customCity?: string;
   role: 'user' | 'admin';
   status: 'active' | 'suspended';
   lastLogin?: Date;
   cart: ICartItem[];
   wishlist: IWishlistItem[];
   compareList: ICompareItem[];
+  collaboratedEvents?: Array<{
+    eventId: ObjectId;
+    role: 'owner' | 'collaborator';
+    permissions: {
+      canAddGuests: boolean;
+      canEditGuests: boolean;
+      canDeleteGuests: boolean;
+      canViewFullEvent: boolean;
+    };
+    allocatedInvites: number;
+    usedInvites: number;
+    addedAt: Date;
+    addedBy: ObjectId;
+  }>;
+  accountOrigin?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -463,11 +594,74 @@ interface IEvent {
     isConfirmed: boolean;
     confirmedAt?: Date;
     confirmedBy?: ObjectId;
+    reopenedAt?: Date;
+    reopenedBy?: ObjectId;
+    reopenCount: number;
   };
+  collaborators?: Array<{
+    userId: ObjectId;
+    allocatedInvites: number;
+    usedInvites: number;
+    permissions: {
+      canAddGuests: boolean;
+      canEditGuests: boolean;
+      canDeleteGuests: boolean;
+      canViewFullEvent: boolean;
+    };
+    addedAt: Date;
+    addedBy: ObjectId;
+  }>;
+  totalAllocatedInvites: number;
+  invitationCardImage?: {
+    public_id: string;
+    secure_url: string;
+    url: string;
+    format: string;
+    width: number;
+    height: number;
+    bytes: number;
+    created_at: string;
+  };
+  qrCodeReaderUrl?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 ```
+
+### Bill Model
+```typescript
+interface IBill {
+  userId: ObjectId;
+  orderId: ObjectId;
+  billNumber: string; // Unique bill number
+  paymentId: string;
+  totalAmount: number;
+  paymentMethod: string;
+  transactionId?: string;
+  paymentDate: Date;
+  events: Array<{
+    eventId: ObjectId;
+    eventName?: string;
+    hostName: string;
+    eventDate: Date;
+    eventLocation: string;
+    packageType: string;
+    inviteCount: number;
+    price: number;
+  }>;
+  user: {
+    name: string;
+    email: string;
+    phone: string;
+    city: string;
+  };
+  emailSent: boolean;
+  emailSentAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
 
 ## 🔒 Security
 
