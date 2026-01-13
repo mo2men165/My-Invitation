@@ -16,7 +16,8 @@ import {
   Loader2,
   ExternalLink,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Mail
 } from 'lucide-react';
 import Link from 'next/link';
 import { paymentAPI } from '@/lib/api/payment';
