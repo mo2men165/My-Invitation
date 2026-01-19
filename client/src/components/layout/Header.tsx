@@ -173,7 +173,7 @@ export function Header() {
                   onClick={() => setIsUserMenuOpen(false)}
                 >
                   <Calendar className="w-5 h-5 flex-shrink-0" />
-                  <span className='mr-2'>الأحداث</span>
+                  <span className='mr-2'>المناسبات</span>
                 </Link>
                 
                 <Link
@@ -221,9 +221,9 @@ export function Header() {
   return (
     <header className="bg-gray-900/60 border-b border-gray-700 sticky top-0 z-50 shadow-lg shadow-gray-900/50 backdrop-blur-sm">
         <div className="container mx-auto px-8 py-4">
-        <div className="grid grid-cols-2 lg:grid-cols-3 items-center min-h-[50px]">
+        <div className="grid grid-cols-2 items-center min-h-[50px]">
           
-          {/* Logo - Right Side */}
+          {/* Logo - Left Side */}
           <div className="flex justify-center">
             <Link href="/" className="block">
               <Image 
@@ -236,80 +236,24 @@ export function Header() {
             </Link>
           </div>
 
-          {/* Navigation Links - Center */}
-          <nav className="hidden lg:flex items-center justify-center">
-            <div className="flex items-center">
-            {navLinks.map((link, index) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`relative text-[18px] font-medium transition-all duration-300 hover:text-[#C09B52] group py-2 px-5 whitespace-nowrap ${
-                    isActive ? 'text-[#C09B52]' : 'text-gray-300'
-                  } ${index > 0 ? 'mr-8' : ''}`}
-                >
-                  <span className="relative z-10 whitespace-nowrap">{link.label}</span>
-                  {/* Animated underline */}
-                  <span className={`absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-[#C09B52] to-[#C09B52] transform transition-all duration-300 ${
-                    isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
-                  } origin-center`} />
-                  {/* Glow effect */}
-                  <span className="absolute inset-0 bg-[#C09B52]/10 rounded-lg transform scale-0 group-hover:scale-100 transition-transform duration-300 -z-10" />
-                </Link>
-              );
-            })}
-
-            </div>
-          </nav>
-
-          {/* Action Items - Left Side - Hidden on Mobile */}
-          <div className="hidden lg:flex items-center justify-center">
-            
-            {/* Show shopping features only if authenticated and initialized */}
+          {/* Menu Button & Cart - All Screen Sizes */}
+          <div className="flex items-center justify-end gap-3" ref={mobileMenuRef}>
+            {/* Cart Icon - Simple on mobile, with total on md+ */}
             {isAuthenticated && isInitialized && (
               <>
-                {/* Compare Icon */}
-                <button className="group relative mr-4">
-                  <div className="p-2 rounded-full bg-gray-900 border border-gray-700 hover:border-[#C09B52] transition-all duration-300 hover:bg-gray-800 hover:shadow-lg hover:shadow-[#C09B52]/20">
-                    <Link href='/compare'>
-                      <GitCompare className="w-4 h-4 text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300" />
-                    </Link>
-                  </div>
-                  {/* Badge */}
-                  {compareCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#C09B52] text-black text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold border-2 border-black">
-                      {compareCount}
+                {/* Simple cart icon for mobile */}
+                <Link href="/cart" className="relative p-2 md:hidden">
+                  <ShoppingCart className="w-6 h-6 text-gray-300 hover:text-[#C09B52] transition-colors duration-300" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 bg-[#C09B52] text-black text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-black">
+                      {cartCount}
                     </span>
                   )}
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-gray-800 border border-gray-700 text-[#C09B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
-                    المقارنة
-                  </div>
-                </button>
-
-                {/* Wishlist Icon */}
-                <button className="group relative mr-4">
-                  <div className="p-2 rounded-full bg-gray-900 border border-gray-700 hover:border-[#C09B52] transition-all duration-300 hover:bg-gray-800 hover:shadow-lg hover:shadow-[#C09B52]/20">
-                    <Link href='/wishlist'>
-                      <Heart className="w-4 h-4 text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300 group-hover:fill-[#C09B52]" />
-                    </Link>
-                  </div>
-                  {/* Badge */}
-                  {wishlistCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#C09B52] text-black text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold border-2 border-black">
-                      {wishlistCount}
-                    </span>
-                  )}
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-gray-800 border border-gray-700 text-[#C09B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
-                    المفضلة
-                  </div>
-                </button>
-
-                {/* Cart with Total */}
-                <Link href="/cart" className="group relative mr-4">
-                  <div className="flex items-center bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-full px-3 py-2 hover:border-[#C09B52] transition-all duration-300 hover:shadow-lg hover:shadow-[#C09B52]/20 min-w-[110px]">
+                </Link>
+                
+                {/* Cart with total for md+ screens */}
+                <Link href="/cart" className="hidden md:block group relative">
+                  <div className="relative flex items-center bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-full px-3 py-2 hover:border-[#C09B52] transition-all duration-300 hover:shadow-lg hover:shadow-[#C09B52]/20 min-w-[110px]">
                     <div className="relative ml-2">
                       <ShoppingCart className="w-4 h-4 text-gray-300 group-hover:text-[#C09B52] transition-colors duration-300" />
                       {/* Cart items badge */}
@@ -325,30 +269,11 @@ export function Header() {
                         {cartTotal.toLocaleString('ar-SA')} ر.س
                       </span>
                     </div>
+                    {/* Glow effect */}
+                    <div className="absolute inset-0 bg-[#C09B52]/10 rounded-full transform scale-0 group-hover:scale-105 transition-transform duration-300 -z-10" />
                   </div>
-                  {/* Glow effect */}
-                  <div className="absolute inset-0 bg-[#C09B52]/10 rounded-full transform scale-0 group-hover:scale-105 transition-transform duration-300 -z-10" />
                 </Link>
               </>
-            )}
-
-            {/* User Section - Desktop Only */}
-            <UserSection />
-
-          </div>
-
-          {/* Mobile Menu Button & Cart */}
-          <div className="lg:hidden flex items-center justify-end gap-3" ref={mobileMenuRef}>
-            {/* Mobile Cart Icon */}
-            {isAuthenticated && isInitialized && (
-              <Link href="/cart" className="relative p-2">
-                <ShoppingCart className="w-6 h-6 text-gray-300 hover:text-[#C09B52] transition-colors duration-300" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-[#C09B52] text-black text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-black">
-                    {cartCount}
-                  </span>
-                )}
-              </Link>
             )}
             
             <button 
@@ -364,7 +289,7 @@ export function Header() {
               </svg>
             </button>
 
-            {/* Mobile Menu Dropdown */}
+            {/* Menu Dropdown */}
             {isMobileMenuOpen && (
               <div className="absolute top-full left-0 right-0 bg-black border-t border-gray-800 shadow-2xl z-50 max-h-[80vh] overflow-y-auto scrollbar-hide">
                 <div className="container mx-auto px-8 py-6">
@@ -397,13 +322,13 @@ export function Header() {
                             pathname === '/events' ? 'text-[#C09B52] bg-gray-800/50' : 'text-gray-300 hover:text-[#C09B52]'
                           }`}
                         >
-                          الأحداث
+                          المناسبات
                         </Link>
                       )}
                     </div>
                   </nav>
 
-                  {/* User Section for Mobile */}
+                  {/* User Section */}
                   {isAuthenticated && isInitialized && user ? (
                     <>
                       {/* User Info */}
@@ -503,7 +428,7 @@ export function Header() {
                       </div>
                     </>
                   ) : (
-                    /* Not Authenticated Mobile Actions */
+                    /* Not Authenticated Actions */
                     <div className="border-t border-gray-800 pt-6">
                       <div className="space-y-3">
                         <Link
