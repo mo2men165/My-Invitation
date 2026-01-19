@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { registerUser, clearError } from '../../store/authSlice';
@@ -40,9 +40,11 @@ export function RegisterForm() {
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    control,
+    formState: { errors, isValid, isDirty },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
+    mode: 'onChange', // Validate on change to enable/disable button properly
   });
 
   const watchedPassword = watch('password');
@@ -201,33 +203,42 @@ export function RegisterForm() {
           </Label>
           <div className="relative">
             <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
-            <Select onValueChange={(value) => {
-              setValue('city', value as any);
-              // Clear customCity when switching away from 'اخري'
-              if (value !== 'اخري') {
-                setValue('customCity', '');
-              }
-            }}>
-              <SelectTrigger 
-                dir='rtl' 
-                className={`bg-white/10 mt-4 border-white/20 text-white backdrop-blur-sm focus:border-yellow-500 transition-all h-12 pr-12 ${
-                  errors.city ? 'border-red-500' : ''
-                }`}
-              >
-                <SelectValue placeholder="اختر المدينة" className="text-gray-400" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-800 border-gray-700 max-h-60">
-                {saudiCities.map((city) => (
-                  <SelectItem 
-                    key={city} 
-                    value={city} 
-                    className="text-white hover:bg-gray-700 focus:bg-gray-700"
+            <Controller
+              name="city"
+              control={control}
+              render={({ field }) => (
+                <Select 
+                  value={field.value || ''} 
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    // Clear customCity when switching away from 'اخري'
+                    if (value !== 'اخري') {
+                      setValue('customCity', '');
+                    }
+                  }}
+                >
+                  <SelectTrigger 
+                    dir='rtl' 
+                    className={`bg-white/10 mt-4 border-white/20 text-white backdrop-blur-sm focus:border-yellow-500 transition-all h-12 pr-12 ${
+                      errors.city ? 'border-red-500' : ''
+                    }`}
                   >
-                    {city}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    <SelectValue placeholder="اختر المدينة" className="text-gray-400" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700 max-h-60">
+                    {saudiCities.map((city) => (
+                      <SelectItem 
+                        key={city} 
+                        value={city} 
+                        className="text-white hover:bg-gray-700 focus:bg-gray-700"
+                      >
+                        {city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </div>
           {errors.city && (
             <p className="text-sm text-red-300">{errors.city.message}</p>
@@ -350,11 +361,11 @@ export function RegisterForm() {
         {/* Submit Button */}
         <Button
           type="submit"
-          className="w-full text-black font-bold py-3 rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 group disabled:opacity-50 disabled:hover:scale-100"
-          disabled={isLoading}
+          className="w-full text-black font-bold py-3 rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 group disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed disabled:transform-none"
+          disabled={isLoading || (isDirty && !isValid)}
           style={{ 
-            backgroundColor: '#C09B52',
-            boxShadow: '0 10px 30px rgba(192, 155, 82, 0.3)'
+            backgroundColor: isLoading || (isDirty && !isValid) ? '#9a7a42' : '#C09B52',
+            boxShadow: isLoading || (isDirty && !isValid) ? 'none' : '0 10px 30px rgba(192, 155, 82, 0.3)'
           }}
         >
           {isLoading ? (
