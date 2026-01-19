@@ -32,10 +32,9 @@ export const registerSchema = z.object({
     message: 'يجب اختيار مدينة من القائمة المحددة'
   }),
   customCity: z.string()
-    .min(2, 'اسم المدينة يجب أن يكون حرفين على الأقل')
-    .max(50, 'اسم المدينة طويل جداً')
     .trim()
-    .optional(),
+    .optional()
+    .default(''),
   password: z.string()
     .min(8, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل')
     .regex(/^(?=.*[a-z])/, 'كلمة المرور يجب أن تحتوي على حرف صغير واحد على الأقل')
@@ -47,13 +46,43 @@ export const registerSchema = z.object({
   message: "كلمات المرور غير متطابقة",
   path: ["confirmPassword"],
 }).refine((data) => {
-  // If city is 'اخري', customCity must be provided
-  if (data.city === 'اخري' && (!data.customCity || data.customCity.trim().length === 0)) {
+  // If city is 'اخري', customCity must be provided and valid
+  if (data.city === 'اخري') {
+    // Check if customCity is empty
+    if (!data.customCity || data.customCity === '' || data.customCity.trim().length === 0) {
+      return false;
+    }
+    // Validate length when city is 'اخري'
+    const trimmed = data.customCity.trim();
+    if (trimmed.length < 2) {
+      return false;
+    }
+    if (trimmed.length > 50) {
+      return false;
+    }
+  }
+  // If city is not 'اخري', customCity can be empty (no validation needed)
+  return true;
+}, {
+  message: 'يجب إدخال اسم المدينة عند اختيار "أخرى"',
+  path: ['customCity']
+}).refine((data) => {
+  // Additional validation for min length when city is 'اخري'
+  if (data.city === 'اخري' && data.customCity && data.customCity.trim().length > 0 && data.customCity.trim().length < 2) {
     return false;
   }
   return true;
 }, {
-  message: 'يجب إدخال اسم المدينة عند اختيار "أخرى"',
+  message: 'اسم المدينة يجب أن يكون حرفين على الأقل',
+  path: ['customCity']
+}).refine((data) => {
+  // Additional validation for max length when city is 'اخري'
+  if (data.city === 'اخري' && data.customCity && data.customCity.trim().length > 50) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'اسم المدينة طويل جداً',
   path: ['customCity']
 });
 

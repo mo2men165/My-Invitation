@@ -41,14 +41,20 @@ export function RegisterForm() {
     setValue,
     watch,
     control,
-    formState: { errors, isValid, isDirty },
+    trigger,
+    formState: { errors, isValid, isDirty, touchedFields },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    mode: 'onChange', // Validate on change to enable/disable button properly
+    mode: 'all', // Validate on change, blur, and submit to ensure proper validation on mobile
   });
 
   const watchedPassword = watch('password');
   const watchedCity = watch('city');
+  const watchedValues = watch(); // Watch all form values to check if form is filled
+
+  // Check if form has been filled (at least one field has a value)
+  const hasFormData = watchedValues.firstName || watchedValues.lastName || watchedValues.email || 
+                      watchedValues.phone || watchedValues.city || watchedValues.password;
 
   const onSubmit = async (data: RegisterFormData) => {
     dispatch(clearError());
@@ -209,11 +215,16 @@ export function RegisterForm() {
               render={({ field }) => (
                 <Select 
                   value={field.value || ''} 
-                  onValueChange={(value) => {
+                  onValueChange={async (value) => {
                     field.onChange(value);
                     // Clear customCity when switching away from 'اخري'
                     if (value !== 'اخري') {
                       setValue('customCity', '');
+                    }
+                    // Explicitly trigger validation on mobile
+                    await trigger('city');
+                    if (value !== 'اخري') {
+                      await trigger('customCity');
                     }
                   }}
                 >
@@ -362,10 +373,10 @@ export function RegisterForm() {
         <Button
           type="submit"
           className="w-full text-black font-bold py-3 rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 group disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed disabled:transform-none"
-          disabled={isLoading || (isDirty && !isValid)}
+          disabled={isLoading || (hasFormData && (!isValid || Object.keys(errors).length > 0))}
           style={{ 
-            backgroundColor: isLoading || (isDirty && !isValid) ? '#9a7a42' : '#C09B52',
-            boxShadow: isLoading || (isDirty && !isValid) ? 'none' : '0 10px 30px rgba(192, 155, 82, 0.3)'
+            backgroundColor: isLoading || (hasFormData && (!isValid || Object.keys(errors).length > 0)) ? '#9a7a42' : '#C09B52',
+            boxShadow: isLoading || (hasFormData && (!isValid || Object.keys(errors).length > 0)) ? 'none' : '0 10px 30px rgba(192, 155, 82, 0.3)'
           }}
         >
           {isLoading ? (
