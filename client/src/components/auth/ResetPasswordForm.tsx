@@ -29,20 +29,29 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const [hasVerifiedToken, setHasVerifiedToken] = useState(false);
 
-  // Verify token on component mount
+  // Verify token on component mount (only once, and not after successful reset)
   useEffect(() => {
+    // Skip verification if already verified or if reset was successful
+    if (hasVerifiedToken || isSuccess) {
+      return;
+    }
+
     const verifyToken = async () => {
       try {
         const response = await authAPI.verifyResetToken(token);
         if (response.valid) {
           setIsTokenValid(true);
           setUserEmail(response.email || '');
+          setHasVerifiedToken(true);
         } else {
           setIsTokenValid(false);
+          setHasVerifiedToken(true);
         }
       } catch (error) {
         setIsTokenValid(false);
+        setHasVerifiedToken(true);
       }
     };
 
@@ -50,8 +59,9 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       verifyToken();
     } else {
       setIsTokenValid(false);
+      setHasVerifiedToken(true);
     }
-  }, [token]);
+  }, [token, hasVerifiedToken, isSuccess]);
 
 
 
