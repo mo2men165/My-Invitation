@@ -145,18 +145,25 @@ class AuthAPI {
   }
 
   async resetPassword(token: string, password: string): Promise<ApiResponse> {
+    console.log('[AUTH API] Sending reset password request...');
+    
     const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, password }),
     });
-
+  
+    console.log('[AUTH API] Response received:', response.status);
+    
     const result = await response.json();
+    console.log('[AUTH API] Response data:', result);
     
     if (!response.ok) {
+      console.log('[AUTH API] Throwing error');
       throw new Error(result.error?.message || 'فشل في إعادة تعيين كلمة المرور');
     }
-
+    
+    console.log('[AUTH API] Returning result');
     return result;
   }
 

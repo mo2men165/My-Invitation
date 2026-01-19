@@ -15,6 +15,33 @@ import { Loader2, KeyRound, ArrowLeft, Eye, EyeOff, CheckCircle, XCircle } from 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+// Helper to check if token reset is in progress or completed (uses sessionStorage to persist across HMR)
+const isResetInProgressOrCompleted = (token: string): boolean => {
+  if (typeof window === 'undefined') return false;
+  const status = sessionStorage.getItem(`reset_status_${token}`);
+  return status === 'in_progress' || status === 'completed';
+};
+
+const markResetInProgress = (token: string): void => {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(`reset_status_${token}`, 'in_progress');
+};
+
+const markResetCompleted = (token: string): void => {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(`reset_status_${token}`, 'completed');
+};
+
+const markResetFailed = (token: string): void => {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(`reset_status_${token}`);
+};
+
+const clearResetStatus = (token: string): void => {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(`reset_status_${token}`);
+};
+
 interface ResetPasswordFormProps {
   token: string;
 }
@@ -24,72 +51,119 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const dispatch = useAppDispatch();
   
   const { isLoading, error } = useAppSelector((state) => state.auth);
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isTokenValid, setIsTokenValid] = useState<boolean | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [hasVerifiedToken, setHasVerifiedToken] = useState(false);
-
-  // Verify token on component mount (only once, and not after successful reset)
+  
+  // Check if this token was already successfully reset (persists across remounts and HMR)
+  const [isSuccess, setIsSuccess] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem(`reset_status_${token}`) === 'completed';
+  });
+  
+  // Sync isSuccess with sessionStorage on mount and periodically
+  // This handles the case where the async reset completes after a remount
   useEffect(() => {
-    // Skip verification if already verified or if reset was successful
-    if (hasVerifiedToken || isSuccess) {
+    // Check immediately on mount
+    const checkStatus = () => {
+      const status = sessionStorage.getItem(`reset_status_${token}`);
+      if (status === 'completed' && !isSuccess) {
+        setIsSuccess(true);
+      }
+    };
+    
+    checkStatus();
+    
+    // Poll every 100ms while reset is in progress (handles async completion after remount)
+    const status = sessionStorage.getItem(`reset_status_${token}`);
+    if (status === 'in_progress') {
+      const interval = setInterval(checkStatus, 100);
+      return () => clearInterval(interval);
+    }
+  }, [token, isSuccess]);
+
+  // Verify token on component mount (only to validate before showing form)
+  // Skip verification if reset is in progress or already completed
+  useEffect(() => {
+    // Don't verify if reset is in progress or completed for this token
+    // But we need to set isTokenValid so the UI doesn't show loading forever
+    if (isResetInProgressOrCompleted(token)) {
+      setIsTokenValid(true); // Allow UI to proceed
+      return;
+    }
+
+    if (!token) {
+      setIsTokenValid(false);
       return;
     }
 
     const verifyToken = async () => {
+      // Double-check before making API call
+      if (isResetInProgressOrCompleted(token)) {
+        setIsTokenValid(true); // Allow UI to proceed
+        return;
+      }
+
       try {
         const response = await authAPI.verifyResetToken(token);
         if (response.valid) {
           setIsTokenValid(true);
           setUserEmail(response.email || '');
-          setHasVerifiedToken(true);
         } else {
           setIsTokenValid(false);
-          setHasVerifiedToken(true);
         }
       } catch (error) {
         setIsTokenValid(false);
-        setHasVerifiedToken(true);
       }
     };
 
-    if (token) {
-      verifyToken();
-    } else {
-      setIsTokenValid(false);
-      setHasVerifiedToken(true);
+    verifyToken();
+  }, [token]);
+
+  // Auto-redirect to login after 2 seconds on success
+  useEffect(() => {
+    if (isSuccess) {
+      const timer = setTimeout(() => {
+        // Clean up sessionStorage before redirecting
+        clearResetStatus(token);
+        router.push('/login');
+      }, 2000);
+      return () => clearTimeout(timer);
     }
-  }, [token, hasVerifiedToken, isSuccess]);
+  }, [isSuccess, router, token]);
 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    watch,
+  } = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      token,
+    },
+  });
 
+  const watchedPassword = watch('password');
 
-    const {
-      register,
-      handleSubmit,
-      formState: { errors },
-      watch,
-    } = useForm<ResetPasswordFormData>({
-      resolver: zodResolver(resetPasswordSchema),
-      defaultValues: {
-        token,
-      },
-    });
-
-    const watchedPassword = watch('password');
-
-    const onSubmit = async (data: ResetPasswordFormData) => {
-      dispatch(clearError());
-      
-      try {
-        await dispatch(resetPassword({ token: data.token, password: data.password })).unwrap();
-        setIsSuccess(true);
-      } catch (error) {
-        
-        // Error is handled by Redux
-      }
-    };
+  const onSubmit = async (data: ResetPasswordFormData) => {
+    dispatch(clearError());
+    
+    // Mark as in progress BEFORE the API call to prevent verification during remounts
+    markResetInProgress(data.token);
+    
+    try {
+      await dispatch(resetPassword({ token: data.token, password: data.password })).unwrap();
+      markResetCompleted(data.token); // Mark token as completed
+      setIsSuccess(true);
+    } catch (error) {
+      // Reset failed, allow verification again
+      markResetFailed(data.token);
+      // Error is handled by Redux
+    }
+  };
 
   // Password strength indicator
   const getPasswordStrength = (password: string) => {
@@ -97,11 +171,11 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     
     let score = 0;
     const checks = [
-      { regex: /.{8,}/, point: 1 }, // Length
-      { regex: /[a-z]/, point: 1 }, // Lowercase
-      { regex: /[A-Z]/, point: 1 }, // Uppercase
-      { regex: /\d/, point: 1 }, // Number
-      { regex: /[!@#$%^&*(),.?":{}|<>]/, point: 1 }, // Special char
+      { regex: /.{8,}/, point: 1 },
+      { regex: /[a-z]/, point: 1 },
+      { regex: /[A-Z]/, point: 1 },
+      { regex: /\d/, point: 1 },
+      { regex: /[!@#$%^&*(),.?":{}|<>]/, point: 1 },
     ];
     
     checks.forEach(check => {
@@ -179,7 +253,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     );
   }
 
-  // Success state
+  // Success state - auto-redirects after 2 seconds
   if (isSuccess) {
     return (
       <div className="w-full space-y-6 text-center">
@@ -190,21 +264,9 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
           
           <h1 className="text-3xl font-bold text-white">تم تغيير كلمة المرور!</h1>
           <p className="text-gray-300">
-            تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة
+            تم تغيير كلمة المرور بنجاح. سيتم توجيهك إلى صفحة تسجيل الدخول...
           </p>
         </div>
-
-        <Button
-          onClick={() => router.push('/login')}
-          className="w-full text-black font-bold py-3 rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 group"
-          style={{ 
-            backgroundColor: '#C09B52',
-            boxShadow: '0 10px 30px rgba(192, 155, 82, 0.3)'
-          }}
-        >
-          تسجيل الدخول
-          <ArrowLeft className="mr-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-        </Button>
       </div>
     );
   }
@@ -233,10 +295,8 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Hidden token field */}
         <input type="hidden" {...register('token')} />
 
-        {/* New Password Field */}
         <div className="space-y-2">
           <Label htmlFor="password" className="text-white font-medium">كلمة المرور الجديدة</Label>
           <div className="relative">
@@ -262,7 +322,6 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             </button>
           </div>
 
-          {/* Password Strength Indicator */}
           {watchedPassword && (
             <div className="space-y-2">
               <div className="flex items-center space-x-2 ">
@@ -289,7 +348,6 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
           )}
         </div>
 
-        {/* Confirm Password Field */}
         <div className="space-y-2">
           <Label htmlFor="confirmPassword" className="text-white font-medium">تأكيد كلمة المرور</Label>
           <div className="relative">
@@ -342,7 +400,6 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         </Button>
       </form>
 
-      {/* Password Requirements */}
       <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 space-y-2">
         <h3 className="text-blue-300 font-medium text-sm">متطلبات كلمة المرور:</h3>
         <ul className="text-xs text-blue-200 space-y-1">
