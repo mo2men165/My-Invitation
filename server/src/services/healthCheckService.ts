@@ -3,7 +3,7 @@ import axios, { AxiosError } from 'axios';
 import { logger } from '../config/logger';
 import { emailService } from './emailService';
 
-const HEALTH_CHECK_INTERVAL = 3 * 60 * 1000; // 3 minutes
+const HEALTH_CHECK_INTERVAL = 90 * 1000; // 90 seconds
 const REQUEST_TIMEOUT = 60 * 1000; // 1 minute
 const NOTIFICATION_COOLDOWN = 5 * 60 * 1000; // 5 minutes cooldown between notifications
 
@@ -45,7 +45,7 @@ class HealthCheckService {
     }
 
     this.isRunning = true;
-    logger.info('🏥 Starting Health Check Service - will run continuously every 3 minutes');
+    logger.info('🏥 Starting Health Check Service - will run continuously every 90 seconds');
 
     // Run initial check immediately
     this.checkHealth().catch((error) => {
@@ -59,6 +59,12 @@ class HealthCheckService {
         // If somehow stopped, restart it
         logger.warn('Health check service was stopped, restarting...');
         this.isRunning = true;
+      }
+      
+      // Prevent concurrent pings - skip if already checking
+      if (this.isChecking) {
+        logger.debug('Skipping scheduled health check - check already in progress');
+        return;
       }
       
       this.checkHealth().catch((error) => {
