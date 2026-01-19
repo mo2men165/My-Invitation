@@ -9,6 +9,7 @@ import { connectDatabase } from './config/database';
 import { connectRedis } from './config/redis';
 import { configureCloudinary } from './config/cloudinary';
 import { logger } from './config/logger';
+import { healthCheckService } from './services/healthCheckService';
 
 const PORT = process.env.PORT || 5000;
 
@@ -36,14 +37,20 @@ const startServer = async () => {
 };
 
 // Handle graceful shutdown
+const gracefulShutdown = () => {
+  logger.info('Shutting down gracefully...');
+  healthCheckService.stop();
+  process.exit(0);
+};
+
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
+  gracefulShutdown();
 });
 
 process.on('SIGINT', () => {
   logger.info('SIGINT received, shutting down gracefully');
-  process.exit(0);
+  gracefulShutdown();
 });
 
 startServer();
