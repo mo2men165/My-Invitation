@@ -27,14 +27,11 @@ export const registerSchema = z.object({
     .regex(/^[5][0-9]{8}$/, 'رقم الهاتف السعودي يجب أن يبدأ بـ 5 ويتكون من 9 أرقام'),
   email: z.string()
     .email('عنوان البريد الإلكتروني غير صحيح')
-    .toLowerCase(), // Email is now mandatory
+    .toLowerCase(),
   city: z.enum(saudiCities, {
     message: 'يجب اختيار مدينة من القائمة المحددة'
   }),
-  customCity: z.string()
-    .trim()
-    .optional()
-    .default(''),
+  customCity: z.string().optional(), // Make it optional
   password: z.string()
     .min(8, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل')
     .regex(/^(?=.*[a-z])/, 'كلمة المرور يجب أن تحتوي على حرف صغير واحد على الأقل')
@@ -45,45 +42,33 @@ export const registerSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "كلمات المرور غير متطابقة",
   path: ["confirmPassword"],
-}).refine((data) => {
-  // If city is 'اخري', customCity must be provided and valid
+}).superRefine((data, ctx) => {
   if (data.city === 'اخري') {
-    // Check if customCity is empty
-    if (!data.customCity || data.customCity === '' || data.customCity.trim().length === 0) {
-      return false;
+    if (!data.customCity || data.customCity.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'يجب إدخال اسم المدينة عند اختيار "أخرى"',
+        path: ['customCity'],
+      });
+      return;
     }
-    // Validate length when city is 'اخري'
+    
     const trimmed = data.customCity.trim();
     if (trimmed.length < 2) {
-      return false;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'اسم المدينة يجب أن يكون حرفين على الأقل',
+        path: ['customCity'],
+      });
     }
     if (trimmed.length > 50) {
-      return false;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'اسم المدينة طويل جداً',
+        path: ['customCity'],
+      });
     }
   }
-  // If city is not 'اخري', customCity can be empty (no validation needed)
-  return true;
-}, {
-  message: 'يجب إدخال اسم المدينة عند اختيار "أخرى"',
-  path: ['customCity']
-}).refine((data) => {
-  // Additional validation for min length when city is 'اخري'
-  if (data.city === 'اخري' && data.customCity && data.customCity.trim().length > 0 && data.customCity.trim().length < 2) {
-    return false;
-  }
-  return true;
-}, {
-  message: 'اسم المدينة يجب أن يكون حرفين على الأقل',
-  path: ['customCity']
-}).refine((data) => {
-  // Additional validation for max length when city is 'اخري'
-  if (data.city === 'اخري' && data.customCity && data.customCity.trim().length > 50) {
-    return false;
-  }
-  return true;
-}, {
-  message: 'اسم المدينة طويل جداً',
-  path: ['customCity']
 });
 
 export const loginSchema = z.object({

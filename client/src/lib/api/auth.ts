@@ -45,29 +45,35 @@ class AuthAPI {
   }
 
   async register(data: RegisterFormData): Promise<ApiResponse<{ user: User; tokens: AuthTokens }>> {
-    // Remove confirmPassword before sending to backend
-    const { confirmPassword, ...registerData } = data;
+    // Remove confirmPassword and conditionally remove customCity
+    const { confirmPassword, customCity, ...registerData } = data;
+    
+    // Only include customCity if city is 'اخري' and customCity has a value
+    const payload = data.city === 'اخري' && customCity
+      ? { ...registerData, customCity }
+      : registerData;
     
     const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(registerData),
+      body: JSON.stringify(payload),
     });
-
+  
     const result = await response.json();
     
     if (!response.ok) {
       throw new Error(result.error?.message || 'فشل في إنشاء الحساب');
     }
-
+  
     // Store tokens in localStorage
     if (result.tokens) {
       localStorage.setItem('access_token', result.tokens.access_token);
       localStorage.setItem('refresh_token', result.tokens.refresh_token);
     }
-
+  
     return result;
   }
+     
 
   async login(data: LoginFormData): Promise<ApiResponse<{ user: User; tokens: AuthTokens }>> {
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {

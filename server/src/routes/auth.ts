@@ -75,9 +75,38 @@ router.get('/me', checkJwt, extractUser, async (req: Request, res: Response) => 
 // Register new user
 router.post('/register', async (req: Request, res: Response) => {
   try {
+    // Log incoming request body for debugging
+    logger.info('Registration request received', {
+      body: {
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
+        email: req.body.email,
+        phone: req.body.phone,
+        city: req.body.city,
+        customCity: req.body.customCity,
+        hasPassword: !!req.body.password,
+        hasConfirmPassword: !!req.body.confirmPassword
+      }
+    });
+
     const validationResult = registerSchema.safeParse(req.body);
     
     if (!validationResult.success) {
+      // Log all validation errors for debugging
+      logger.error('Registration validation failed', {
+        errors: validationResult.error.issues.map(issue => ({
+          path: issue.path.join('.'),
+          message: issue.message,
+          code: issue.code
+        })),
+        receivedData: {
+          city: req.body.city,
+          customCity: req.body.customCity,
+          customCityType: typeof req.body.customCity,
+          customCityLength: req.body.customCity?.length
+        }
+      });
+      
       const firstError = validationResult.error.issues[0];
       return res.status(400).json({
         success: false,
@@ -85,7 +114,16 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
+    logger.info('Registration validation passed');
+    
     const userData = transformRegisterData(validationResult.data);
+    
+    logger.info('Transformed registration data', {
+      city: userData.city,
+      customCity: userData.customCity,
+      customCityType: typeof userData.customCity,
+      customCityLength: userData.customCity?.length
+    });
 
     // Check if phone number already exists for the same role
     const existingUserByPhone = await User.findOne({ phone: userData.phone, role: 'user' });
@@ -121,7 +159,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     // Create user in database
-    const user = new User({
+    const userDataForDB = {
       firstName: userData.firstName,
       lastName: userData.lastName,
       name: userData.name,
@@ -131,7 +169,17 @@ router.post('/register', async (req: Request, res: Response) => {
       city: userData.city,
       customCity: userData.city === 'اخري' ? userData.customCity : undefined, // Only set customCity if city is 'اخري'
       status: 'active' // No verification needed
+    };
+    
+    logger.info('Creating user in database', {
+      city: userDataForDB.city,
+      customCity: userDataForDB.customCity,
+      customCityType: typeof userDataForDB.customCity,
+      customCityIsUndefined: userDataForDB.customCity === undefined,
+      customCityIsEmptyString: userDataForDB.customCity === ''
     });
+    
+    const user = new User(userDataForDB);
 
     await user.save();
 
@@ -164,7 +212,12 @@ router.post('/register', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    logger.error('Registration error:', error);
+    logger.error('Registration error:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      ...(error.errors && { mongooseErrors: error.errors })
+    });
     
     // Handle MongoDB duplicate key errors
     if (error.code === 11000) {

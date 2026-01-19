@@ -42,9 +42,10 @@ export function RegisterForm() {
     watch,
     control,
     trigger,
+    clearErrors,
     formState: { errors, isValid, isDirty, touchedFields },
   } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(registerSchema) as any,
     mode: 'all', // Validate on change, blur, and submit to ensure proper validation on mobile
   });
 
@@ -57,9 +58,18 @@ export function RegisterForm() {
                       watchedValues.phone || watchedValues.city || watchedValues.password;
 
   const onSubmit = async (data: RegisterFormData) => {
-    dispatch(clearError());
-    dispatch(registerUser(data));
-  };
+  dispatch(clearError());
+  
+  // Remove customCity from payload if city is not 'اخري'
+  const { customCity, ...rest } = data;
+  const payload = data.city === 'اخري' 
+    ? data 
+    : rest;
+  
+  dispatch(registerUser(payload));
+};
+
+
 
   // Password strength indicator
   const getPasswordStrength = (password: string) => {
@@ -92,7 +102,7 @@ export function RegisterForm() {
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-5">
         {/* Name Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* First Name */}
@@ -219,11 +229,13 @@ export function RegisterForm() {
                     field.onChange(value);
                     // Clear customCity when switching away from 'اخري'
                     if (value !== 'اخري') {
-                      setValue('customCity', '');
+                      setValue('customCity', undefined, { shouldValidate: false }); // Clear without validation
+                      clearErrors('customCity'); // Clear any existing errors
                     }
                     // Explicitly trigger validation on mobile
                     await trigger('city');
-                    if (value !== 'اخري') {
+                    // Only validate customCity if 'اخري' is selected
+                    if (value === 'اخري') {
                       await trigger('customCity');
                     }
                   }}
@@ -373,7 +385,7 @@ export function RegisterForm() {
         <Button
           type="submit"
           className="w-full text-black font-bold py-3 rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 group disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed disabled:transform-none"
-          disabled={isLoading || (hasFormData && (!isValid || Object.keys(errors).length > 0))}
+          disabled={!!(isLoading || (hasFormData && (!isValid || Object.keys(errors).length > 0)))}
           style={{ 
             backgroundColor: isLoading || (hasFormData && (!isValid || Object.keys(errors).length > 0)) ? '#9a7a42' : '#C09B52',
             boxShadow: isLoading || (hasFormData && (!isValid || Object.keys(errors).length > 0)) ? 'none' : '0 10px 30px rgba(192, 155, 82, 0.3)'
