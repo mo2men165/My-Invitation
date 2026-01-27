@@ -13,6 +13,12 @@ interface PasswordResetData {
   used?: boolean; // Marked as used after successful reset (kept for verification during redirect)
 }
 
+// Types for lookup results
+export type LookupResult = 
+  | { found: true; hasEmail: true; email: string }  // User found with email - normal flow
+  | { found: true; hasEmail: false; phone: string }  // User found but registered with phone only
+  | { found: false };  // User not found in database
+
 class PasswordResetService {
   private readonly RESET_TOKEN_EXPIRY = 15 * 60; // 15 minutes in seconds
   private readonly MAX_RESET_ATTEMPTS = 3;
@@ -250,6 +256,137 @@ class PasswordResetService {
     } catch (error) {
       logger.error('Reset token verification error:', error);
       return { valid: false };
+    }
+  }
+
+  /**
+   * Lookup user by email or phone to determine their registration status
+   * Returns information about whether user exists and if they have an email
+   */
+  async lookupUser(identifier: string, type: 'email' | 'phone'): Promise<LookupResult> {
+    try {
+      let user: IUser | null = null;
+
+      if (type === 'email') {
+        user = await User.findOne({ email: identifier.toLowerCase() });
+      } else {
+        // For phone, search with the full international format
+        const fullPhone = identifier.startsWith('+966') ? identifier : `+966${identifier}`;
+        user = await User.findOne({ phone: fullPhone });
+      }
+
+      if (!user) {
+        return { found: false };
+      }
+
+      // User exists - check if they have an email
+      // In this system, email is required during registration, but we're preparing
+      // for users who might have registered with phone-only flow
+      if (user.email && user.email.trim() !== '') {
+        return { found: true, hasEmail: true, email: user.email };
+      } else {
+        return { found: true, hasEmail: false, phone: user.phone };
+      }
+    } catch (error) {
+      logger.error('User lookup error:', error);
+      throw new Error('خطأ في البحث عن المستخدم');
+    }
+  }
+
+  /**
+   * Initiate password reset for a user found by phone number
+   * Stores the provided email in the user's profile and sends reset email to it
+   */
+  async initiatePasswordResetByPhone(phone: string, newEmail: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Check rate limiting using the phone number
+      await this.checkRateLimit(phone);
+
+      // Normalize phone number
+      const fullPhone = phone.startsWith('+966') ? phone : `+966${phone}`;
+      
+      // Find user by phone
+      const user = await User.findOne({ phone: fullPhone });
+
+      if (!user) {
+        throw new Error('لم يتم العثور على حساب مرتبط بهذا الرقم');
+      }
+
+      // Check if user account is active
+      if (user.status !== 'active') {
+        throw new Error('الحساب غير نشط. يرجى التواصل مع الدعم الفني');
+      }
+
+      // Check if the new email is already in use by another user
+      const existingEmailUser = await User.findOne({ 
+        email: newEmail.toLowerCase(), 
+        _id: { $ne: user._id },
+        role: user.role
+      });
+
+      if (existingEmailUser) {
+        throw new Error('البريد الإلكتروني مستخدم بالفعل من قبل مستخدم آخر');
+      }
+
+      // Update user's email in the database
+      const oldEmail = user.email;
+      user.email = newEmail.toLowerCase();
+      await user.save();
+
+      logger.info(`Email updated for user ${user._id} from ${oldEmail} to ${newEmail}`);
+
+      // Generate reset token
+      const token = this.generateResetToken((user._id as Types.ObjectId).toString());
+      
+      // Store reset data with the new email
+      await this.storeResetData(token, {
+        userId: (user._id as Types.ObjectId).toString(),
+        email: newEmail.toLowerCase(),
+        expiresAt: new Date(Date.now() + this.RESET_TOKEN_EXPIRY * 1000)
+      });
+
+      // Send reset email to the new email address (user.email is already updated and saved)
+      await this.sendResetEmail(user, token);
+
+      logger.info(`Password reset initiated for user: ${user._id} via phone lookup`);
+
+      return {
+        success: true,
+        message: 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني الجديد'
+      };
+
+    } catch (error: any) {
+      logger.error('Password reset by phone error:', error);
+      throw new Error(error.message || 'فشل في بدء عملية إعادة تعيين كلمة المرور');
+    }
+  }
+
+  /**
+   * Check if a user exists by email or phone (for explicit user feedback)
+   * Unlike initiatePasswordReset, this explicitly tells if user exists or not
+   */
+  async checkUserExists(identifier: string, type: 'email' | 'phone'): Promise<{ exists: boolean; hasEmail?: boolean }> {
+    try {
+      let user: IUser | null = null;
+
+      if (type === 'email') {
+        user = await User.findOne({ email: identifier.toLowerCase() });
+      } else {
+        const fullPhone = identifier.startsWith('+966') ? identifier : `+966${identifier}`;
+        user = await User.findOne({ phone: fullPhone });
+      }
+
+      if (!user) {
+        return { exists: false };
+      }
+
+      return { 
+        exists: true, 
+        hasEmail: !!(user.email && user.email.trim() !== '')
+      };
+    } catch (error) {
+      logger.error('Check user exists error:', error);
+      throw new Error('خطأ في التحقق من المستخدم');
     }
   }
 }

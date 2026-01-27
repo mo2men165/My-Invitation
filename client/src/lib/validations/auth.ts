@@ -91,6 +91,21 @@ export const forgotPasswordSchema = z.object({
     .toLowerCase()
 });
 
+// Schema for looking up user by phone number
+export const forgotPasswordPhoneSchema = z.object({
+  phone: z.string()
+    .regex(/^[5][0-9]{8}$/, 'رقم الهاتف السعودي يجب أن يبدأ بـ 5 ويتكون من 9 أرقام')
+});
+
+// Schema for initiating password reset by phone with email
+export const forgotPasswordByPhoneSchema = z.object({
+  phone: z.string()
+    .regex(/^[5][0-9]{8}$/, 'رقم الهاتف السعودي يجب أن يبدأ بـ 5 ويتكون من 9 أرقام'),
+  email: z.string()
+    .email('عنوان البريد الإلكتروني غير صحيح')
+    .toLowerCase()
+});
+
 export const resetPasswordSchema = z.object({
   token: z.string().min(1, 'رمز إعادة التعيين مطلوب'),
   password: z.string()
@@ -108,6 +123,8 @@ export const resetPasswordSchema = z.object({
 export type RegisterFormData = z.infer<typeof registerSchema>;
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+export type ForgotPasswordPhoneFormData = z.infer<typeof forgotPasswordPhoneSchema>;
+export type ForgotPasswordByPhoneFormData = z.infer<typeof forgotPasswordByPhoneSchema>;
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
 // Helper function to determine if identifier is email or phone

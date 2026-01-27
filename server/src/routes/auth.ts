@@ -411,6 +411,108 @@ router.post('/logout', checkJwt, extractUser, async (req: Request, res: Response
 });
 
 // Password reset routes
+
+/**
+ * POST /api/auth/lookup-user
+ * Check if a user exists by email or phone for password reset
+ * Returns whether user exists and if they have an email on file
+ */
+router.post('/lookup-user', async (req: Request, res: Response) => {
+  try {
+    const lookupSchema = z.object({
+      identifier: z.string().min(1, 'المعرف مطلوب'),
+      type: z.enum(['email', 'phone'], { message: 'نوع المعرف يجب أن يكون email أو phone' })
+    });
+
+    const validationResult = lookupSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      const firstError = validationResult.error.issues[0];
+      return res.status(400).json({
+        success: false,
+        error: { message: firstError.message }
+      });
+    }
+
+    const { identifier, type } = validationResult.data;
+
+    // Additional validation based on type
+    if (type === 'email') {
+      const emailValidation = z.string().email('البريد الإلكتروني غير صحيح').safeParse(identifier);
+      if (!emailValidation.success) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'البريد الإلكتروني غير صحيح' }
+        });
+      }
+    } else if (type === 'phone') {
+      const phoneValidation = z.string().regex(/^[5][0-9]{8}$/, 'رقم الهاتف السعودي يجب أن يبدأ بـ 5 ويتكون من 9 أرقام').safeParse(identifier);
+      if (!phoneValidation.success) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'رقم الهاتف السعودي يجب أن يبدأ بـ 5 ويتكون من 9 أرقام' }
+        });
+      }
+    }
+
+    const result = await passwordResetService.lookupUser(identifier, type);
+
+    return res.json({
+      success: true,
+      ...result
+    });
+
+  } catch (error: any) {
+    logger.error('Lookup user error:', error);
+    
+    return res.status(400).json({
+      success: false,
+      error: { message: error.message || 'خطأ في البحث عن المستخدم' }
+    });
+  }
+});
+
+/**
+ * POST /api/auth/forgot-password-by-phone
+ * Initiate password reset for a user found by phone number
+ * Requires providing a new email address to receive the reset link
+ */
+router.post('/forgot-password-by-phone', async (req: Request, res: Response) => {
+  try {
+    const phoneResetSchema = z.object({
+      phone: z.string().regex(/^[5][0-9]{8}$/, 'رقم الهاتف السعودي يجب أن يبدأ بـ 5 ويتكون من 9 أرقام'),
+      email: z.string().email('البريد الإلكتروني غير صحيح').toLowerCase()
+    });
+
+    const validationResult = phoneResetSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      const firstError = validationResult.error.issues[0];
+      return res.status(400).json({
+        success: false,
+        error: { message: firstError.message }
+      });
+    }
+
+    const { phone, email } = validationResult.data;
+
+    const result = await passwordResetService.initiatePasswordResetByPhone(phone, email);
+
+    return res.json({
+      success: true,
+      message: result.message
+    });
+
+  } catch (error: any) {
+    logger.error('Forgot password by phone error:', error);
+    
+    return res.status(400).json({
+      success: false,
+      error: { message: error.message || 'فشل في بدء عملية إعادة تعيين كلمة المرور' }
+    });
+  }
+});
+
 router.post('/forgot-password', async (req: Request, res: Response) => {
   try {
     const validationResult = resetPasswordSchema.safeParse(req.body);

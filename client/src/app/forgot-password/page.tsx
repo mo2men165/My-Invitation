@@ -61,10 +61,10 @@ export default function ForgotPasswordPage() {
                 {/* Security Features */}
                 <div className="space-y-4 pt-8">
                   {[
+                    'البحث بالبريد الإلكتروني أو رقم الهاتف',
                     'إعادة تعيين عبر البريد الإلكتروني',
                     'حماية متقدمة لبياناتك',
-                    'استعادة سريعة للحساب',
-                    'دعم فني على مدار الساعة'
+                    'استعادة سريعة للحساب'
                   ].map((feature, index) => (
                     <div key={index} className="flex items-center space-x-3 ">
                       <div 

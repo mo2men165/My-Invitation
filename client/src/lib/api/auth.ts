@@ -1,5 +1,11 @@
 // src/lib/api/auth.ts
-import { RegisterFormData, LoginFormData, ForgotPasswordFormData } from '../validations/auth';
+import { RegisterFormData, LoginFormData, ForgotPasswordFormData, ForgotPasswordByPhoneFormData } from '../validations/auth';
+
+// Types for user lookup response
+export type UserLookupResult = 
+  | { success: true; found: true; hasEmail: true; email: string }  // User found with email
+  | { success: true; found: true; hasEmail: false; phone: string }  // User found but registered with phone only
+  | { success: true; found: false };  // User not found
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -130,6 +136,46 @@ class AuthAPI {
 
   async forgotPassword(data: ForgotPasswordFormData): Promise<ApiResponse> {
     const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في إرسال رابط إعادة التعيين');
+    }
+
+    return result;
+  }
+
+  /**
+   * Look up a user by email or phone to check if they exist
+   * Returns whether user exists and if they have an email on file
+   */
+  async lookupUser(identifier: string, type: 'email' | 'phone'): Promise<UserLookupResult> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/lookup-user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, type }),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'خطأ في البحث عن المستخدم');
+    }
+
+    return result;
+  }
+
+  /**
+   * Initiate password reset for a user found by phone number
+   * Requires providing a new email address to receive the reset link
+   */
+  async forgotPasswordByPhone(data: ForgotPasswordByPhoneFormData): Promise<ApiResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password-by-phone`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
