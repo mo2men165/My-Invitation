@@ -21,11 +21,16 @@ const startServer = async () => {
     await connectDatabase();
     await connectRedis();
 
-    // Start server
-    app.listen(PORT, () => {
-      logger.info(`🚀 Server running on port ${PORT}`);
-      logger.info(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
+    // Only start the server if NOT in Vercel environment
+    // Vercel uses api/index.ts as entry point instead
+    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+      app.listen(PORT, () => {
+        logger.info(`🚀 Server running on port ${PORT}`);
+        logger.info(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+      });
+    } else {
+      logger.info('Running in Vercel environment - server will be handled by serverless function');
+    }
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
@@ -49,3 +54,6 @@ process.on('SIGINT', () => {
 });
 
 startServer();
+
+// Export app for Vercel compatibility
+export default app;
