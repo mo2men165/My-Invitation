@@ -7,8 +7,6 @@ import { connectDatabase } from './config/database';
 import { connectRedis } from './config/redis';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
-import { eventStatusService } from './services/eventStatusService';
-import { healthCheckService } from './services/healthCheckService';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -22,7 +20,6 @@ import adminRoutes from './routes/admin';
 import contactRoutes from './routes/contact';
 import collaborationRoutes from './routes/collaboration';
 import whatsappRoutes from './routes/whatsapp';
-import healthRoutes from './routes/health';
 
 
 const app = express();
@@ -108,10 +105,7 @@ app.use((err: any, req: any, res: any, next: any) => {
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
-    timestamp: new Date().toISOString(),
-    services: {
-      eventStatusChecker: eventStatusService.isStatusCheckerRunning()
-    }
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -130,7 +124,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/collaboration', collaborationRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
-app.use('/api/health', healthRoutes);
 
 
 
@@ -147,26 +140,5 @@ app.use('/', (req, res) => {
 
 // Error handling
 app.use(errorHandler);
-
-/**
- * Initialize services after database connection
- */
-export const initializeServices = async (): Promise<void> => {
-  try {
-    // Start event status checker
-    eventStatusService.startStatusChecker();
-    
-    // Run initial check on startup
-    await eventStatusService.updateExpiredEvents();
-    
-    // Start health check service (self-ping to keep server awake)
-    healthCheckService.start();
-    
-    logger.info('✅ All services initialized successfully');
-  } catch (error) {
-    logger.error('❌ Error initializing services:', error);
-    throw error;
-  }
-};
 
 export default app;

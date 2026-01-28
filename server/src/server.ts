@@ -4,12 +4,11 @@ import dotenv from 'dotenv';
 // Load environment variables FIRST
 dotenv.config();
 
-import app, { initializeServices } from './app';
+import app from './app';
 import { connectDatabase } from './config/database';
 import { connectRedis } from './config/redis';
 import { configureCloudinary } from './config/cloudinary';
 import { logger } from './config/logger';
-import { healthCheckService } from './services/healthCheckService';
 
 const PORT = process.env.PORT || 5000;
 
@@ -21,9 +20,6 @@ const startServer = async () => {
     // Connect to databases
     await connectDatabase();
     await connectRedis();
-
-    // Initialize services (Event Status Service)
-    await initializeServices();
 
     // Start server
     app.listen(PORT, () => {
@@ -39,7 +35,6 @@ const startServer = async () => {
 // Handle graceful shutdown
 const gracefulShutdown = () => {
   logger.info('Shutting down gracefully...');
-  healthCheckService.stop();
   process.exit(0);
 };
 

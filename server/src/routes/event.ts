@@ -4,7 +4,7 @@ import { Event } from '../models/Event';
 import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
-import { eventStatusService } from '../services/eventStatusService';
+// import { eventStatusService } from '../services/eventStatusService';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { phoneValidationSchema, normalizePhoneNumber } from '../utils/phoneValidation';
