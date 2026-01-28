@@ -3,6 +3,18 @@ import axios from 'axios';
 import { logger } from '../config/logger';
 import { Event } from '../models/Event';
 import { Types } from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
+
+// Type for bulk job message types
+export type BulkMessageType = 'invitation' | 'reminder' | 'thank-you';
+
+// Interface for queued job response
+export interface QueuedJobResponse {
+  success: boolean;
+  jobId: string;
+  message: string;
+  guestCount: number;
+}
 
 export class WhatsappService {
   private static readonly WHATSAPP_API_URL = 'https://graph.facebook.com/v18.0';
@@ -1167,75 +1179,91 @@ export class WhatsappService {
   }
 
   /**
-   * Send bulk invitations
+   * Queue a bulk WhatsApp job for background processing
    */
-  static async sendBulkInvitations(eventId: string, guestIds: string[]): Promise<any> {
-    logger.info('=== WHATSAPP BULK: Starting bulk invitation send ===', {
+  private static queueBulkJob(
+    eventId: string,
+    guestIds: string[],
+    messageType: BulkMessageType
+  ): QueuedJobResponse {
+    const jobId = uuidv4();
+    
+    logger.info('=== WHATSAPP QUEUE: Job queued for background processing ===', {
+      jobId,
+      eventId,
+      messageType,
+      guestCount: guestIds.length,
+      timestamp: new Date().toISOString()
+    });
+
+    // Trigger background function (fire and forget)
+    this.triggerBackgroundJob(jobId, eventId, guestIds, messageType);
+
+    return {
+      success: true,
+      jobId,
+      message: `Job queued successfully. ${guestIds.length} guests will be processed in background.`,
+      guestCount: guestIds.length
+    };
+  }
+
+  /**
+   * Trigger the background function to process WhatsApp messages
+   * This is a fire-and-forget operation
+   */
+  private static async triggerBackgroundJob(
+    jobId: string,
+    eventId: string,
+    guestIds: string[],
+    messageType: BulkMessageType
+  ): Promise<void> {
+    try {
+      // Determine base URL
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.SERVER_URL || 'http://localhost:5000';
+
+      const url = `${baseUrl}/api/background/whatsapp`;
+
+      logger.info('Triggering background job', {
+        jobId,
+        url,
+        eventId,
+        guestCount: guestIds.length
+      });
+
+      // Fire and forget - don't await
+      axios.post(url, {
+        eventId,
+        guestIds,
+        messageType
+      }).catch(error => {
+        logger.error('Failed to trigger background job', {
+          jobId,
+          error: error.message,
+          eventId
+        });
+      });
+
+    } catch (error) {
+      logger.error('Error in triggerBackgroundJob', {
+        jobId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Send bulk invitations - queues job for background processing
+   */
+  static async sendBulkInvitations(eventId: string, guestIds: string[]): Promise<QueuedJobResponse> {
+    logger.info('=== WHATSAPP BULK INVITATIONS: Queueing job ===', {
       eventId,
       guestCount: guestIds.length,
       guestIds
     });
 
-    const results = [];
-    let successCount = 0;
-    let failureCount = 0;
-    
-    for (let i = 0; i < guestIds.length; i++) {
-      const guestId = guestIds[i];
-      
-      logger.info(`WHATSAPP BULK: Processing guest ${i + 1}/${guestIds.length}`, {
-        guestId,
-        progress: `${i + 1}/${guestIds.length}`
-      });
-
-      try {
-        const result = await this.sendInvitation(eventId, guestId);
-        results.push({
-          guestId,
-          success: result.success,
-          error: result.error,
-          messageId: result.data?.messageId
-        });
-        
-        if (result.success) {
-          successCount++;
-          logger.info(`WHATSAPP BULK: Guest ${i + 1} SUCCESS`, { guestId });
-        } else {
-          failureCount++;
-          logger.error(`WHATSAPP BULK: Guest ${i + 1} FAILED`, { 
-            guestId, 
-            error: result.error 
-          });
-        }
-        
-        // Add delay between messages to avoid rate limits
-        if (i < guestIds.length - 1) {
-          logger.info('WHATSAPP BULK: Waiting 1 second before next message...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      } catch (error: any) {
-        failureCount++;
-        logger.error(`WHATSAPP BULK: Guest ${i + 1} EXCEPTION`, {
-          guestId,
-          error: error.message,
-          stack: error.stack
-        });
-        results.push({
-          guestId,
-          success: false,
-          error: error.message
-        });
-      }
-    }
-
-    logger.info('=== WHATSAPP BULK: Bulk send complete ===', {
-      eventId,
-      total: guestIds.length,
-      success: successCount,
-      failed: failureCount
-    });
-
-    return results;
+    return this.queueBulkJob(eventId, guestIds, 'invitation');
   }
 
   /**
@@ -1630,11 +1658,11 @@ export class WhatsappService {
   }
 
   /**
-   * Send reminders to all confirmed guests
+   * Send reminders to all confirmed guests - queues job for background processing
    * Premium: 3 days before event
    * VIP: 5 days before event
    */
-  static async sendEventReminders(eventId: string): Promise<{ success: boolean; sent: number; failed: number; results: any[] }> {
+  static async sendEventReminders(eventId: string): Promise<QueuedJobResponse | { success: boolean; sent: number; failed: number; results: any[] }> {
     try {
       const event = await Event.findById(eventId);
       if (!event) {
@@ -1646,69 +1674,38 @@ export class WhatsappService {
         return { success: false, sent: 0, failed: 0, results: [] };
       }
 
-      const results = [];
-      let sent = 0;
-      let failed = 0;
-
-      // Send to guests who accepted RSVP
+      // Get guests who accepted RSVP
       const confirmedGuests = event.guests.filter(g => 
         g.rsvpStatus === 'accepted' && g.whatsappMessageSent
       );
 
-      for (const guest of confirmedGuests) {
-        try {
-          const result = await this.sendReminderMessage(eventId, guest._id!.toString());
-          
-          if (result.success) {
-            sent++;
-            results.push({
-              guestId: guest._id,
-              guestName: guest.name,
-              success: true
-            });
-          } else {
-            failed++;
-            results.push({
-              guestId: guest._id,
-              guestName: guest.name,
-              success: false,
-              error: result.error
-            });
-          }
-
-          // Delay between messages to avoid rate limits
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (error: any) {
-          failed++;
-          results.push({
-            guestId: guest._id,
-            guestName: guest.name,
-            success: false,
-            error: error.message
-          });
-        }
+      if (confirmedGuests.length === 0) {
+        logger.info('WHATSAPP REMINDERS: No confirmed guests to send reminders to', {
+          eventId
+        });
+        return { success: true, sent: 0, failed: 0, results: [] };
       }
 
-      logger.info('Event reminders sent:', {
+      const guestIds = confirmedGuests.map(g => g._id!.toString());
+
+      logger.info('=== WHATSAPP REMINDERS: Queueing job ===', {
         eventId,
         packageType: event.packageType,
-        sent,
-        failed,
-        total: confirmedGuests.length
+        guestCount: guestIds.length
       });
 
-      return { success: true, sent, failed, results };
+      return this.queueBulkJob(eventId, guestIds, 'reminder');
 
     } catch (error: any) {
-      logger.error('Error sending event reminders:', error);
+      logger.error('Error queueing event reminders:', error);
       return { success: false, sent: 0, failed: 0, results: [] };
     }
   }
 
   /**
-   * Send thank you messages to all attended guests (VIP only)
+   * Send thank you messages to all attended guests (VIP only) - queues job for background processing
    */
-  static async sendThankYouMessages(eventId: string): Promise<{ success: boolean; sent: number; failed: number; results: any[] }> {
+  static async sendThankYouMessages(eventId: string): Promise<QueuedJobResponse | { success: boolean; sent: number; failed: number; results: any[] }> {
     try {
       const event = await Event.findById(eventId);
       if (!event) {
@@ -1720,58 +1717,27 @@ export class WhatsappService {
         return { success: false, sent: 0, failed: 0, results: [] };
       }
 
-      const results = [];
-      let sent = 0;
-      let failed = 0;
-
-      // Send to guests who actually attended
+      // Get guests who actually attended
       const attendedGuests = event.guests.filter(g => g.actuallyAttended === true);
 
-      for (const guest of attendedGuests) {
-        try {
-          const result = await this.sendThankYouMessage(eventId, guest._id!.toString());
-          
-          if (result.success) {
-            sent++;
-            results.push({
-              guestId: guest._id,
-              guestName: guest.name,
-              success: true
-            });
-          } else {
-            failed++;
-            results.push({
-              guestId: guest._id,
-              guestName: guest.name,
-              success: false,
-              error: result.error
-            });
-          }
-
-          // Delay between messages to avoid rate limits
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (error: any) {
-          failed++;
-          results.push({
-            guestId: guest._id,
-            guestName: guest.name,
-            success: false,
-            error: error.message
-          });
-        }
+      if (attendedGuests.length === 0) {
+        logger.info('WHATSAPP THANK YOU: No attended guests to send thank you messages to', {
+          eventId
+        });
+        return { success: true, sent: 0, failed: 0, results: [] };
       }
 
-      logger.info('Thank you messages sent:', {
+      const guestIds = attendedGuests.map(g => g._id!.toString());
+
+      logger.info('=== WHATSAPP THANK YOU: Queueing job ===', {
         eventId,
-        sent,
-        failed,
-        total: attendedGuests.length
+        guestCount: guestIds.length
       });
 
-      return { success: true, sent, failed, results };
+      return this.queueBulkJob(eventId, guestIds, 'thank-you');
 
     } catch (error: any) {
-      logger.error('Error sending thank you messages:', error);
+      logger.error('Error queueing thank you messages:', error);
       return { success: false, sent: 0, failed: 0, results: [] };
     }
   }
