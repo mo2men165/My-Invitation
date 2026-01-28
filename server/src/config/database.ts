@@ -45,14 +45,14 @@ export const connectDatabase = async (): Promise<typeof mongoose> => {
 
     global.mongooseCache!.conn = await global.mongooseCache!.promise;
     
-    logger.info('✅ MongoDB connected successfully');
+    logger.info('MongoDB connected');
     return global.mongooseCache!.conn;
   } catch (error) {
     // Reset cache on connection failure
     global.mongooseCache!.promise = null;
     global.mongooseCache!.conn = null;
     
-    logger.error('❌ MongoDB connection failed:', error);
+    logger.error('MongoDB connection failed:', error);
     throw error;
   }
 };

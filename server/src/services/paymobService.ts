@@ -34,20 +34,6 @@ export class PaymobService {
       cancelUrl: process.env.PAYMOB_CANCEL_URL || 'http://localhost:3000/payment/result?reason=cancelled'
     };
 
-    // Debug logging for configuration (without exposing sensitive data)
-    logger.info('Paymob Configuration Check:', {
-      integrationId: this.config.integrationId,
-      iframeId: this.config.iframeId,
-      baseUrl: this.config.baseUrl,
-      currency: this.config.currency,
-      debugMode: this.config.debugMode,
-      hasApiKey: !!this.config.apiKey,
-      hasSecretKey: !!this.config.secretKey,
-      hasPublicKey: !!this.config.publicKey,
-      apiKeyLength: this.config.apiKey?.length || 0,
-      secretKeyLength: this.config.secretKey?.length || 0
-    });
-
     this.validateConfig();
   }
 
@@ -70,11 +56,7 @@ export class PaymobService {
         return this.authToken;
       }
 
-      logger.info('Attempting Paymob authentication...', {
-        baseUrl: this.config.baseUrl,
-        apiKeyPrefix: this.config.apiKey?.substring(0, 10) + '...',
-        apiKeyLength: this.config.apiKey?.length
-      });
+      logger.debug('Paymob authentication attempt');
 
       const response: AxiosResponse<PaymobAuthResponse> = await axios.post(
         `${this.config.baseUrl}/auth/tokens`,

@@ -9,8 +9,7 @@ export const configureCloudinary = (): void => {
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
     if (!cloudName || !apiKey || !apiSecret) {
-      logger.warn('⚠️ Cloudinary credentials not found. Image uploads will not work.');
-      logger.warn('Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in your .env file');
+      logger.warn('Cloudinary credentials missing - image uploads disabled');
       return;
     }
 
@@ -21,9 +20,9 @@ export const configureCloudinary = (): void => {
       secure: true // Use HTTPS
     });
 
-    logger.info('✅ Cloudinary configured successfully');
+    logger.info('Cloudinary configured');
   } catch (error) {
-    logger.error('❌ Cloudinary configuration failed:', error);
+    logger.error('Cloudinary configuration failed:', error);
     throw error;
   }
 };

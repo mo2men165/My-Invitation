@@ -25,11 +25,8 @@ const startServer = async () => {
     // Vercel uses api/index.ts as entry point instead
     if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
       app.listen(PORT, () => {
-        logger.info(`🚀 Server running on port ${PORT}`);
-        logger.info(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+        logger.info(`Server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
       });
-    } else {
-      logger.info('Running in Vercel environment - server will be handled by serverless function');
     }
   } catch (error) {
     logger.error('Failed to start server:', error);
@@ -38,20 +35,13 @@ const startServer = async () => {
 };
 
 // Handle graceful shutdown
-const gracefulShutdown = () => {
-  logger.info('Shutting down gracefully...');
+const gracefulShutdown = (signal: string) => {
+  logger.info(`Shutdown (${signal})`);
   process.exit(0);
 };
 
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  gracefulShutdown();
-});
-
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  gracefulShutdown();
-});
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 startServer();
 

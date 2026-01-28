@@ -54,7 +54,7 @@ export const getRedisClient = async (): Promise<RedisClientType> => {
       });
 
       client.on('connect', () => {
-        logger.info('✅ Redis connected successfully');
+        logger.info('Redis connected');
       });
 
       client.on('disconnect', () => {
@@ -79,7 +79,7 @@ export const getRedisClient = async (): Promise<RedisClientType> => {
     global.redisCache!.promise = null;
     global.redisCache!.client = null;
     
-    logger.error('❌ Redis connection failed:', error);
+    logger.error('Redis connection failed:', error);
     throw error;
   }
 };
