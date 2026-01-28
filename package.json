@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@vercel/node": "^5.5.28",
     "concurrently": "^9.2.0"
   },
   "dependencies": {
