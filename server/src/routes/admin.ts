@@ -1209,9 +1209,23 @@ router.post('/events/:eventId/send-reminders', async (req: Request, res: Respons
 
     logger.info(`Admin ${adminId} triggered reminders for event ${eventId}`, result);
 
+    // Check if result is a queued job response
+    if ('jobId' in result) {
+      return res.json({
+        success: true,
+        message: `تم جدولة المهمة بنجاح. سيتم إرسال تذكيرات لـ ${result.guestCount} ضيف.`,
+        data: {
+          jobId: result.jobId,
+          guestCount: result.guestCount,
+          status: 'queued'
+        }
+      });
+    }
+
+    // Fallback for empty guest list case
     return res.json({
       success: true,
-      message: `تم إرسال ${result.sent} تذكير، فشل ${result.failed}`,
+      message: 'لا يوجد ضيوف مؤكدين لإرسال التذكيرات لهم',
       data: result
     });
 
@@ -1256,9 +1270,23 @@ router.post('/events/:eventId/send-thank-you', async (req: Request, res: Respons
 
     logger.info(`Admin ${adminId} triggered thank you messages for event ${eventId}`, result);
 
+    // Check if result is a queued job response
+    if ('jobId' in result) {
+      return res.json({
+        success: true,
+        message: `تم جدولة المهمة بنجاح. سيتم إرسال رسائل شكر لـ ${result.guestCount} ضيف.`,
+        data: {
+          jobId: result.jobId,
+          guestCount: result.guestCount,
+          status: 'queued'
+        }
+      });
+    }
+
+    // Fallback for empty guest list case
     return res.json({
       success: true,
-      message: `تم إرسال ${result.sent} رسالة شكر، فشل ${result.failed}`,
+      message: 'لا يوجد ضيوف حضروا لإرسال رسائل الشكر لهم',
       data: result
     });
 

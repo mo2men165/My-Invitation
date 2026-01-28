@@ -231,14 +231,24 @@ router.post('/send-event-reminders', async (req: Request, res: Response) => {
 
     const result = await WhatsappService.sendEventReminders(eventId);
 
+    // Check if result is a queued job response
+    if ('jobId' in result) {
+      return res.json({
+        success: true,
+        message: `Job queued successfully. ${result.guestCount} guests will receive reminders.`,
+        data: {
+          jobId: result.jobId,
+          guestCount: result.guestCount,
+          status: 'queued'
+        }
+      });
+    }
+
+    // Fallback for empty guest list case
     return res.json({
-      success: result.success,
-      message: `Reminders sent: ${result.sent}, Failed: ${result.failed}`,
-      data: {
-        sent: result.sent,
-        failed: result.failed,
-        results: result.results
-      }
+      success: true,
+      message: 'No confirmed guests to send reminders to',
+      data: result
     });
   } catch (error: any) {
     logger.error('Error sending event reminders:', error);
@@ -266,14 +276,24 @@ router.post('/send-thank-you-messages', async (req: Request, res: Response) => {
 
     const result = await WhatsappService.sendThankYouMessages(eventId);
 
+    // Check if result is a queued job response
+    if ('jobId' in result) {
+      return res.json({
+        success: true,
+        message: `Job queued successfully. ${result.guestCount} guests will receive thank you messages.`,
+        data: {
+          jobId: result.jobId,
+          guestCount: result.guestCount,
+          status: 'queued'
+        }
+      });
+    }
+
+    // Fallback for empty guest list case
     return res.json({
-      success: result.success,
-      message: `Thank you messages sent: ${result.sent}, Failed: ${result.failed}`,
-      data: {
-        sent: result.sent,
-        failed: result.failed,
-        results: result.results
-      }
+      success: true,
+      message: 'No attended guests to send thank you messages to',
+      data: result
     });
   } catch (error: any) {
     logger.error('Error sending thank you messages:', error);
