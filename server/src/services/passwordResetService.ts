@@ -35,10 +35,10 @@ class PasswordResetService {
    * Store reset token data in Redis
    */
   private async storeResetData(token: string, data: PasswordResetData): Promise<void> {
-    const redis = getRedisClient();
+    const redisClient = await getRedisClient();
     const key = `password_reset:${token}`;
     
-    await redis.setEx(key, this.RESET_TOKEN_EXPIRY, JSON.stringify(data));
+    await redisClient.setEx(key, this.RESET_TOKEN_EXPIRY, JSON.stringify(data));
     logger.info(`Password reset token stored for user: ${data.userId}`);
   }
 
@@ -47,9 +47,9 @@ class PasswordResetService {
    */
   private async getResetData(token: string): Promise<PasswordResetData | null> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       const key = `password_reset:${token}`;
-      const data = await redis.get(key);
+      const data = await redisClient.get(key);
       
       if (!data) {
         return null;
@@ -66,9 +66,9 @@ class PasswordResetService {
    * Delete reset token from Redis
    */
   private async deleteResetToken(token: string): Promise<void> {
-    const redis = getRedisClient();
+    const redisClient = await getRedisClient();
     const key = `password_reset:${token}`;
-    await redis.del(key);
+    await redisClient.del(key);
   }
 
   /**
@@ -77,12 +77,12 @@ class PasswordResetService {
    * while preventing the token from being reused for another reset
    */
   private async markTokenAsUsed(token: string, data: PasswordResetData): Promise<void> {
-    const redis = getRedisClient();
+    const redisClient = await getRedisClient();
     const key = `password_reset:${token}`;
     
     // Update the token data to mark it as used, keep it for 60 seconds to allow redirect
     const usedData: PasswordResetData = { ...data, used: true };
-    await redis.setEx(key, 60, JSON.stringify(usedData)); // 60 seconds should be plenty for redirect
+    await redisClient.setEx(key, 60, JSON.stringify(usedData)); // 60 seconds should be plenty for redirect
     
     logger.info(`Password reset token marked as used for user: ${data.userId}`);
   }
@@ -91,11 +91,11 @@ class PasswordResetService {
    * Check rate limiting for password reset attempts
    */
   private async checkRateLimit(email: string): Promise<void> {
-    const redis = getRedisClient();
+    const redisClient = await getRedisClient();
     const key = `reset_attempts:${email.toLowerCase()}`;
     
-    const attempts = await redis.incr(key);
-    await redis.expire(key, this.LOCKOUT_DURATION);
+    const attempts = await redisClient.incr(key);
+    await redisClient.expire(key, this.LOCKOUT_DURATION);
     
     if (Number(attempts) > this.MAX_RESET_ATTEMPTS) {
       throw new Error('تم تجاوز عدد محاولات إعادة تعيين كلمة المرور. حاول مرة أخرى خلال 30 دقيقة');
@@ -212,8 +212,8 @@ class PasswordResetService {
       await this.markTokenAsUsed(token, resetData);
 
       // Clear rate limit attempts
-      const redis = getRedisClient();
-      await redis.del(`reset_attempts:${resetData.email.toLowerCase()}`);
+      const redisClient = await getRedisClient();
+      await redisClient.del(`reset_attempts:${resetData.email.toLowerCase()}`);
 
       logger.info(`Password reset completed for user: ${user._id}`);
 

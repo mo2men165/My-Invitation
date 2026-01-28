@@ -17,10 +17,10 @@ export class CacheService {
    */
   static async cacheUserCart(userId: string, cart: ICartItem[]): Promise<void> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       const key = this.CACHE_KEYS.USER_CART(userId);
       
-      await redis.setEx(key, this.CACHE_TTL, JSON.stringify(cart));
+      await redisClient.setEx(key, this.CACHE_TTL, JSON.stringify(cart));
       logger.debug(`Cached cart for user ${userId}`);
     } catch (error) {
       logger.error('Error caching user cart:', error);
@@ -33,10 +33,10 @@ export class CacheService {
    */
   static async getCachedUserCart(userId: string): Promise<ICartItem[] | null> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       const key = this.CACHE_KEYS.USER_CART(userId);
       
-      const cached = await redis.get(key);
+      const cached = await redisClient.get(key);
       if (!cached) return null;
       
       const cart = JSON.parse(cached.toString()) as ICartItem[];
@@ -53,10 +53,10 @@ export class CacheService {
    */
   static async cacheUserWishlist(userId: string, wishlist: IWishlistItem[]): Promise<void> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       const key = this.CACHE_KEYS.USER_WISHLIST(userId);
       
-      await redis.setEx(key, this.CACHE_TTL, JSON.stringify(wishlist));
+      await redisClient.setEx(key, this.CACHE_TTL, JSON.stringify(wishlist));
       logger.debug(`Cached wishlist for user ${userId}`);
     } catch (error) {
       logger.error('Error caching user wishlist:', error);
@@ -68,10 +68,10 @@ export class CacheService {
    */
   static async getCachedUserWishlist(userId: string): Promise<IWishlistItem[] | null> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       const key = this.CACHE_KEYS.USER_WISHLIST(userId);
       
-      const cached = await redis.get(key);
+      const cached = await redisClient.get(key);
       if (!cached) return null;
       
       const wishlist = JSON.parse(cached.toString()) as IWishlistItem[];
@@ -88,10 +88,10 @@ export class CacheService {
    */
   static async cacheUserCompare(userId: string, compareList: ICompareItem[]): Promise<void> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       const key = this.CACHE_KEYS.USER_COMPARE(userId);
       
-      await redis.setEx(key, this.CACHE_TTL, JSON.stringify(compareList));
+      await redisClient.setEx(key, this.CACHE_TTL, JSON.stringify(compareList));
       logger.debug(`Cached compare list for user ${userId}`);
     } catch (error) {
       logger.error('Error caching user compare list:', error);
@@ -103,10 +103,10 @@ export class CacheService {
    */
   static async getCachedUserCompare(userId: string): Promise<ICompareItem[] | null> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       const key = this.CACHE_KEYS.USER_COMPARE(userId);
       
-      const cached = await redis.get(key);
+      const cached = await redisClient.get(key);
       if (!cached) return null;
       
       const compareList = JSON.parse(cached.toString()) as ICompareItem[];
@@ -130,10 +130,10 @@ export class CacheService {
     }
   ): Promise<void> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       
       // Use pipeline for better performance
-      const pipeline = redis.multi();
+      const pipeline = redisClient.multi();
       
       pipeline.setEx(
         this.CACHE_KEYS.USER_CART(userId), 
@@ -165,7 +165,7 @@ export class CacheService {
    */
   static async invalidateUserCache(userId: string): Promise<void> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       
       const keys = [
         this.CACHE_KEYS.USER_CART(userId),
@@ -174,7 +174,7 @@ export class CacheService {
         this.CACHE_KEYS.USER_DATA(userId)
       ];
       
-      await redis.del(keys);
+      await redisClient.del(keys);
       logger.debug(`Invalidated cache for user ${userId}`);
     } catch (error) {
       logger.error('Error invalidating user cache:', error);
@@ -186,8 +186,8 @@ export class CacheService {
    */
   static async invalidateUserCartCache(userId: string): Promise<void> {
     try {
-      const redis = getRedisClient();
-      await redis.del(this.CACHE_KEYS.USER_CART(userId));
+      const redisClient = await getRedisClient();
+      await redisClient.del(this.CACHE_KEYS.USER_CART(userId));
       logger.debug(`Invalidated cart cache for user ${userId}`);
     } catch (error) {
       logger.error('Error invalidating cart cache:', error);
@@ -196,8 +196,8 @@ export class CacheService {
 
   static async invalidateUserWishlistCache(userId: string): Promise<void> {
     try {
-      const redis = getRedisClient();
-      await redis.del(this.CACHE_KEYS.USER_WISHLIST(userId));
+      const redisClient = await getRedisClient();
+      await redisClient.del(this.CACHE_KEYS.USER_WISHLIST(userId));
       logger.debug(`Invalidated wishlist cache for user ${userId}`);
     } catch (error) {
       logger.error('Error invalidating wishlist cache:', error);
@@ -206,8 +206,8 @@ export class CacheService {
 
   static async invalidateUserCompareCache(userId: string): Promise<void> {
     try {
-      const redis = getRedisClient();
-      await redis.del(this.CACHE_KEYS.USER_COMPARE(userId));
+      const redisClient = await getRedisClient();
+      await redisClient.del(this.CACHE_KEYS.USER_COMPARE(userId));
       logger.debug(`Invalidated compare cache for user ${userId}`);
     } catch (error) {
       logger.error('Error invalidating compare cache:', error);
@@ -223,12 +223,12 @@ export class CacheService {
     compare: boolean;
   }> {
     try {
-      const redis = getRedisClient();
+      const redisClient = await getRedisClient();
       
       const [cartExists, wishlistExists, compareExists] = await Promise.all([
-        redis.exists(this.CACHE_KEYS.USER_CART(userId)),
-        redis.exists(this.CACHE_KEYS.USER_WISHLIST(userId)),
-        redis.exists(this.CACHE_KEYS.USER_COMPARE(userId))
+        redisClient.exists(this.CACHE_KEYS.USER_CART(userId)),
+        redisClient.exists(this.CACHE_KEYS.USER_WISHLIST(userId)),
+        redisClient.exists(this.CACHE_KEYS.USER_COMPARE(userId))
       ]);
       
       return {
