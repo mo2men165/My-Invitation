@@ -38,9 +38,10 @@ export const connectDatabase = async (): Promise<typeof mongoose> => {
     // Create new connection with serverless-optimized options
     global.mongooseCache!.promise = mongoose.connect(mongoUri, {
       bufferCommands: false,
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
+      maxPoolSize: 1,
+      family: 4
+      // serverSelectionTimeoutMS: 5000,
+      // socketTimeoutMS: 45000,
     });
 
     global.mongooseCache!.conn = await global.mongooseCache!.promise;
