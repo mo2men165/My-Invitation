@@ -19,10 +19,9 @@ const addCollaboratorSchema = z.object({
   name: z.string().min(2, 'الاسم يجب أن يكون على الأقل حرفين').max(100, 'الاسم طويل جداً'),
   email: z.string().email('البريد الإلكتروني غير صحيح').max(255),
   phone: phoneValidationSchema,
-  city: z.enum(['الرياض', 'جدة', 'الدمام', 'المدينة المنورة', 'مكة المكرمة', 'القصيم']).refine(
-    (val) => ['الرياض', 'جدة', 'الدمام', 'المدينة المنورة', 'مكة المكرمة', 'القصيم'].includes(val),
-    { message: 'المدينة غير مدعومة' }
-  ),
+  city: z.enum(['الرياض', 'جدة', 'الدمام', 'المدينة المنورة', 'مكة المكرمة', 'القصيم'], {
+    errorMap: () => ({ message: 'المدينة غير مدعومة' })
+  }),
   allocatedInvites: z.number().min(1, 'يجب تخصيص دعوة واحدة على الأقل').max(500, 'تجاوز الحد الأقصى للدعوات'),
   permissions: z.object({
     canAddGuests: z.boolean().optional(),

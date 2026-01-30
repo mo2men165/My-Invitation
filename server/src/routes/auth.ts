@@ -421,7 +421,9 @@ router.post('/lookup-user', async (req: Request, res: Response) => {
   try {
     const lookupSchema = z.object({
       identifier: z.string().min(1, 'المعرف مطلوب'),
-      type: z.enum(['email', 'phone'], { message: 'نوع المعرف يجب أن يكون email أو phone' })
+      type: z.enum(['email', 'phone'], {
+        errorMap: () => ({ message: 'نوع المعرف يجب أن يكون email أو phone' })
+      })
     });
 
     const validationResult = lookupSchema.safeParse(req.body);

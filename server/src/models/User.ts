@@ -349,7 +349,7 @@ const collaboratedEventSchema = new Schema({
 }, { _id: true });
 
 // User schema
-const userSchema = new Schema<IUser>({
+const userSchema: Schema<IUser> = new Schema({
   firstName: {
     type: String,
     required: true,

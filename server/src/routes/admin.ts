@@ -1204,7 +1204,7 @@ router.post('/events/:eventId/send-reminders', async (req: Request, res: Respons
     }
 
     // Import WhatsappService
-    const { WhatsappService } = await import('../services/whatsappService');
+    const { WhatsappService } = await import('../services/whatsappService.js');
     const result = await WhatsappService.sendEventReminders(eventIdString);
 
     logger.info(`Admin ${adminId} triggered reminders for event ${eventId}`, result);
@@ -1265,7 +1265,7 @@ router.post('/events/:eventId/send-thank-you', async (req: Request, res: Respons
     }
 
     // Import WhatsappService
-    const { WhatsappService } = await import('../services/whatsappService');
+    const { WhatsappService } = await import('../services/whatsappService.js');
     const result = await WhatsappService.sendThankYouMessages(eventIdString);
 
     logger.info(`Admin ${adminId} triggered thank you messages for event ${eventId}`, result);
@@ -1721,7 +1721,7 @@ router.post('/orders/:orderId/complete', async (req: Request, res: Response) => 
     }
 
     // Process the order manually using the same logic as webhook
-    const { OrderService } = await import('../services/orderService');
+    const { OrderService } = await import('../services/orderService.js');
     const result = await OrderService.processSuccessfulPayment(
       order.merchantOrderId,
       transactionId || `ADMIN_MANUAL_${Date.now()}`
@@ -2207,7 +2207,7 @@ router.put('/users/:userId/cart/:cartItemId/price', async (req: Request, res: Re
     await user.save();
 
     // Invalidate cache
-    const { CacheService } = await import('../services/cacheService');
+    const { CacheService } = await import('../services/cacheService.js');
     await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} modified price for cart item ${cartItemId} of user ${userId} to ${price}`);
@@ -2287,7 +2287,7 @@ router.post('/users/:userId/cart/:cartItemId/discount', async (req: Request, res
     await user.save();
 
     // Invalidate cache
-    const { CacheService } = await import('../services/cacheService');
+    const { CacheService } = await import('../services/cacheService.js');
     await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} applied ${percentage}% discount to cart item ${cartItemId} of user ${userId}`);
@@ -2379,7 +2379,7 @@ router.post('/users/:userId/cart/discount-all', async (req: Request, res: Respon
     await user.save();
 
     // Invalidate cache
-    const { CacheService } = await import('../services/cacheService');
+    const { CacheService } = await import('../services/cacheService.js');
     await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} applied ${percentage}% discount to all cart items of user ${userId}`);
@@ -2447,7 +2447,7 @@ router.delete('/users/:userId/cart/:cartItemId/price-modification', async (req: 
     await user.save();
 
     // Invalidate cache
-    const { CacheService } = await import('../services/cacheService');
+    const { CacheService } = await import('../services/cacheService.js');
     await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} removed price modification for cart item ${cartItemId} of user ${userId}`);

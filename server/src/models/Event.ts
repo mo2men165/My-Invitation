@@ -224,7 +224,7 @@ const guestSchema = new Schema<IGuest>({
   }
 }, { _id: true });
 
-const eventSchema = new Schema<IEvent>({
+const eventSchema: Schema<IEvent> = new Schema({
   userId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
