@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../config/logger';
 import { WhatsappService } from '../services/whatsappService';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
+import { withDB } from '../utils/routeUtils';
 
 const router = Router();
 
@@ -72,7 +73,7 @@ router.get('/webhook', (req: Request, res: Response) => {
  * POST /api/whatsapp/webhook
  * Receive messages and status updates from Meta
  */
-router.post('/webhook', async (req: Request, res: Response) => {
+router.post('/webhook', withDB(async (req: Request, res: Response) => {
   try {
     const webhookData = req.body;
     
@@ -100,13 +101,13 @@ router.post('/webhook', async (req: Request, res: Response) => {
     // Still return 200 to avoid retries
     res.status(200).json({ status: 'error', message: error.message });
   }
-});
+}));
 
 /**
  * POST /api/whatsapp/send-invitation
  * Send invitation to a guest
  */
-router.post('/send-invitation', async (req: Request, res: Response) => {
+router.post('/send-invitation', withDB(async (req: Request, res: Response) => {
   try {
     logger.info('=== ROUTE: POST /api/whatsapp/send-invitation - REQUEST RECEIVED ===', {
       hasBody: !!req.body,
@@ -181,13 +182,13 @@ router.post('/send-invitation', async (req: Request, res: Response) => {
       error: { message: 'Failed to send invitation' }
     });
   }
-});
+}));
 
 /**
  * POST /api/whatsapp/send-bulk-invitations
  * Send invitations to multiple guests
  */
-router.post('/send-bulk-invitations', async (req: Request, res: Response) => {
+router.post('/send-bulk-invitations', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId, guestIds } = req.body;
 
@@ -212,13 +213,13 @@ router.post('/send-bulk-invitations', async (req: Request, res: Response) => {
       error: { message: 'Failed to send bulk invitations' }
     });
   }
-});
+}));
 
 /**
  * POST /api/whatsapp/send-event-reminders
  * Send reminders to all confirmed guests (Premium: 3 days, VIP: 5 days before event)
  */
-router.post('/send-event-reminders', async (req: Request, res: Response) => {
+router.post('/send-event-reminders', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId } = req.body;
 
@@ -257,13 +258,13 @@ router.post('/send-event-reminders', async (req: Request, res: Response) => {
       error: { message: 'Failed to send reminders' }
     });
   }
-});
+}));
 
 /**
  * POST /api/whatsapp/send-thank-you-messages
  * Send thank you messages to all attended guests (VIP only - 4 hours after event)
  */
-router.post('/send-thank-you-messages', async (req: Request, res: Response) => {
+router.post('/send-thank-you-messages', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId } = req.body;
 
@@ -302,7 +303,7 @@ router.post('/send-thank-you-messages', async (req: Request, res: Response) => {
       error: { message: 'Failed to send thank you messages' }
     });
   }
-});
+}));
 
 /**
  * GET /api/whatsapp/test-config

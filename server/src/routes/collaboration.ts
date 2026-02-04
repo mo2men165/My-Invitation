@@ -8,6 +8,7 @@ import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { phoneValidationSchema } from '../utils/phoneValidation';
+import { withDB } from '../utils/routeUtils';
 
 const router = Router();
 
@@ -20,7 +21,7 @@ const addCollaboratorSchema = z.object({
   email: z.string().email('البريد الإلكتروني غير صحيح').max(255),
   phone: phoneValidationSchema,
   city: z.enum(['الرياض', 'جدة', 'الدمام', 'المدينة المنورة', 'مكة المكرمة', 'القصيم'], {
-    errorMap: () => ({ message: 'المدينة غير مدعومة' })
+    message: 'المدينة غير مدعومة'
   }),
   allocatedInvites: z.number().min(1, 'يجب تخصيص دعوة واحدة على الأقل').max(500, 'تجاوز الحد الأقصى للدعوات'),
   permissions: z.object({
@@ -45,7 +46,7 @@ const updatePermissionsSchema = z.object({
  * POST /api/collaboration/events/:eventId/collaborators
  * Add a collaborator to an event
  */
-router.post('/events/:eventId/collaborators', async (req: Request, res: Response) => {
+router.post('/events/:eventId/collaborators', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { eventId } = req.params;
@@ -98,13 +99,13 @@ router.post('/events/:eventId/collaborators', async (req: Request, res: Response
       error: { message: 'خطأ في إضافة المتعاون' }
     });
   }
-});
+}));
 
 /**
  * GET /api/collaboration/events/:eventId/collaborators
  * Get collaborators for an event
  */
-router.get('/events/:eventId/collaborators', async (req: Request, res: Response) => {
+router.get('/events/:eventId/collaborators', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { eventId } = req.params;
@@ -147,13 +148,13 @@ router.get('/events/:eventId/collaborators', async (req: Request, res: Response)
       error: { message: 'خطأ في جلب المتعاونين' }
     });
   }
-});
+}));
 
 /**
  * PATCH /api/collaboration/events/:eventId/collaborators/:collaboratorId
  * Update collaborator permissions
  */
-router.patch('/events/:eventId/collaborators/:collaboratorId', async (req: Request, res: Response) => {
+router.patch('/events/:eventId/collaborators/:collaboratorId', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { eventId, collaboratorId } = req.params;
@@ -199,13 +200,13 @@ router.patch('/events/:eventId/collaborators/:collaboratorId', async (req: Reque
       error: { message: 'خطأ في تحديث المتعاون' }
     });
   }
-});
+}));
 
 /**
  * DELETE /api/collaboration/events/:eventId/collaborators/:collaboratorId
  * Remove a collaborator from an event
  */
-router.delete('/events/:eventId/collaborators/:collaboratorId', async (req: Request, res: Response) => {
+router.delete('/events/:eventId/collaborators/:collaboratorId', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { eventId, collaboratorId } = req.params;
@@ -239,13 +240,13 @@ router.delete('/events/:eventId/collaborators/:collaboratorId', async (req: Requ
       error: { message: 'خطأ في إزالة المتعاون' }
     });
   }
-});
+}));
 
 /**
  * GET /api/collaboration/my-events
  * Get user's events (both owned and collaborated)
  */
-router.get('/my-events', async (req: Request, res: Response) => {
+router.get('/my-events', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { role, status, limit = 10, page = 1 } = req.query;
@@ -296,13 +297,13 @@ router.get('/my-events', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب المناسبات' }
     });
   }
-});
+}));
 
 /**
  * GET /api/collaboration/events/:eventId/permissions
  * Get user's permissions for a specific event
  */
-router.get('/events/:eventId/permissions', async (req: Request, res: Response) => {
+router.get('/events/:eventId/permissions', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { eventId } = req.params;
@@ -367,13 +368,13 @@ router.get('/events/:eventId/permissions', async (req: Request, res: Response) =
       error: { message: 'خطأ في التحقق من الصلاحيات' }
     });
   }
-});
+}));
 
 /**
  * GET /api/collaboration/stats
  * Get collaboration statistics for the user
  */
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/stats', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -434,6 +435,6 @@ router.get('/stats', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب الإحصائيات' }
     });
   }
-});
+}));
 
 export default router;

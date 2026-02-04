@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { Event } from '../models/Event';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
+import { withDB } from '../utils/routeUtils';
 import { Types } from 'mongoose';
 import { BillService } from '../services/billService';
 
@@ -14,7 +15,7 @@ router.use(checkJwt, extractUser, requireActiveUser);
  * GET /api/dashboard/stats
  * Get user's dashboard statistics
  */
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/stats', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     
@@ -116,13 +117,13 @@ router.get('/stats', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب إحصائيات لوحة التحكم' }
     });
   }
-});
+}));
 
 /**
  * GET /api/dashboard/recent-orders
  * Get user's recent orders
  */
-router.get('/recent-orders', async (req: Request, res: Response) => {
+router.get('/recent-orders', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { limit = 5 } = req.query;
@@ -197,13 +198,13 @@ router.get('/recent-orders', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب الطلبات الحديثة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/dashboard/bills
  * Get user's bills
  */
-router.get('/bills', async (req: Request, res: Response) => {
+router.get('/bills', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { limit = 20, page = 1 } = req.query;
@@ -236,13 +237,13 @@ router.get('/bills', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب الفواتير' }
     });
   }
-});
+}));
 
 /**
  * GET /api/dashboard/bills/:billId
  * Get a specific bill by ID
  */
-router.get('/bills/:billId', async (req: Request, res: Response) => {
+router.get('/bills/:billId', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const billId = Array.isArray(req.params.billId) ? req.params.billId[0] : req.params.billId;
@@ -270,6 +271,6 @@ router.get('/bills/:billId', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب الفاتورة' }
     });
   }
-});
+}));
 
 export default router;

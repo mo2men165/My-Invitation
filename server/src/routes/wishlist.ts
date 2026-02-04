@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
+import { withDB } from '../utils/routeUtils';
 import { CacheService } from '../services/cacheService';
 import { 
   wishlistItemSchema, 
@@ -20,7 +21,7 @@ router.use(checkJwt, extractUser, requireActiveUser);
  * GET /api/wishlist
  * Get user's wishlist items
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -61,14 +62,14 @@ router.get('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب المفضلة' }
     });
   }
-});
+}));
 
 /**
  * POST /api/wishlist
  * Add item to wishlist
  */
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -143,10 +144,10 @@ router.post('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في إضافة التصميم للمفضلة' }
     });
   }
-});
+}));
 
 
-router.post('/bulk', async (req: Request, res: Response) => {
+router.post('/bulk', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -221,12 +222,12 @@ router.post('/bulk', async (req: Request, res: Response) => {
       error: { message: 'خطأ في إضافة التصاميم للمفضلة' }
     });
   }
-});
+}));
 /**
  * DELETE /api/wishlist/:designId
  * Remove item from wishlist
  */
-router.delete('/:designId', async (req: Request, res: Response) => {
+router.delete('/:designId', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { designId } = req.params;
@@ -279,13 +280,13 @@ router.delete('/:designId', async (req: Request, res: Response) => {
       error: { message: 'خطأ في حذف التصميم من المفضلة' }
     });
   }
-});
+}));
 
 /**
  * DELETE /api/wishlist
  * Clear entire wishlist
  */
-router.delete('/', async (req: Request, res: Response) => {
+router.delete('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -320,13 +321,13 @@ router.delete('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في مسح المفضلة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/wishlist/check/:designId
  * Check if design is in wishlist
  */
-router.get('/check/:designId', async (req: Request, res: Response) => {
+router.get('/check/:designId', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { designId } = req.params;
@@ -375,13 +376,13 @@ router.get('/check/:designId', async (req: Request, res: Response) => {
       error: { message: 'خطأ في فحص المفضلة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/wishlist/count
  * Get wishlist items count
  */
-router.get('/count', async (req: Request, res: Response) => {
+router.get('/count', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -417,6 +418,6 @@ router.get('/count', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب عدد عناصر المفضلة' }
     });
   }
-});
+}));
 
 export default router;

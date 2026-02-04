@@ -9,6 +9,7 @@ import {
   transformRegisterData,
   parseIdentifier
 } from '../utils/validation';
+import { withDB } from '../utils/routeUtils';
 import { authService } from '../services/authService';
 import { passwordResetService } from '../services/passwordResetService';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
@@ -35,7 +36,7 @@ router.get('/protected', checkJwt, extractUser, (req: Request, res: Response) =>
 });
 
 // Get current user profile
-router.get('/me', checkJwt, extractUser, async (req: Request, res: Response) => {
+router.get('/me', checkJwt, extractUser, withDB(async (req: Request, res: Response) => {
   try {
     const user = await User.findById(req.user?.id).select('-password');
     
@@ -70,10 +71,10 @@ router.get('/me', checkJwt, extractUser, async (req: Request, res: Response) => 
       error: { message: 'خطأ في الخادم' }
     });
   }
-});
+}));
 
 // Register new user
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', withDB(async (req: Request, res: Response) => {
   try {
     // Log incoming request body for debugging
     logger.info('Registration request received', {
@@ -240,10 +241,10 @@ router.post('/register', async (req: Request, res: Response) => {
       error: { message: 'خطأ في إنشاء الحساب' }
     });
   }
-});
+}));
 
 // Login user
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', withDB(async (req: Request, res: Response) => {
   try {
     const validationResult = loginSchema.safeParse(req.body);
     
@@ -335,10 +336,10 @@ router.post('/login', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تسجيل الدخول' }
     });
   }
-});
+}));
 
 // Refresh token
-router.post('/refresh', async (req: Request, res: Response) => {
+router.post('/refresh', withDB(async (req: Request, res: Response) => {
   try {
     const { refresh_token } = req.body;
 
@@ -386,7 +387,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
       error: { message: 'فشل في تحديث الجلسة' }
     });
   }
-});
+}));
 
 // Logout (optional - since we're using stateless JWT)
 router.post('/logout', checkJwt, extractUser, async (req: Request, res: Response) => {
@@ -417,12 +418,12 @@ router.post('/logout', checkJwt, extractUser, async (req: Request, res: Response
  * Check if a user exists by email or phone for password reset
  * Returns whether user exists and if they have an email on file
  */
-router.post('/lookup-user', async (req: Request, res: Response) => {
+router.post('/lookup-user', withDB(async (req: Request, res: Response) => {
   try {
     const lookupSchema = z.object({
       identifier: z.string().min(1, 'المعرف مطلوب'),
       type: z.enum(['email', 'phone'], {
-        errorMap: () => ({ message: 'نوع المعرف يجب أن يكون email أو phone' })
+        message: 'نوع المعرف يجب أن يكون email أو phone'
       })
     });
 
@@ -472,14 +473,14 @@ router.post('/lookup-user', async (req: Request, res: Response) => {
       error: { message: error.message || 'خطأ في البحث عن المستخدم' }
     });
   }
-});
+}));
 
 /**
  * POST /api/auth/forgot-password-by-phone
  * Initiate password reset for a user found by phone number
  * Requires providing a new email address to receive the reset link
  */
-router.post('/forgot-password-by-phone', async (req: Request, res: Response) => {
+router.post('/forgot-password-by-phone', withDB(async (req: Request, res: Response) => {
   try {
     const phoneResetSchema = z.object({
       phone: z.string().regex(/^[5][0-9]{8}$/, 'رقم الهاتف السعودي يجب أن يبدأ بـ 5 ويتكون من 9 أرقام'),
@@ -513,9 +514,9 @@ router.post('/forgot-password-by-phone', async (req: Request, res: Response) => 
       error: { message: error.message || 'فشل في بدء عملية إعادة تعيين كلمة المرور' }
     });
   }
-});
+}));
 
-router.post('/forgot-password', async (req: Request, res: Response) => {
+router.post('/forgot-password', withDB(async (req: Request, res: Response) => {
   try {
     const validationResult = resetPasswordSchema.safeParse(req.body);
     
@@ -544,10 +545,10 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
       error: { message: error.message || 'فشل في بدء عملية إعادة تعيين كلمة المرور' }
     });
   }
-});
+}));
 
 // Verify reset token (for frontend to check if token is valid)
-router.get('/verify-reset-token/:token', async (req: Request, res: Response) => {
+router.get('/verify-reset-token/:token', withDB(async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
 
@@ -575,9 +576,9 @@ router.get('/verify-reset-token/:token', async (req: Request, res: Response) => 
       error: { message: 'خطأ في التحقق من الرمز' }
     });
   }
-});
+}));
 
-router.post('/reset-password', async (req: Request, res: Response) => {
+router.post('/reset-password', withDB(async (req: Request, res: Response) => {
   try {
     const { token, password } = req.body;
 
@@ -623,7 +624,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
       error: { message: error.message || 'فشل في إعادة تعيين كلمة المرور' }
     });
   }
-});
+}));
 
 // ==================================================
 // ACCOUNT SETTINGS ENDPOINTS
@@ -633,7 +634,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
  * PUT /api/auth/profile
  * Update user profile information
  */
-router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Request, res: Response) => {
+router.put('/profile', checkJwt, extractUser, requireActiveUser, withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     
@@ -767,13 +768,13 @@ router.put('/profile', checkJwt, extractUser, requireActiveUser, async (req: Req
       error: { message: 'خطأ في تحديث الملف الشخصي' }
     });
   }
-});
+}));
 
 /**
  * POST /api/auth/change-password
  * Change user password
  */
-router.post('/change-password', checkJwt, extractUser, requireActiveUser, async (req: Request, res: Response) => {
+router.post('/change-password', checkJwt, extractUser, requireActiveUser, withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     
@@ -862,13 +863,13 @@ router.post('/change-password', checkJwt, extractUser, requireActiveUser, async 
       error: { message: 'خطأ في تغيير كلمة المرور' }
     });
   }
-});
+}));
 
 /**
  * GET /api/auth/account-stats
  * Get user account statistics
  */
-router.get('/account-stats', checkJwt, extractUser, requireActiveUser, async (req: Request, res: Response) => {
+router.get('/account-stats', checkJwt, extractUser, requireActiveUser, withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     
@@ -901,6 +902,6 @@ router.get('/account-stats', checkJwt, extractUser, requireActiveUser, async (re
       error: { message: 'خطأ في جلب إحصائيات الحساب' }
     });
   }
-});
+}));
 
 export default router;

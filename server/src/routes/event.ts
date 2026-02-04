@@ -4,6 +4,7 @@ import { Event } from '../models/Event';
 import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
+import { withDB } from '../utils/routeUtils';
 // import { eventStatusService } from '../services/eventStatusService';
 import { Types } from 'mongoose';
 import { z } from 'zod';
@@ -64,7 +65,7 @@ function initializeRefundableSlots(event: any): void {
  * GET /api/events
  * Get user's events with filtering options
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { status, approvalStatus, limit = 10, page = 1 } = req.query;
@@ -109,13 +110,13 @@ router.get('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب المناسبات' }
     });
   }
-});
+}));
 
 /**
  * GET /api/events/:id
  * Get specific event with full details including guests
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
@@ -235,13 +236,13 @@ router.get('/:id', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب المناسبة' }
     });
   }
-});
+}));
 
 /**
  * POST /api/events/:id/guests
  * Add guest to event (supports both owners and collaborators)
  */
-router.post('/:id/guests', async (req: Request, res: Response) => {
+router.post('/:id/guests', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
@@ -427,13 +428,13 @@ router.post('/:id/guests', async (req: Request, res: Response) => {
       error: { message: 'خطأ في إضافة الضيف' }
     });
   }
-});
+}));
 
 /**
  * PATCH /api/events/:id/guests/:guestId
  * Update guest information
  */
-router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
+router.patch('/:id/guests/:guestId', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id, guestId } = req.params;
@@ -546,13 +547,13 @@ router.patch('/:id/guests/:guestId', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تحديث بيانات الضيف' }
     });
   }
-});
+}));
 
 /**
  * POST /api/events/:id/guests/confirm
  * Confirm final guest list for all package types
  */
-router.post('/:id/guests/confirm', async (req: Request, res: Response) => {
+router.post('/:id/guests/confirm', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
@@ -625,13 +626,13 @@ router.post('/:id/guests/confirm', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تأكيد قائمة الضيوف' }
     });
   }
-});
+}));
 
 /**
  * DELETE /api/events/:id/guests/:guestId
  * Remove guest from event
  */
-router.delete('/:id/guests/:guestId', async (req: Request, res: Response) => {
+router.delete('/:id/guests/:guestId', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id, guestId } = req.params;
@@ -710,13 +711,13 @@ router.delete('/:id/guests/:guestId', async (req: Request, res: Response) => {
       error: { message: 'خطأ في حذف الضيف' }
     });
   }
-});
+}));
 
 /**
  * POST /api/events/:id/guests/:guestId/whatsapp
  * Mark WhatsApp message as sent for a guest
  */
-router.post('/:id/guests/:guestId/whatsapp', async (req: Request, res: Response) => {
+router.post('/:id/guests/:guestId/whatsapp', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id, guestId } = req.params;
@@ -779,13 +780,13 @@ router.post('/:id/guests/:guestId/whatsapp', async (req: Request, res: Response)
       error: { message: 'خطأ في تحديث حالة الرسالة' }
     });
   }
-});
+}));
 
 /**
  * PATCH /api/events/:id/status
  * Update event status (only allow upcoming -> cancelled)
  */
-router.patch('/:id/status', async (req: Request, res: Response) => {
+router.patch('/:id/status', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
@@ -835,13 +836,13 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تحديث حالة المناسبة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/events/stats
  * Get user's event statistics
  */
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/stats', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -882,6 +883,6 @@ router.get('/stats', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب إحصائيات المناسبات' }
     });
   }
-});
+}));
 
 export default router;

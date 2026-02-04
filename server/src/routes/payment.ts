@@ -9,6 +9,7 @@ import { Order } from '../models/Order';
 import { Event } from '../models/Event';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
+import { withDB } from '../utils/routeUtils';
 import { PaymobWebhookData } from '../types/paymob';
 
 const router = Router();
@@ -33,7 +34,7 @@ router.use((req, res, next) => {
  * GET /api/payment/summary
  * Get payment summary for current cart
  */
-router.get('/summary', async (req: Request, res: Response) => {
+router.get('/summary', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -58,13 +59,13 @@ router.get('/summary', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب ملخص الدفع' }
     });
   }
-});
+}));
 
 /**
  * POST /api/payment/create-paymob-order
  * Create Paymob order and get payment URL
  */
-router.post('/create-paymob-order', async (req: Request, res: Response) => {
+router.post('/create-paymob-order', withDB(async (req: Request, res: Response) => {
   const orderCreationStartTime = Date.now();
   const orderCreationId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
@@ -346,13 +347,13 @@ router.post('/create-paymob-order', async (req: Request, res: Response) => {
       processingTime: totalProcessingTime
     });
   }
-});
+}));
 
 /**
  * POST /api/payment/process
  * Process successful payment and convert cart to events
  */
-router.post('/process', async (req: Request, res: Response) => {
+router.post('/process', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { paymentId, amount, paymentMethod, transactionId } = req.body;
@@ -397,13 +398,13 @@ router.post('/process', async (req: Request, res: Response) => {
       error: { message: error.message || 'خطأ في معالجة الدفع' }
     });
   }
-});
+}));
 
 /**
  * POST /api/payment/failed
  * Handle payment failure
  */
-router.post('/failed', async (req: Request, res: Response) => {
+router.post('/failed', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { paymentId, amount, errorReason } = req.body;
@@ -430,13 +431,13 @@ router.post('/failed', async (req: Request, res: Response) => {
       error: { message: 'خطأ في معالجة فشل الدفع' }
     });
   }
-});
+}));
 
 /**
  * GET /api/payment/paymob/config
  * Get Paymob configuration for frontend
  */
-router.get('/paymob/config', async (req: Request, res: Response) => {
+router.get('/paymob/config', withDB(async (req: Request, res: Response) => {
   try {
     const config = paymobService.getConfig();
     
@@ -451,14 +452,14 @@ router.get('/paymob/config', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب إعدادات الدفع' }
     });
   }
-});
+}));
 
 /**
  * POST /api/payment/paymob/webhook
  * Handle Paymob webhook notifications
  * This route should NOT require authentication as it's called by Paymob
  */
-router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
+router.post('/paymob/webhook', cors(), withDB(async (req: Request, res: Response) => {
   const webhookStartTime = Date.now();
   const webhookId = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
@@ -769,14 +770,14 @@ router.post('/paymob/webhook', cors(), async (req: Request, res: Response) => {
       processingTime: totalProcessingTime
     });
   }
-});
+}));
 
 /**
  * POST /api/payment/paymob/callback
  * Unified callback endpoint for Paymob success/failure redirects
  * This endpoint receives POST data from Paymob and redirects user accordingly
  */
-router.post('/paymob/callback', cors(), async (req: Request, res: Response) => {
+router.post('/paymob/callback', cors(), withDB(async (req: Request, res: Response) => {
   const callbackStartTime = Date.now();
   const callbackId = `callback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
@@ -902,13 +903,13 @@ router.post('/paymob/callback', cors(), async (req: Request, res: Response) => {
     
     return res.redirect(errorUrl);
   }
-});
+}));
 
 /**
  * GET /api/payment/pending-orders
  * Get user's pending orders
  */
-router.get('/pending-orders', async (req: Request, res: Response) => {
+router.get('/pending-orders', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     
@@ -938,13 +939,13 @@ router.get('/pending-orders', async (req: Request, res: Response) => {
       error: { message: error.message || 'خطأ في جلب الطلبات المعلقة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/payment/pending-cart-items
  * Get cart item IDs that are in pending orders
  */
-router.get('/pending-cart-items', async (req: Request, res: Response) => {
+router.get('/pending-cart-items', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     
@@ -961,13 +962,13 @@ router.get('/pending-cart-items', async (req: Request, res: Response) => {
       error: { message: error.message || 'خطأ في جلب العناصر المعلقة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/payment/order/:merchantOrderId
  * Get order data by merchant order ID for payment result page
  */
-router.get('/order/:merchantOrderId', async (req: Request, res: Response) => {
+router.get('/order/:merchantOrderId', withDB(async (req: Request, res: Response) => {
   try {
     const { merchantOrderId } = req.params;
     const userId = req.user!.id;
@@ -1063,13 +1064,13 @@ router.get('/order/:merchantOrderId', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب بيانات الطلب' }
     });
   }
-});
+}));
 
 /**
  * GET /api/payment/paymob/status/:transactionId
  * Get payment status from Paymob
  */
-router.get('/paymob/status/:transactionId', async (req: Request, res: Response) => {
+router.get('/paymob/status/:transactionId', withDB(async (req: Request, res: Response) => {
   try {
     const { transactionId } = req.params;
     const transactionIdString = Array.isArray(transactionId) ? transactionId[0] : transactionId;
@@ -1091,6 +1092,6 @@ router.get('/paymob/status/:transactionId', async (req: Request, res: Response) 
       error: { message: 'خطأ في جلب حالة الدفع' }
     });
   }
-});
+}));
 
 export default router;

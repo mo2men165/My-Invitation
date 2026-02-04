@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
+import { withDB } from '../utils/routeUtils';
 import { CacheService } from '../services/cacheService';
 import { 
   cartItemSchema, 
@@ -20,7 +21,7 @@ router.use(checkJwt, extractUser, requireActiveUser);
  * GET /api/cart
  * Get user's cart items
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -61,13 +62,13 @@ router.get('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب السلة' }
     });
   }
-});
+}));
 
 /**
  * POST /api/cart
  * Add item to cart (no event creation until payment)
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -168,13 +169,13 @@ router.post('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في إضافة العنصر للسلة' }
     });
   }
-});
+}));
 
 /**
  * PATCH /api/cart/:id
  * Update cart item
  */
-router.patch('/:id', async (req: Request, res: Response) => {
+router.patch('/:id', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
@@ -263,13 +264,13 @@ router.patch('/:id', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تحديث العنصر' }
     });
   }
-});
+}));
 
 /**
  * DELETE /api/cart/:id
  * Remove item from cart
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
@@ -322,13 +323,13 @@ router.delete('/:id', async (req: Request, res: Response) => {
       error: { message: 'خطأ في حذف العنصر' }
     });
   }
-});
+}));
 
 /**
  * DELETE /api/cart
  * Clear entire cart
  */
-router.delete('/', async (req: Request, res: Response) => {
+router.delete('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -363,13 +364,13 @@ router.delete('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في مسح السلة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/cart/count
  * Get cart items count (lightweight endpoint)
  */
-router.get('/count', async (req: Request, res: Response) => {
+router.get('/count', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -405,13 +406,13 @@ router.get('/count', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب عدد عناصر السلة' }
     });
   }
-});
+}));
 
 /**
  * POST /api/cart/invalidate-cache
  * Manually invalidate cart cache for current user
  */
-router.post('/invalidate-cache', async (req: Request, res: Response) => {
+router.post('/invalidate-cache', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -429,13 +430,13 @@ router.post('/invalidate-cache', async (req: Request, res: Response) => {
       error: { message: 'خطأ في مسح ذاكرة التخزين المؤقت' }
     });
   }
-});
+}));
 
 /**
  * PATCH /api/cart/:id/field
  * Update specific field in cart item
  */
-router.patch('/:id/field', async (req: Request, res: Response) => {
+router.patch('/:id/field', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { id } = req.params;
@@ -577,6 +578,6 @@ router.patch('/:id/field', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تحديث الحقل' }
     });
   }
-});
+}));
 
 export default router;

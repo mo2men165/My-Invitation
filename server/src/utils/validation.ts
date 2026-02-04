@@ -36,7 +36,7 @@ export const registerSchema = z.object({
     .email('عنوان البريد الإلكتروني غير صحيح')
     .toLowerCase(),
   city: z.enum(saudiCities, {
-    errorMap: () => ({ message: 'يجب اختيار مدينة من القائمة المحددة' })
+    message: 'يجب اختيار مدينة من القائمة المحددة'
   }),
   customCity: z.string()
     .min(2, 'اسم المدينة يجب أن يكون حرفين على الأقل')

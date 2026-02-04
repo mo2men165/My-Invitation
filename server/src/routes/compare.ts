@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
+import { withDB } from '../utils/routeUtils';
 import { CacheService } from '../services/cacheService';
 import { 
   compareItemSchema, 
@@ -20,7 +21,7 @@ router.use(checkJwt, extractUser, requireActiveUser);
  * GET /api/compare
  * Get user's compare list
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -61,13 +62,13 @@ router.get('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب قائمة المقارنة' }
     });
   }
-});
+}));
 
 /**
  * POST /api/compare
  * Add item to compare list
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -142,13 +143,13 @@ router.post('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في إضافة التصميم لقائمة المقارنة' }
     });
   }
-});
+}));
 
 /**
  * POST /api/compare/bulk
  * Replace compare list with new items (max 3)
  */
-router.post('/bulk', async (req: Request, res: Response) => {
+router.post('/bulk', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -210,13 +211,13 @@ router.post('/bulk', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تحديث قائمة المقارنة' }
     });
   }
-});
+}));
 
 /**
  * DELETE /api/compare/:designId
  * Remove item from compare list
  */
-router.delete('/:designId', async (req: Request, res: Response) => {
+router.delete('/:designId', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { designId } = req.params;
@@ -269,13 +270,13 @@ router.delete('/:designId', async (req: Request, res: Response) => {
       error: { message: 'خطأ في حذف التصميم من قائمة المقارنة' }
     });
   }
-});
+}));
 
 /**
  * DELETE /api/compare
  * Clear entire compare list
  */
-router.delete('/', async (req: Request, res: Response) => {
+router.delete('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -310,13 +311,13 @@ router.delete('/', async (req: Request, res: Response) => {
       error: { message: 'خطأ في مسح قائمة المقارنة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/compare/check/:designId
  * Check if design is in compare list
  */
-router.get('/check/:designId', async (req: Request, res: Response) => {
+router.get('/check/:designId', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { designId } = req.params;
@@ -365,13 +366,13 @@ router.get('/check/:designId', async (req: Request, res: Response) => {
       error: { message: 'خطأ في فحص قائمة المقارنة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/compare/count
  * Get compare list items count
  */
-router.get('/count', async (req: Request, res: Response) => {
+router.get('/count', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -407,13 +408,13 @@ router.get('/count', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب عدد عناصر المقارنة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/compare/full
  * Check if compare list is full (3 items)
  */
-router.get('/full', async (req: Request, res: Response) => {
+router.get('/full', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
@@ -451,6 +452,6 @@ router.get('/full', async (req: Request, res: Response) => {
       error: { message: 'خطأ في فحص قائمة المقارنة' }
     });
   }
-});
+}));
 
 export default router;

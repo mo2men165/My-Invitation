@@ -5,6 +5,7 @@ import { User } from '../models/User';
 import { Order } from '../models/Order';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireAdmin } from '../middleware/auth';
+import { withDB } from '../utils/routeUtils';
 import { Types } from 'mongoose';
 import { NotificationService } from '../services/notificationService';
 import { AdminNotification } from '../models/AdminNotification';
@@ -39,7 +40,7 @@ function calculateEffectiveTotalInvited(guests: any[]): number {
  * GET /api/admin/dashboard/stats
  * Admin dashboard overview statistics
  */
-router.get('/dashboard/stats', async (req: Request, res: Response) => {
+router.get('/dashboard/stats', withDB(async (req: Request, res: Response) => {
   try {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -130,7 +131,7 @@ router.get('/dashboard/stats', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب إحصائيات لوحة التحكم' }
     });
   }
-});
+}));
 
 // ============================================
 // EVENT APPROVAL MANAGEMENT
@@ -140,7 +141,7 @@ router.get('/dashboard/stats', async (req: Request, res: Response) => {
  * GET /api/admin/events/pending
  * Get events pending approval
  */
-router.get('/events/pending', async (req: Request, res: Response) => {
+router.get('/events/pending', withDB(async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -262,13 +263,13 @@ router.get('/events/pending', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب الأحداث المعلقة' }
     });
   }
-});
+}));
 
 /**
  * GET /api/admin/events/all
  * Get all events with filtering
  */
-router.get('/events/all', async (req: Request, res: Response) => {
+router.get('/events/all', withDB(async (req: Request, res: Response) => {
   try {
     const { 
       page = 1, 
@@ -412,13 +413,13 @@ router.get('/events/all', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب الأحداث' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/events/:eventId/approve
  * Approve an event with invitation card image upload
  */
-router.post('/events/:eventId/approve', uploadSingleImage, async (req: Request, res: Response) => {
+router.post('/events/:eventId/approve', uploadSingleImage, withDB(async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -541,13 +542,13 @@ router.post('/events/:eventId/approve', uploadSingleImage, async (req: Request, 
       error: { message: 'خطأ في الموافقة على الحدث' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/events/:eventId/reject
  * Reject an event
  */
-router.post('/events/:eventId/reject', async (req: Request, res: Response) => {
+router.post('/events/:eventId/reject', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -598,13 +599,13 @@ router.post('/events/:eventId/reject', async (req: Request, res: Response) => {
       error: { message: 'خطأ في رفض الحدث' }
     });
   }
-});
+}));
 
 /**
  * PUT /api/admin/events/:eventId/image
  * Update event invitation card image (can create if not exists or update if exists)
  */
-router.put('/events/:eventId/image', uploadSingleImage, async (req: Request, res: Response) => {
+router.put('/events/:eventId/image', uploadSingleImage, withDB(async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -697,13 +698,13 @@ router.put('/events/:eventId/image', uploadSingleImage, async (req: Request, res
       error: { message: 'خطأ في تحديث صورة الحدث' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/events/bulk-approve
  * Bulk approve multiple events
  */
-router.post('/events/bulk-approve', async (req: Request, res: Response) => {
+router.post('/events/bulk-approve', withDB(async (req: Request, res: Response) => {
   try {
     const { eventIds, notes } = req.body;
     const adminId = req.user!.id;
@@ -746,7 +747,7 @@ router.post('/events/bulk-approve', async (req: Request, res: Response) => {
       error: { message: 'خطأ في الموافقة الجماعية' }
     });
   }
-});
+}));
 
 // ============================================
 // EVENT GUEST MANAGEMENT
@@ -756,7 +757,7 @@ router.post('/events/bulk-approve', async (req: Request, res: Response) => {
  * GET /api/admin/events/:eventId/guests
  * Get all guests for a specific event (admin only)
  */
-router.get('/events/:eventId/guests', async (req: Request, res: Response) => {
+router.get('/events/:eventId/guests', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -870,13 +871,13 @@ router.get('/events/:eventId/guests', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب ضيوف المناسبة' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/events/:eventId/guests/:guestId/whatsapp
  * Mark WhatsApp message as sent for a guest (admin only)
  */
-router.post('/events/:eventId/guests/:guestId/whatsapp', async (req: Request, res: Response) => {
+router.post('/events/:eventId/guests/:guestId/whatsapp', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId, guestId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -917,13 +918,13 @@ router.post('/events/:eventId/guests/:guestId/whatsapp', async (req: Request, re
       error: { message: 'خطأ في تحديث حالة الرسالة' }
     });
   }
-});
+}));
 
 /**
  * PUT /api/admin/events/:eventId/guests/:guestId/invite-image
  * Update individual invite image for a guest (premium and VIP packages only)
  */
-router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, async (req: Request, res: Response) => {
+router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, withDB(async (req: Request, res: Response) => {
   try {
     const { eventId, guestId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -1049,13 +1050,13 @@ router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, a
       error: { message: 'خطأ في تحديث صورة الدعوة' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/events/:eventId/reopen-guest-list
  * Reopen guest list for users after confirmation (all package types)
  */
-router.post('/events/:eventId/reopen-guest-list', async (req: Request, res: Response) => {
+router.post('/events/:eventId/reopen-guest-list', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -1108,13 +1109,13 @@ router.post('/events/:eventId/reopen-guest-list', async (req: Request, res: Resp
       error: { message: 'خطأ في إعادة فتح قائمة الضيوف' }
     });
   }
-});
+}));
 
 /**
  * PUT /api/admin/events/:eventId/guests/:guestId/attendance
  * Mark guest attendance (VIP packages only - post-event)
  */
-router.put('/events/:eventId/guests/:guestId/attendance', async (req: Request, res: Response) => {
+router.put('/events/:eventId/guests/:guestId/attendance', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId, guestId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -1175,13 +1176,13 @@ router.put('/events/:eventId/guests/:guestId/attendance', async (req: Request, r
       error: { message: 'خطأ في تسجيل الحضور' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/events/:eventId/send-reminders
  * Send reminder messages to all confirmed guests (Premium: 3 days, VIP: 5 days)
  */
-router.post('/events/:eventId/send-reminders', async (req: Request, res: Response) => {
+router.post('/events/:eventId/send-reminders', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -1236,13 +1237,13 @@ router.post('/events/:eventId/send-reminders', async (req: Request, res: Respons
       error: { message: 'خطأ في إرسال التذكيرات' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/events/:eventId/send-thank-you
  * Send thank you messages to all attended guests (VIP only - after event)
  */
-router.post('/events/:eventId/send-thank-you', async (req: Request, res: Response) => {
+router.post('/events/:eventId/send-thank-you', withDB(async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -1297,7 +1298,7 @@ router.post('/events/:eventId/send-thank-you', async (req: Request, res: Respons
       error: { message: 'خطأ في إرسال رسائل الشكر' }
     });
   }
-});
+}));
 
 // ============================================
 // USER MANAGEMENT
@@ -1307,7 +1308,7 @@ router.post('/events/:eventId/send-thank-you', async (req: Request, res: Respons
  * GET /api/admin/users
  * Get all users with pagination and filtering
  */
-router.get('/users', async (req: Request, res: Response) => {
+router.get('/users', withDB(async (req: Request, res: Response) => {
   try {
     const { 
       page = 1, 
@@ -1390,13 +1391,13 @@ router.get('/users', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب المستخدمين' }
     });
   }
-});
+}));
 
 /**
  * PUT /api/admin/users/:userId/status
  * Update user status (active/suspended)
  */
-router.put('/users/:userId/status', async (req: Request, res: Response) => {
+router.put('/users/:userId/status', withDB(async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const userIdString = Array.isArray(userId) ? userId[0] : userId;
@@ -1443,13 +1444,13 @@ router.put('/users/:userId/status', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تحديث حالة المستخدم' }
     });
   }
-});
+}));
 
 /**
  * PUT /api/admin/users/:userId/role
  * Update user role (user/admin)
  */
-router.put('/users/:userId/role', async (req: Request, res: Response) => {
+router.put('/users/:userId/role', withDB(async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const userIdString = Array.isArray(userId) ? userId[0] : userId;
@@ -1488,7 +1489,7 @@ router.put('/users/:userId/role', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تحديث دور المستخدم' }
     });
   }
-});
+}));
 
 // ============================================
 // ORDER MANAGEMENT
@@ -1498,7 +1499,7 @@ router.put('/users/:userId/role', async (req: Request, res: Response) => {
  * GET /api/admin/orders
  * Get all orders with filtering and pagination
  */
-router.get('/orders', async (req: Request, res: Response) => {
+router.get('/orders', withDB(async (req: Request, res: Response) => {
   try {
     const { 
       page = 1, 
@@ -1613,13 +1614,13 @@ router.get('/orders', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب الطلبات' }
     });
   }
-});
+}));
 
 /**
  * GET /api/admin/orders/:orderId
  * Get detailed information about a specific order
  */
-router.get('/orders/:orderId', async (req: Request, res: Response) => {
+router.get('/orders/:orderId', withDB(async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
     const orderIdString = Array.isArray(orderId) ? orderId[0] : orderId;
@@ -1692,13 +1693,13 @@ router.get('/orders/:orderId', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب تفاصيل الطلب' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/orders/:orderId/complete
  * Manually mark order as completed and create events
  */
-router.post('/orders/:orderId/complete', async (req: Request, res: Response) => {
+router.post('/orders/:orderId/complete', withDB(async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
     const orderIdString = Array.isArray(orderId) ? orderId[0] : orderId;
@@ -1758,13 +1759,13 @@ router.post('/orders/:orderId/complete', async (req: Request, res: Response) => 
       error: { message: 'خطأ في تأكيد الطلب' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/orders/:orderId/fail
  * Manually mark order as failed
  */
-router.post('/orders/:orderId/fail', async (req: Request, res: Response) => {
+router.post('/orders/:orderId/fail', withDB(async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
     const orderIdString = Array.isArray(orderId) ? orderId[0] : orderId;
@@ -1812,13 +1813,13 @@ router.post('/orders/:orderId/fail', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تحديث حالة الطلب' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/orders/:orderId/cancel
  * Manually cancel order
  */
-router.post('/orders/:orderId/cancel', async (req: Request, res: Response) => {
+router.post('/orders/:orderId/cancel', withDB(async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
     const orderIdString = Array.isArray(orderId) ? orderId[0] : orderId;
@@ -1866,13 +1867,13 @@ router.post('/orders/:orderId/cancel', async (req: Request, res: Response) => {
       error: { message: 'خطأ في إلغاء الطلب' }
     });
   }
-});
+}));
 
 /**
  * GET /api/admin/collaboration/analytics
  * Get detailed collaboration analytics
  */
-router.get('/collaboration/analytics', async (req: Request, res: Response) => {
+router.get('/collaboration/analytics', withDB(async (req: Request, res: Response) => {
   try {
     // Get collaboration statistics
     const [
@@ -2006,13 +2007,13 @@ router.get('/collaboration/analytics', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب تحليلات التعاون' }
     });
   }
-});
+}));
 
 /**
  * GET /api/admin/notifications
  * Get admin notifications
  */
-router.get('/notifications', async (req: Request, res: Response) => {
+router.get('/notifications', withDB(async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 20, unreadOnly = false } = req.query;
     const adminId = req.user!.id;
@@ -2066,13 +2067,13 @@ router.get('/notifications', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب الإشعارات' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/notifications/:id/read
  * Mark notification as read
  */
-router.post('/notifications/:id/read', async (req: Request, res: Response) => {
+router.post('/notifications/:id/read', withDB(async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const idString = Array.isArray(id) ? id[0] : id;
@@ -2092,7 +2093,7 @@ router.post('/notifications/:id/read', async (req: Request, res: Response) => {
       error: { message: 'خطأ في تحديث الإشعار' }
     });
   }
-});
+}));
 
 // ============================================
 // USER CART MANAGEMENT
@@ -2102,7 +2103,7 @@ router.post('/notifications/:id/read', async (req: Request, res: Response) => {
  * GET /api/admin/users/:userId/cart
  * Get user's cart items (admin only)
  */
-router.get('/users/:userId/cart', async (req: Request, res: Response) => {
+router.get('/users/:userId/cart', withDB(async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const userIdString = Array.isArray(userId) ? userId[0] : userId;
@@ -2153,13 +2154,13 @@ router.get('/users/:userId/cart', async (req: Request, res: Response) => {
       error: { message: 'خطأ في جلب سلة المستخدم' }
     });
   }
-});
+}));
 
 /**
  * PUT /api/admin/users/:userId/cart/:cartItemId/price
  * Update cart item price manually (admin only)
  */
-router.put('/users/:userId/cart/:cartItemId/price', async (req: Request, res: Response) => {
+router.put('/users/:userId/cart/:cartItemId/price', withDB(async (req: Request, res: Response) => {
   try {
     const { userId, cartItemId } = req.params;
     const userIdString = Array.isArray(userId) ? userId[0] : userId;
@@ -2227,13 +2228,13 @@ router.put('/users/:userId/cart/:cartItemId/price', async (req: Request, res: Re
       error: { message: 'خطأ في تحديث السعر' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/users/:userId/cart/:cartItemId/discount
  * Apply percentage discount to cart item (admin only)
  */
-router.post('/users/:userId/cart/:cartItemId/discount', async (req: Request, res: Response) => {
+router.post('/users/:userId/cart/:cartItemId/discount', withDB(async (req: Request, res: Response) => {
   try {
     const { userId, cartItemId } = req.params;
     const userIdString = Array.isArray(userId) ? userId[0] : userId;
@@ -2310,13 +2311,13 @@ router.post('/users/:userId/cart/:cartItemId/discount', async (req: Request, res
       error: { message: 'خطأ في تطبيق الخصم' }
     });
   }
-});
+}));
 
 /**
  * POST /api/admin/users/:userId/cart/discount-all
  * Apply percentage discount to all cart items (admin only)
  */
-router.post('/users/:userId/cart/discount-all', async (req: Request, res: Response) => {
+router.post('/users/:userId/cart/discount-all', withDB(async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const userIdString = Array.isArray(userId) ? userId[0] : userId;
@@ -2400,13 +2401,13 @@ router.post('/users/:userId/cart/discount-all', async (req: Request, res: Respon
       error: { message: 'خطأ في تطبيق الخصم' }
     });
   }
-});
+}));
 
 /**
  * DELETE /api/admin/users/:userId/cart/:cartItemId/price-modification
  * Remove admin price modification and restore original price (admin only)
  */
-router.delete('/users/:userId/cart/:cartItemId/price-modification', async (req: Request, res: Response) => {
+router.delete('/users/:userId/cart/:cartItemId/price-modification', withDB(async (req: Request, res: Response) => {
   try {
     const { userId, cartItemId } = req.params;
     const userIdString = Array.isArray(userId) ? userId[0] : userId;
@@ -2467,6 +2468,6 @@ router.delete('/users/:userId/cart/:cartItemId/price-modification', async (req: 
       error: { message: 'خطأ في إعادة السعر الأصلي' }
     });
   }
-});
+}));
 
 export default router;

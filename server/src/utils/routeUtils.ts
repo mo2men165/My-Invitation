@@ -1,6 +1,7 @@
 // server/src/utils/routeUtils.ts - Shared utilities for server routes
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../config/logger';
+import { connectDatabase } from '../config/database';
 
 // Common response types
 export interface ApiResponse<T = any> {
@@ -111,6 +112,37 @@ export const handleAsyncError = (
 ) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+/**
+ * Higher-order function that ensures MongoDB is connected before executing the handler.
+ * Uses the cached connection from connectDatabase() to avoid creating new connections per request.
+ * Compatible with serverless (Vercel) deployments.
+ * 
+ * @param handler - The async route handler function
+ * @returns A wrapped handler that ensures DB connection before execution
+ * 
+ * @example
+ * router.get('/users', withDB(async (req, res) => {
+ *   const users = await User.find();
+ *   res.json(users);
+ * }));
+ */
+export const withDB = (
+  handler: (req: Request, res: Response, next: NextFunction) => Promise<any>
+) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Ensure MongoDB is connected before executing the handler
+      await connectDatabase();
+      console.log('MongoDB connected from helper function');
+      // Execute the handler
+      await handler(req, res, next);
+    } catch (error) {
+      // Pass errors to Express error handler
+      next(error);
+    }
   };
 };
 
