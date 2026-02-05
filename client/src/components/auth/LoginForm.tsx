@@ -21,6 +21,11 @@ export function LoginForm() {
   const { isLoading, error, isAuthenticated, user } = useAppSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Clear any stale errors when component mounts
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
   // Redirect when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {

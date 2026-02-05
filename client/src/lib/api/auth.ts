@@ -1,6 +1,49 @@
 // src/lib/api/auth.ts
 import { RegisterFormData, LoginFormData, ForgotPasswordFormData, ForgotPasswordByPhoneFormData } from '../validations/auth';
 
+/**
+ * Sanitize error messages to hide technical details from users
+ * Converts network/fetch errors to user-friendly Arabic messages
+ */
+function sanitizeErrorMessage(error: any): string {
+  const message = error?.message || String(error);
+  
+  // Network/fetch errors - server unreachable
+  if (
+    message.includes('Failed to fetch') ||
+    message.includes('NetworkError') ||
+    message.includes('net::ERR_') ||
+    message.includes('ECONNREFUSED') ||
+    message.includes('ETIMEDOUT') ||
+    message.includes('fetch') && error.name === 'TypeError'
+  ) {
+    return 'الخادم غير متاح حالياً. يرجى المحاولة مرة أخرى لاحقاً';
+  }
+  
+  // Timeout errors
+  if (message.includes('timeout') || message.includes('Timeout')) {
+    return 'انتهت مهلة الاتصال. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى';
+  }
+  
+  // CORS errors (shouldn't normally happen in production)
+  if (message.includes('CORS') || message.includes('cross-origin')) {
+    return 'خطأ في الاتصال بالخادم. يرجى المحاولة مرة أخرى';
+  }
+  
+  // Generic network errors
+  if (message.includes('network') || message.includes('Network')) {
+    return 'خطأ في الشبكة. يرجى التحقق من اتصالك بالإنترنت';
+  }
+  
+  // If it's already a user-friendly Arabic message, return as-is
+  if (/[\u0600-\u06FF]/.test(message)) {
+    return message;
+  }
+  
+  // For any other unhandled error, return generic message
+  return 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى';
+}
+
 // Types for user lookup response
 export type UserLookupResult = 
   | { success: true; found: true; hasEmail: true; email: string }  // User found with email
@@ -51,56 +94,64 @@ class AuthAPI {
   }
 
   async register(data: RegisterFormData): Promise<ApiResponse<{ user: User; tokens: AuthTokens }>> {
-    // Remove confirmPassword and conditionally remove customCity
-    const { confirmPassword, customCity, ...registerData } = data;
+    try {
+      // Remove confirmPassword and conditionally remove customCity
+      const { confirmPassword, customCity, ...registerData } = data;
+      
+      // Only include customCity if city is 'اخري' and customCity has a value
+      const payload = data.city === 'اخري' && customCity
+        ? { ...registerData, customCity }
+        : registerData;
+      
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
     
-    // Only include customCity if city is 'اخري' and customCity has a value
-    const payload = data.city === 'اخري' && customCity
-      ? { ...registerData, customCity }
-      : registerData;
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في إنشاء الحساب');
+      }
     
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  
-    const result = await response.json();
+      // Store tokens in localStorage
+      if (result.tokens) {
+        localStorage.setItem('access_token', result.tokens.access_token);
+        localStorage.setItem('refresh_token', result.tokens.refresh_token);
+      }
     
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في إنشاء الحساب');
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error));
     }
-  
-    // Store tokens in localStorage
-    if (result.tokens) {
-      localStorage.setItem('access_token', result.tokens.access_token);
-      localStorage.setItem('refresh_token', result.tokens.refresh_token);
-    }
-  
-    return result;
   }
      
 
   async login(data: LoginFormData): Promise<ApiResponse<{ user: User; tokens: AuthTokens }>> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في تسجيل الدخول');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في تسجيل الدخول');
+      }
+
+      // Store tokens in localStorage
+      if (result.tokens) {
+        localStorage.setItem('access_token', result.tokens.access_token);
+        localStorage.setItem('refresh_token', result.tokens.refresh_token);
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error));
     }
-
-    // Store tokens in localStorage
-    if (result.tokens) {
-      localStorage.setItem('access_token', result.tokens.access_token);
-      localStorage.setItem('refresh_token', result.tokens.refresh_token);
-    }
-
-    return result;
   }
 
   async logout(): Promise<void> {
@@ -120,34 +171,42 @@ class AuthAPI {
   }
 
   async getCurrentUser(): Promise<ApiResponse<{ user: User }>> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-      method: 'GET',
-      headers: this.getAuthHeaders(),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في جلب بيانات المستخدم');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في جلب بيانات المستخدم');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error));
     }
-
-    return result;
   }
 
   async forgotPassword(data: ForgotPasswordFormData): Promise<ApiResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في إرسال رابط إعادة التعيين');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في إرسال رابط إعادة التعيين');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error));
     }
-
-    return result;
   }
 
   /**
@@ -155,19 +214,23 @@ class AuthAPI {
    * Returns whether user exists and if they have an email on file
    */
   async lookupUser(identifier: string, type: 'email' | 'phone'): Promise<UserLookupResult> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/lookup-user`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, type }),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/lookup-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, type }),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'خطأ في البحث عن المستخدم');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'خطأ في البحث عن المستخدم');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error));
     }
-
-    return result;
   }
 
   /**
@@ -175,57 +238,62 @@ class AuthAPI {
    * Requires providing a new email address to receive the reset link
    */
   async forgotPasswordByPhone(data: ForgotPasswordByPhoneFormData): Promise<ApiResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password-by-phone`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password-by-phone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في إرسال رابط إعادة التعيين');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في إرسال رابط إعادة التعيين');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error));
     }
-
-    return result;
   }
 
   async resetPassword(token: string, password: string): Promise<ApiResponse> {
-    console.log('[AUTH API] Sending reset password request...');
-    
-    const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, password }),
-    });
-  
-    console.log('[AUTH API] Response received:', response.status);
-    
-    const result = await response.json();
-    console.log('[AUTH API] Response data:', result);
-    
-    if (!response.ok) {
-      console.log('[AUTH API] Throwing error');
-      throw new Error(result.error?.message || 'فشل في إعادة تعيين كلمة المرور');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في إعادة تعيين كلمة المرور');
+      }
+      
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error));
     }
-    
-    console.log('[AUTH API] Returning result');
-    return result;
   }
 
   async verifyResetToken(token: string): Promise<{ success: boolean; valid: boolean; email?: string }> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/verify-reset-token/${token}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/verify-reset-token/${token}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في التحقق من الرمز');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في التحقق من الرمز');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error));
     }
-
-    return result;
   }
 
   async refreshToken(): Promise<AuthTokens> {
@@ -265,11 +333,8 @@ class AuthAPI {
         token_type: result.token_type || 'Bearer'
       };
     } catch (error: any) {
-      // If it's a network error, don't clear tokens
-      if (error.name === 'TypeError' || error.message.includes('fetch')) {
-        throw new Error('خطأ في الشبكة. يرجى المحاولة مرة أخرى');
-      }
-      throw error;
+      // If it's a network error, use sanitized message
+      throw new Error(sanitizeErrorMessage(error));
     }
   }
 

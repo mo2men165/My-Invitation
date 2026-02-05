@@ -63,6 +63,11 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     return sessionStorage.getItem(`reset_status_${token}`) === 'completed';
   });
   
+  // Clear any stale errors when component mounts
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
   // Sync isSuccess with sessionStorage on mount and periodically
   // This handles the case where the async reset completes after a remount
   useEffect(() => {

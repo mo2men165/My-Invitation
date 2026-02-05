@@ -4,6 +4,7 @@ import { authService } from '../services/authService';
 import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { Types } from 'mongoose';
+import { connectDatabase } from '../config/database';
 
 // Extend Express Request interface to include user
 declare global {
@@ -77,6 +78,9 @@ export const extractUser = async (req: Request, res: Response, next: NextFunctio
     // The user info is already in req.user from checkJwt
     // We can optionally fetch fresh data from database if needed
     if (req.user?.id) {
+      // Ensure MongoDB is connected before querying
+      await connectDatabase();
+      
       const user = await User.findById(req.user.id).select('-password');
       
       if (!user) {

@@ -1,6 +1,7 @@
 // server/src/services/eventStatusService.ts
 import { Event } from '../models/Event';
 import { logger } from '../config/logger';
+import { connectDatabase } from '../config/database';
 
 /**
  * Calculate the exact end time of an event
@@ -15,9 +16,13 @@ export function calculateEventEndTime(eventDate: Date, endTime: string): Date {
 
 /**
  * Update events that have passed their end time to 'done' status
+ * Can be called from cron jobs or serverless functions
  */
 export async function updateExpiredEvents(): Promise<void> {
   try {
+    // Ensure MongoDB is connected (safe for serverless)
+    await connectDatabase();
+    
     const now = new Date();
     
     // Find events where end time has passed

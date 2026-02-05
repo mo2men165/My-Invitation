@@ -24,6 +24,11 @@ export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Clear any stale errors when component mounts
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
   // Redirect when authenticated
   useEffect(() => {
     if (isAuthenticated && user) {

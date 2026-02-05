@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAppDispatch, useAppSelector } from '@/store';
@@ -50,6 +50,11 @@ export function ForgotPasswordForm() {
     lookupError: null,
     isLookingUp: false,
   });
+
+  // Clear any stale errors when component mounts
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
 
   // Email form
   const emailForm = useForm<ForgotPasswordFormData>({
