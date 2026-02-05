@@ -282,11 +282,16 @@ const CartModal = memo<CartModalProps>(({
       resetForm();
       onClose();
     } catch (error: any) {
+      // Redux thunks with rejectWithValue throw the error message as a string
+      const errorMessage = typeof error === 'string' 
+        ? error 
+        : (error?.response?.data?.error?.message || error?.message || (state.isEditMode ? "فشل في تحديث العنصر" : "فشل في إضافة العنصر للسلة"));
+      
       toast({
         title: state.isEditMode ? "خطأ في التحديث" : "خطأ في الإضافة",
-        description: error?.response?.data?.error?.message || error?.message || (state.isEditMode ? "فشل في تحديث العنصر" : "فشل في إضافة العنصر للسلة"),
+        description: errorMessage,
         variant: "destructive",
-        duration: 3000
+        duration: 5000 // Longer duration for error messages so users can read them
       });
     }
   }, [

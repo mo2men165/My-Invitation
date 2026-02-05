@@ -1,6 +1,49 @@
 // src/lib/api/cart.ts
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
+/**
+ * Sanitize error messages to hide technical details from users
+ * Converts network/fetch errors to user-friendly Arabic messages
+ */
+function sanitizeErrorMessage(error: any, defaultMessage: string): string {
+  const message = error?.message || String(error);
+  
+  // Network/fetch errors - server unreachable
+  if (
+    message.includes('Failed to fetch') ||
+    message.includes('NetworkError') ||
+    message.includes('net::ERR_') ||
+    message.includes('ECONNREFUSED') ||
+    message.includes('ETIMEDOUT') ||
+    (message.includes('fetch') && error.name === 'TypeError')
+  ) {
+    return 'الخادم غير متاح حالياً. يرجى المحاولة مرة أخرى لاحقاً';
+  }
+  
+  // Timeout errors
+  if (message.includes('timeout') || message.includes('Timeout')) {
+    return 'انتهت مهلة الاتصال. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى';
+  }
+  
+  // CORS errors
+  if (message.includes('CORS') || message.includes('cross-origin')) {
+    return 'خطأ في الاتصال بالخادم. يرجى المحاولة مرة أخرى';
+  }
+  
+  // Generic network errors
+  if (message.includes('network') || message.includes('Network')) {
+    return 'خطأ في الشبكة. يرجى التحقق من اتصالك بالإنترنت';
+  }
+  
+  // If it's already a user-friendly Arabic message, return as-is
+  if (/[\u0600-\u06FF]/.test(message)) {
+    return message;
+  }
+  
+  // For any other unhandled error, return the default message
+  return defaultMessage;
+}
+
 export interface CartItem {
   _id: string;
   designId: string;
@@ -69,112 +112,141 @@ class CartAPI {
   }
 
   async getCart(): Promise<CartApiResponse<CartItem[]>> {
-    const response = await fetch(`${API_BASE_URL}/api/cart`, {
-      method: 'GET',
-      headers: this.getAuthHeaders(),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/cart`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في جلب السلة');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في جلب السلة');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error, 'فشل في جلب السلة'));
     }
-
-    return result;
   }
 
   async addToCart(item: Omit<CartItem, '_id' | 'addedAt' | 'updatedAt'>): Promise<CartApiResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/cart`, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify(item),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/cart`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(item),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في إضافة العنصر للسلة');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        // Return detailed validation error message from backend
+        throw new Error(result.error?.message || 'فشل في إضافة العنصر للسلة');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error, 'فشل في إضافة العنصر للسلة'));
     }
-
-    return result;
   }
 
   async updateCartItem(id: string, updates: Partial<Omit<CartItem, '_id' | 'addedAt' | 'updatedAt'>>): Promise<CartApiResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/cart/${id}`, {
-      method: 'PATCH',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify(updates),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/cart/${id}`, {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(updates),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في تحديث العنصر');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في تحديث العنصر');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error, 'فشل في تحديث العنصر'));
     }
-
-    return result;
   }
 
   // NEW: Update specific field
   async updateCartItemField(id: string, field: string, value: any): Promise<CartApiResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/cart/${id}/field`, {
-      method: 'PATCH',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify({ field, value }),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/cart/${id}/field`, {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ field, value }),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في تحديث الحقل');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في تحديث الحقل');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error, 'فشل في تحديث الحقل'));
     }
-
-    return result;
   }
 
   async removeFromCart(id: string): Promise<CartApiResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/cart/${id}`, {
-      method: 'DELETE',
-      headers: this.getAuthHeaders(),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/cart/${id}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في حذف العنصر من السلة');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في حذف العنصر من السلة');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error, 'فشل في حذف العنصر من السلة'));
     }
-
-    return result;
   }
 
   async clearCart(): Promise<CartApiResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/cart`, {
-      method: 'DELETE',
-      headers: this.getAuthHeaders(),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/cart`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في مسح السلة');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في مسح السلة');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error, 'فشل في مسح السلة'));
     }
-
-    return result;
   }
 
   async getCartCount(): Promise<CartApiResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/cart/count`, {
-      method: 'GET',
-      headers: this.getAuthHeaders(),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/cart/count`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في جلب عدد عناصر السلة');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'فشل في جلب عدد عناصر السلة');
+      }
+
+      return result;
+    } catch (error: any) {
+      throw new Error(sanitizeErrorMessage(error, 'فشل في جلب عدد عناصر السلة'));
     }
-
-    return result;
   }
 }
 
