@@ -26,7 +26,8 @@ const AdditionalServices = memo<AdditionalServicesProps>(({
 
   const isInMainSaudiCities = useMemo(() => {
     if (!isLocationSelected) return false;
-    return SAUDI_CITIES.includes(locationData.city as typeof SAUDI_CITIES[number]);
+    // Partial match: check if the location contains any of the allowed city names
+    return SAUDI_CITIES.some(city => locationData.city.includes(city));
   }, [locationData.city, isLocationSelected]);
 
   const canAddGateSupervisors = useMemo(() => {
