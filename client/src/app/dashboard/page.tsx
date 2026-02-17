@@ -34,18 +34,18 @@ export default function DashboardPage() {
       fallback={<DashboardSkeleton />}
     >
       <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
-        <div className="container mx-auto px-8 py-12">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8 md:py-12">
           
           {/* Welcome Header */}
-          <div className="mb-12">
-            <div className="flex items-center justify-between mb-6">
+          <div className="mb-6 sm:mb-8 md:mb-12">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div>
-                <h1 className="text-4xl font-bold text-white mb-2">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1 sm:mb-2">
                   مرحباً بك، <span className="text-[#C09B52]">
                     {user?.firstName || 'زائر'}
                   </span>
                 </h1>
-                <p className="text-gray-400 text-lg">إليك نظرة سريعة على نشاطك الأخير</p>
+                <p className="text-gray-400 text-sm sm:text-base md:text-lg">إليك نظرة سريعة على نشاطك الأخير</p>
               </div>
             </div>
           </div>
@@ -55,20 +55,20 @@ export default function DashboardPage() {
 
           {/* Main Content Grid */}
           {tab === 'bills' ? (
-            <div className="mt-12">
+            <div className="mt-6 sm:mt-8 md:mt-12">
               <UserBills />
             </div>
           ) : (
-            <div className="grid lg:grid-cols-3 gap-8 mt-12">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 mt-6 sm:mt-8 md:mt-12">
               
               {/* Left Column - Main Content */}
-              <div className="lg:col-span-2 space-y-8">
+              <div className="lg:col-span-2 space-y-4 sm:space-y-6 md:space-y-8">
                 <RecentOrders />
                 <QuickActions />
               </div>
 
               {/* Right Column - Sidebar */}
-              <div className="space-y-8">
+              <div className="space-y-4 sm:space-y-6 md:space-y-8">
                 <CollaborationDashboard />
                 
                 {/* Delete Account Section */}

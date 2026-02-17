@@ -70,51 +70,51 @@ export function ActivityFeed() {
   ];
 
   return (
-    <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
+    <div className="bg-white/5 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-white/10">
+      <div className="p-3 sm:p-4 md:p-6 border-b border-white/10">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white flex items-center space-x-2 ">
-            <Bell className="w-5 h-5 text-[#C09B52]" />
+          <h2 className="text-base sm:text-lg md:text-xl font-bold text-white flex items-center gap-2">
+            <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-[#C09B52]" />
             <span>النشاط الأخير</span>
           </h2>
-          <span className="w-2 h-2 bg-[#C09B52] rounded-full animate-pulse"></span>
+          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-[#C09B52] rounded-full animate-pulse"></span>
         </div>
       </div>
 
       {/* Activities List */}
-      <div className="p-6">
-        <div className="space-y-4 max-h-96 overflow-y-auto">
+      <div className="p-3 sm:p-4 md:p-6">
+        <div className="space-y-2 sm:space-y-3 md:space-y-4 max-h-72 sm:max-h-80 md:max-h-96 overflow-y-auto">
           {activities.map((activity, index) => {
             const Icon = activity.icon;
             return (
               <div
                 key={activity.id}
-                className="group flex items-start space-x-3  p-3 rounded-xl hover:bg-white/5 transition-all duration-300"
+                className="group flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg sm:rounded-xl hover:bg-white/5 transition-all duration-300"
               >
                 {/* Icon */}
-                <div className={`w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}>
-                  <Icon className={`w-5 h-5 ${activity.color}`} />
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}>
+                  <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${activity.color}`} />
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-white group-hover:text-[#C09B52] transition-colors duration-300 text-sm">
+                  <h3 className="font-medium text-white group-hover:text-[#C09B52] transition-colors duration-300 text-xs sm:text-sm">
                     {activity.title}
                   </h3>
-                  <p className="text-gray-400 text-xs mt-1 line-clamp-2">
+                  <p className="text-gray-400 text-[10px] sm:text-xs mt-0.5 sm:mt-1 line-clamp-2">
                     {activity.description}
                   </p>
-                  <span className="text-gray-500 text-xs mt-2 block">
+                  <span className="text-gray-500 text-[10px] sm:text-xs mt-1 sm:mt-2 block">
                     {activity.time}
                   </span>
                 </div>
 
-                {/* Timeline Dot */}
-                <div className="flex flex-col items-center">
-                  <div className="w-2 h-2 bg-[#C09B52] rounded-full"></div>
+                {/* Timeline Dot - Hidden on small mobile */}
+                <div className="hidden xs:flex flex-col items-center">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-[#C09B52] rounded-full"></div>
                   {index !== activities.length - 1 && (
-                    <div className="w-px h-12 bg-gradient-to-b from-[#C09B52] to-transparent mt-2"></div>
+                    <div className="w-px h-8 sm:h-12 bg-gradient-to-b from-[#C09B52] to-transparent mt-1 sm:mt-2"></div>
                   )}
                 </div>
               </div>
@@ -123,8 +123,8 @@ export function ActivityFeed() {
         </div>
 
         {/* View All Button */}
-        <div className="mt-6 text-center">
-          <button className="text-[#C09B52] hover:text-amber-400 text-sm font-medium transition-colors duration-300">
+        <div className="mt-4 sm:mt-6 text-center">
+          <button className="text-[#C09B52] hover:text-amber-400 text-xs sm:text-sm font-medium transition-colors duration-300">
             عرض جميع الأنشطة
           </button>
         </div>

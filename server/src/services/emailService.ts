@@ -2,6 +2,20 @@
 import { MailerSend, EmailParams, Sender, Recipient } from 'mailersend';
 import { logger } from '../config/logger';
 
+// Lazy singleton instance
+let emailServiceInstance: EmailService | null = null;
+
+/**
+ * Get the EmailService singleton instance.
+ * Uses lazy initialization for serverless compatibility.
+ */
+export function getEmailService(): EmailService {
+  if (!emailServiceInstance) {
+    emailServiceInstance = new EmailService();
+  }
+  return emailServiceInstance;
+}
+
 export interface PasswordResetEmailData {
   name: string;
   email: string;
@@ -1147,4 +1161,22 @@ async sendEventApprovalEmail(data: EventApprovalEmailData): Promise<boolean> {
 
 
 
-export const emailService = new EmailService();
+// Export lazy singleton getter for backward compatibility
+// Usage: import { emailService } from './emailService' still works
+// but initialization is deferred until first access
+export const emailService = {
+  get instance() {
+    return getEmailService();
+  },
+  sendPasswordResetEmail: (...args: Parameters<EmailService['sendPasswordResetEmail']>) => getEmailService().sendPasswordResetEmail(...args),
+  sendWelcomeEmail: (...args: Parameters<EmailService['sendWelcomeEmail']>) => getEmailService().sendWelcomeEmail(...args),
+  sendEventApprovalEmail: (...args: Parameters<EmailService['sendEventApprovalEmail']>) => getEmailService().sendEventApprovalEmail(...args),
+  sendBillEmail: (...args: Parameters<EmailService['sendBillEmail']>) => getEmailService().sendBillEmail(...args),
+  sendBillEmailToUser: (...args: Parameters<EmailService['sendBillEmailToUser']>) => getEmailService().sendBillEmailToUser(...args),
+  sendEventDetailsEmail: (...args: Parameters<EmailService['sendEventDetailsEmail']>) => getEmailService().sendEventDetailsEmail(...args),
+  sendContactEmail: (...args: Parameters<EmailService['sendContactEmail']>) => getEmailService().sendContactEmail(...args),
+  sendContactConfirmationEmail: (...args: Parameters<EmailService['sendContactConfirmationEmail']>) => getEmailService().sendContactConfirmationEmail(...args),
+  sendEmail: (...args: Parameters<EmailService['sendEmail']>) => getEmailService().sendEmail(...args),
+  createBillEmailTemplate: (...args: Parameters<EmailService['createBillEmailTemplate']>) => getEmailService().createBillEmailTemplate(...args),
+  createEventDetailsEmailTemplate: (...args: Parameters<EmailService['createEventDetailsEmailTemplate']>) => getEmailService().createEventDetailsEmailTemplate(...args)
+};

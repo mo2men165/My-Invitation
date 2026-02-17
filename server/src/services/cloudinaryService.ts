@@ -4,6 +4,44 @@ import { logger } from '../config/logger';
 import { Readable } from 'stream';
 import { MulterFile } from '../types/multer';
 
+// Lazy initialization state
+let isCloudinaryConfigured = false;
+
+/**
+ * Ensures Cloudinary is configured before any operation.
+ * Uses lazy initialization pattern for serverless compatibility.
+ * Only configures once, subsequent calls are no-ops.
+ */
+function ensureCloudinaryConfigured(): void {
+  if (isCloudinaryConfigured) {
+    return;
+  }
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    const missing = [];
+    if (!cloudName) missing.push('CLOUDINARY_CLOUD_NAME');
+    if (!apiKey) missing.push('CLOUDINARY_API_KEY');
+    if (!apiSecret) missing.push('CLOUDINARY_API_SECRET');
+    
+    logger.error('Cloudinary credentials missing:', { missing });
+    throw new Error(`Cloudinary configuration failed: Missing ${missing.join(', ')}`);
+  }
+
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+    secure: true
+  });
+
+  isCloudinaryConfigured = true;
+  logger.info('Cloudinary configured (lazy initialization)');
+}
+
 export interface CloudinaryUploadResult {
   public_id: string;
   secure_url: string;
@@ -33,6 +71,9 @@ export class CloudinaryService {
     fileName: string,
     options: UploadOptions = {}
   ): Promise<CloudinaryUploadResult> {
+    // Ensure Cloudinary is configured (lazy initialization for serverless)
+    ensureCloudinaryConfigured();
+    
     try {
       const {
         folder = 'invitations',
@@ -112,6 +153,9 @@ export class CloudinaryService {
     filePath: string,
     options: UploadOptions = {}
   ): Promise<CloudinaryUploadResult> {
+    // Ensure Cloudinary is configured (lazy initialization for serverless)
+    ensureCloudinaryConfigured();
+    
     try {
       const {
         folder = 'invitations',
@@ -165,6 +209,9 @@ export class CloudinaryService {
    * Delete an image from Cloudinary
    */
   static async deleteImage(publicId: string): Promise<void> {
+    // Ensure Cloudinary is configured (lazy initialization for serverless)
+    ensureCloudinaryConfigured();
+    
     try {
       const result = await cloudinary.uploader.destroy(publicId);
       
@@ -185,6 +232,9 @@ export class CloudinaryService {
    * Delete multiple images from Cloudinary
    */
   static async deleteImages(publicIds: string[]): Promise<void> {
+    // Ensure Cloudinary is configured (lazy initialization for serverless)
+    ensureCloudinaryConfigured();
+    
     try {
       if (publicIds.length === 0) return;
 
@@ -207,6 +257,9 @@ export class CloudinaryService {
    * Get image URL with transformations
    */
   static getImageUrl(publicId: string, transformations?: any[]): string {
+    // Ensure Cloudinary is configured (lazy initialization for serverless)
+    ensureCloudinaryConfigured();
+    
     try {
       return cloudinary.url(publicId, {
         secure: true,

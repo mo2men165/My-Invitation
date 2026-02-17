@@ -480,11 +480,11 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
   // Loading state
   if (isLoading) {
     return (
-      <div className="bg-white/5 rounded-xl p-6 space-y-4 border border-white/10">
-        <div className="flex items-center justify-center h-64">
+      <div className="bg-white/5 rounded-lg sm:rounded-xl p-4 sm:p-6 space-y-4 border border-white/10">
+        <div className="flex items-center justify-center h-48 sm:h-64">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 text-[#C09B52] mx-auto mb-2 animate-spin" />
-            <p className="text-white text-sm">جاري تحميل الخرائط...</p>
+            <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 text-[#C09B52] mx-auto mb-2 animate-spin" />
+            <p className="text-white text-xs sm:text-sm">جاري تحميل الخرائط...</p>
           </div>
         </div>
       </div>
@@ -494,26 +494,26 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
   // Error state
   if (loadError) {
     return (
-      <div className="bg-red-500/10 rounded-xl p-6 border border-red-500/20">
+      <div className="bg-red-500/10 rounded-lg sm:rounded-xl p-4 sm:p-6 border border-red-500/20">
         <div className="flex items-center gap-2 text-red-400 mb-2">
-          <AlertCircle className="w-5 h-5" />
-          <span className="font-medium">فشل في تحميل الخرائط</span>
+          <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="font-medium text-sm sm:text-base">فشل في تحميل الخرائط</span>
         </div>
-        <p className="text-red-300 text-sm">{loadError}</p>
+        <p className="text-red-300 text-xs sm:text-sm">{loadError}</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10 mt-3">
+    <div className="bg-white/5 rounded-lg sm:rounded-xl p-3 sm:p-4 space-y-3 sm:space-y-4 border border-white/10 mt-2 sm:mt-3">
       <div className="flex items-center gap-2">
-        <MapPin className="w-5 h-5 text-[#C09B52]" />
-        <span className="text-white font-medium">تحديد موقع المناسبة</span>
+        <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-[#C09B52]" />
+        <span className="text-white font-medium text-sm sm:text-base">تحديد موقع المناسبة</span>
       </div>
 
       {/* Search Input - PlaceAutocompleteElement Container */}
-      <div className="bg-white/[0.02] rounded-2xl border border-white/10 p-5">
-        <label className="text-white font-medium mb-3 flex items-center gap-2">
+      <div className="bg-white/[0.02] rounded-xl sm:rounded-2xl border border-white/10 p-3 sm:p-4 md:p-5">
+        <label className="text-white font-medium mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
           <Search className="w-4 h-4 text-[#C09B52]" />
           ابحث عن الموقع
         </label>
@@ -522,7 +522,7 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
           className="w-full gmp-autocomplete-container"
         >
           {!isMapInitialized && (
-            <div className="w-full px-4 py-4 bg-gradient-to-r from-white/5 to-white/10 border-2 border-white/20 rounded-xl text-gray-400 text-lg text-center">
+            <div className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-gradient-to-r from-white/5 to-white/10 border-2 border-white/20 rounded-lg sm:rounded-xl text-gray-400 text-sm sm:text-base md:text-lg text-center">
               جاري تحميل البحث...
             </div>
           )}
@@ -593,20 +593,20 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
       {/* Google Map */}
       <div
         ref={mapRef}
-        className="w-full h-64 rounded-lg border border-white/10 overflow-hidden bg-gray-800"
-        style={{ minHeight: '256px' }}
+        className="w-full h-48 sm:h-56 md:h-64 rounded-lg border border-white/10 overflow-hidden bg-gray-800"
+        style={{ minHeight: '192px' }}
       />
 
       {/* Selected Location Display */}
       {locationData.address && locationData.displayName && (
-        <div className="bg-[#C09B52]/10 rounded-lg p-3 border border-[#C09B52]/20">
-          <div className="flex items-start gap-3">
-            <MapPin className="w-5 h-5 text-[#C09B52] mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-white text-sm font-medium">الموقع المحدد:</p>
-              <p className="text-gray-300 text-sm mt-1">{locationData.displayName}</p>
+        <div className="bg-[#C09B52]/10 rounded-lg p-2.5 sm:p-3 border border-[#C09B52]/20">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-[#C09B52] mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-xs sm:text-sm font-medium">الموقع المحدد:</p>
+              <p className="text-gray-300 text-xs sm:text-sm mt-1 break-words">{locationData.displayName}</p>
               {locationData.city && (
-                <p className="text-[#C09B52] text-xs mt-1">المدينة: {locationData.city}</p>
+                <p className="text-[#C09B52] text-[10px] sm:text-xs mt-1">المدينة: {locationData.city}</p>
               )}
             </div>
           </div>
@@ -614,7 +614,7 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
       )}
 
       {/* Location Restriction Notice */}
-      <div className="text-xs text-gray-400 bg-blue-500/10 rounded-lg p-3 border border-blue-500/20">
+      <div className="text-[10px] sm:text-xs text-gray-400 bg-blue-500/10 rounded-lg p-2.5 sm:p-3 border border-blue-500/20">
         <p className="font-medium text-blue-300 mb-1">ملاحظة:</p>
         <p>يمكن تحديد المواقع في دول الخليج فقط: {GULF_COUNTRIES.join('، ')}</p>
         <p className="mt-1">اضغط على الخريطة أو اسحب العلامة لتحديد الموقع</p>
@@ -622,8 +622,8 @@ const GoogleMapsLocationPicker: React.FC<GoogleMapsLocationPickerProps> = ({
 
       {/* Error Display */}
       {errors?.location && (
-        <div className="flex items-center gap-2 text-red-400 text-sm">
-          <AlertCircle className="w-4 h-4" />
+        <div className="flex items-center gap-2 text-red-400 text-xs sm:text-sm">
+          <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" />
           {errors.location}
         </div>
       )}

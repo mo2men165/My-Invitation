@@ -49,28 +49,28 @@ const CartSummary = memo<CartSummaryProps>(({
   }, [formData, currentPackage, packageType]);
 
   return (
-    <div className="bg-gradient-to-br from-[#C09B52]/10 via-[#C09B52]/5 to-transparent rounded-2xl border border-[#C09B52]/20 p-6">
-      <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+    <div className="bg-gradient-to-br from-[#C09B52]/10 via-[#C09B52]/5 to-transparent rounded-xl sm:rounded-2xl border border-[#C09B52]/20 p-3 sm:p-4 md:p-6">
+      <h3 className="text-base sm:text-lg md:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
         <span>ملخص الطلب</span>
         {isUpdating && (
-          <div className="w-4 h-4 border-2 border-[#C09B52] border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-[#C09B52] border-t-transparent rounded-full animate-spin"></div>
         )}
       </h3>
       
-      <div className="space-y-4 mb-6">
+      <div className="space-y-2 sm:space-y-3 md:space-y-4 mb-4 sm:mb-6">
         {/* Base Package */}
-        <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
-          <span className="text-gray-300">باقة {currentPackage?.name} ({formData.inviteCount} دعوة)</span>
-          <span className="text-white font-semibold">
+        <div className="flex justify-between items-center p-2 sm:p-3 bg-white/5 rounded-lg sm:rounded-xl gap-2">
+          <span className="text-gray-300 text-xs sm:text-sm truncate">باقة {currentPackage?.name} ({formData.inviteCount} دعوة)</span>
+          <span className="text-white font-semibold text-xs sm:text-sm whitespace-nowrap">
             {formatCurrency(pricing.basePrice)}
           </span>
         </div>
         
         {/* Additional Cards */}
         {formData.additionalCards > 0 && (
-          <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
-            <span className="text-gray-300">كروت إضافية ({formData.additionalCards})</span>
-            <span className="text-white font-semibold">
+          <div className="flex justify-between items-center p-2 sm:p-3 bg-white/5 rounded-lg sm:rounded-xl gap-2">
+            <span className="text-gray-300 text-xs sm:text-sm">كروت إضافية ({formData.additionalCards})</span>
+            <span className="text-white font-semibold text-xs sm:text-sm whitespace-nowrap">
               {formatCurrency(pricing.extraCardsPrice)}
             </span>
           </div>
@@ -78,9 +78,9 @@ const CartSummary = memo<CartSummaryProps>(({
 
         {/* Extra Hours */}
         {formData.extraHours > 0 && (
-          <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
-            <span className="text-gray-300">ساعات إضافية ({formData.extraHours})</span>
-            <span className="text-white font-semibold">
+          <div className="flex justify-between items-center p-2 sm:p-3 bg-white/5 rounded-lg sm:rounded-xl gap-2">
+            <span className="text-gray-300 text-xs sm:text-sm">ساعات إضافية ({formData.extraHours})</span>
+            <span className="text-white font-semibold text-xs sm:text-sm whitespace-nowrap">
               {formatCurrency(pricing.extraHoursPrice)}
             </span>
           </div>
@@ -88,9 +88,9 @@ const CartSummary = memo<CartSummaryProps>(({
         
         {/* Gate Supervisors */}
         {formData.gateSupervisors > 0 && (
-          <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
-            <span className="text-gray-300">مشرفين البوابة ({formData.gateSupervisors})</span>
-            <span className="text-white font-semibold">
+          <div className="flex justify-between items-center p-2 sm:p-3 bg-white/5 rounded-lg sm:rounded-xl gap-2">
+            <span className="text-gray-300 text-xs sm:text-sm">مشرفين البوابة ({formData.gateSupervisors})</span>
+            <span className="text-white font-semibold text-xs sm:text-sm whitespace-nowrap">
               {formatCurrency(pricing.gateSupervisorsPrice)}
             </span>
           </div>
@@ -98,9 +98,9 @@ const CartSummary = memo<CartSummaryProps>(({
 
         {/* Expedited Delivery */}
         {formData.fastDelivery && (
-          <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl">
-            <span className="text-gray-300">نسليم سريع</span>
-            <span className="text-white font-semibold">
+          <div className="flex justify-between items-center p-2 sm:p-3 bg-white/5 rounded-lg sm:rounded-xl gap-2">
+            <span className="text-gray-300 text-xs sm:text-sm">تسليم سريع</span>
+            <span className="text-white font-semibold text-xs sm:text-sm whitespace-nowrap">
               {formatCurrency(pricing.expeditedDeliveryPrice)}
             </span>
           </div>
@@ -109,10 +109,10 @@ const CartSummary = memo<CartSummaryProps>(({
       </div>
 
       {/* Total */}
-      <div className="border-t border-[#C09B52]/30 pt-4 mb-6">
-        <div className="flex justify-between items-center p-4 bg-gradient-to-r from-[#C09B52]/20 to-[#C09B52]/10 rounded-xl">
-          <span className="text-xl font-bold text-white">الإجمالي</span>
-          <span className="text-3xl font-bold text-[#C09B52]">
+      <div className="border-t border-[#C09B52]/30 pt-3 sm:pt-4 mb-4 sm:mb-6">
+        <div className="flex justify-between items-center p-2.5 sm:p-3 md:p-4 bg-gradient-to-r from-[#C09B52]/20 to-[#C09B52]/10 rounded-lg sm:rounded-xl">
+          <span className="text-base sm:text-lg md:text-xl font-bold text-white">الإجمالي</span>
+          <span className="text-xl sm:text-2xl md:text-3xl font-bold text-[#C09B52]">
             {formatCurrency(pricing.total)}
           </span>
         </div>

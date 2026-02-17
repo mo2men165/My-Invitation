@@ -13,6 +13,21 @@ import {
   PaymobConfig
 } from '../types/paymob';
 
+// Lazy singleton instance
+let paymobServiceInstance: PaymobService | null = null;
+
+/**
+ * Get the PaymobService singleton instance.
+ * Uses lazy initialization for serverless compatibility.
+ */
+export function getPaymobService(): PaymobService {
+  if (!paymobServiceInstance) {
+    paymobServiceInstance = new PaymobService();
+    logger.info('PaymobService initialized (lazy initialization)');
+  }
+  return paymobServiceInstance;
+}
+
 export class PaymobService {
   private config: PaymobConfig;
   private authToken: string | null = null;
@@ -452,5 +467,20 @@ export class PaymobService {
   }
 }
 
-// Export singleton instance
-export const paymobService = new PaymobService();
+// Export lazy singleton getter for backward compatibility
+// Usage: import { paymobService } from './paymobService' still works
+// but initialization is deferred until first access
+export const paymobService = {
+  get instance() {
+    return getPaymobService();
+  },
+  createOrder: (...args: Parameters<PaymobService['createOrder']>) => getPaymobService().createOrder(...args),
+  generatePaymentKey: (...args: Parameters<PaymobService['generatePaymentKey']>) => getPaymobService().generatePaymentKey(...args),
+  verifyWebhookSignature: (...args: Parameters<PaymobService['verifyWebhookSignature']>) => getPaymobService().verifyWebhookSignature(...args),
+  processWebhook: (...args: Parameters<PaymobService['processWebhook']>) => getPaymobService().processWebhook(...args),
+  getReturnUrl: (...args: Parameters<PaymobService['getReturnUrl']>) => getPaymobService().getReturnUrl(...args),
+  getCancelUrl: (...args: Parameters<PaymobService['getCancelUrl']>) => getPaymobService().getCancelUrl(...args),
+  getIframeUrl: (...args: Parameters<PaymobService['getIframeUrl']>) => getPaymobService().getIframeUrl(...args),
+  getPaymentStatus: (...args: Parameters<PaymobService['getPaymentStatus']>) => getPaymobService().getPaymentStatus(...args),
+  getConfig: () => getPaymobService().getConfig()
+};

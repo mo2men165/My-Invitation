@@ -26,19 +26,19 @@ const CartActions = memo<CartActionsProps>(({
   termsError
 }) => {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Terms and Conditions Checkbox */}
       {!isEditMode && (
-        <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-xl border border-white/10 p-4">
-          <label className="flex items-start gap-3 cursor-pointer group">
+        <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-lg sm:rounded-xl border border-white/10 p-3 sm:p-4">
+          <label className="flex items-start gap-2 sm:gap-3 cursor-pointer group">
             <input
               type="checkbox"
               checked={termsAccepted}
               onChange={(e) => onTermsChange?.(e.target.checked)}
-              className="mt-1 w-5 h-5 rounded border-gray-400 bg-gray-800 text-[#C09B52] focus:ring-2 focus:ring-[#C09B52] focus:ring-offset-2 focus:ring-offset-gray-900 cursor-pointer transition-all"
+              className="mt-0.5 sm:mt-1 w-4 h-4 sm:w-5 sm:h-5 rounded border-gray-400 bg-gray-800 text-[#C09B52] focus:ring-2 focus:ring-[#C09B52] focus:ring-offset-2 focus:ring-offset-gray-900 cursor-pointer transition-all flex-shrink-0"
             />
-            <div className="flex-1">
-              <span className="text-gray-300 text-sm leading-relaxed group-hover:text-white transition-colors">
+            <div className="flex-1 min-w-0">
+              <span className="text-gray-300 text-xs sm:text-sm leading-relaxed group-hover:text-white transition-colors">
                 أوافق على{' '}
                 <Link 
                   href="/terms" 
@@ -51,8 +51,8 @@ const CartActions = memo<CartActionsProps>(({
                 {' '}وقبول جميع البنود المذكورة
               </span>
               {termsError && (
-                <p className="text-red-400 text-xs mt-1 flex items-center gap-1">
-                  <span className="w-1 h-1 bg-red-400 rounded-full"></span>
+                <p className="text-red-400 text-[10px] sm:text-xs mt-1 flex items-center gap-1">
+                  <span className="w-1 h-1 bg-red-400 rounded-full flex-shrink-0"></span>
                   {termsError}
                 </p>
               )}
@@ -66,7 +66,7 @@ const CartActions = memo<CartActionsProps>(({
         type="button"
         onClick={onAddToCart}
         disabled={isLoading || hasErrors || (!isEditMode && !termsAccepted)}
-        className="w-full py-4 bg-gradient-to-r from-[#C09B52] to-[#B8935A] text-white font-bold text-lg rounded-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden"
+        className="w-full py-3 sm:py-4 bg-gradient-to-r from-[#C09B52] to-[#B8935A] text-white font-bold text-sm sm:text-base md:text-lg rounded-lg sm:rounded-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2 sm:gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity"></div>
         <span className="relative z-10">
@@ -83,27 +83,27 @@ const CartActions = memo<CartActionsProps>(({
         variant="outline"
         onClick={onCancel}
         disabled={isLoading}
-        className="w-full py-3 border-2 border-gray-500/30 text-gray-300 hover:bg-gray-700 transition-all duration-300 disabled:opacity-50 bg-gray-500/10"
+        className="w-full py-2.5 sm:py-3 border-2 border-gray-500/30 text-gray-300 text-sm sm:text-base hover:bg-gray-700 transition-all duration-300 disabled:opacity-50 bg-gray-500/10"
       >
         إلغاء
       </Button>
 
       {/* Info Text */}
       {!isEditMode && (
-        <div className="mt-4 text-center">
-          <p className="text-xs text-gray-400">
+        <div className="mt-3 sm:mt-4 text-center">
+          <p className="text-[10px] sm:text-xs text-gray-400">
             سيتم إنشاء المناسبة بعد إتمام عملية الدفع
           </p>
         </div>
       )}
 
       {/* Error Summary */}
-      <div className="mt-4 text-center">
-        <div className="text-xs text-gray-400 mb-1">
+      <div className="mt-3 sm:mt-4 text-center">
+        <div className="text-[10px] sm:text-xs text-gray-400 mb-1">
           الحقول المطلوبة: <span className="text-red-400">*</span>
         </div>
         {hasErrors && errorCount > 0 && (
-          <div className="flex items-center justify-center gap-1 text-xs text-red-400">
+          <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs text-red-400">
             <div className="w-1 h-1 bg-red-400 rounded-full"></div>
             {errorCount} خطأ يحتاج إلى تصحيح
           </div>

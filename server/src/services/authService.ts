@@ -18,6 +18,21 @@ interface AuthTokens {
   token_type: string;
 }
 
+// Lazy singleton instance
+let authServiceInstance: AuthService | null = null;
+
+/**
+ * Get the AuthService singleton instance.
+ * Uses lazy initialization for serverless compatibility.
+ */
+export function getAuthService(): AuthService {
+  if (!authServiceInstance) {
+    authServiceInstance = new AuthService();
+    logger.info('AuthService initialized (lazy initialization)');
+  }
+  return authServiceInstance;
+}
+
 class AuthService {
   private readonly JWT_SECRET: string;
   private readonly JWT_REFRESH_SECRET: string;
@@ -200,4 +215,18 @@ class AuthService {
   }
 }
 
-export const authService = new AuthService();
+// Export lazy singleton getter for backward compatibility
+// Usage: import { authService } from './authService' still works
+// but initialization is deferred until first access
+export const authService = {
+  get instance() {
+    return getAuthService();
+  },
+  generateTokens: (...args: Parameters<AuthService['generateTokens']>) => getAuthService().generateTokens(...args),
+  verifyAccessToken: (...args: Parameters<AuthService['verifyAccessToken']>) => getAuthService().verifyAccessToken(...args),
+  verifyRefreshToken: (...args: Parameters<AuthService['verifyRefreshToken']>) => getAuthService().verifyRefreshToken(...args),
+  refreshAccessToken: (...args: Parameters<AuthService['refreshAccessToken']>) => getAuthService().refreshAccessToken(...args),
+  extractTokenFromHeader: (...args: Parameters<AuthService['extractTokenFromHeader']>) => getAuthService().extractTokenFromHeader(...args),
+  generatePasswordResetToken: (...args: Parameters<AuthService['generatePasswordResetToken']>) => getAuthService().generatePasswordResetToken(...args),
+  verifyPasswordResetToken: (...args: Parameters<AuthService['verifyPasswordResetToken']>) => getAuthService().verifyPasswordResetToken(...args)
+};

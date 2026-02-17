@@ -353,9 +353,9 @@ const CartModal = memo<CartModalProps>(({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4">
         <div 
-          className="bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 rounded-3xl border border-white/20 shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-y-auto modal-scroll-container"
+          className="bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 rounded-2xl sm:rounded-3xl border border-white/20 shadow-2xl max-w-7xl w-full max-h-[98vh] sm:max-h-[95vh] overflow-y-auto modal-scroll-container"
         >
           
           <CartHeader
@@ -365,9 +365,9 @@ const CartModal = memo<CartModalProps>(({
             isEditMode={state.isEditMode}
           />
 
-          <div className="p-6 grid lg:grid-cols-2 gap-8">
+          <div className="p-3 sm:p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
             {/* Left Column - Form */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <EventDetailsForm
                 formData={formData}
                 onInputChange={updateFormField}
@@ -391,13 +391,13 @@ const CartModal = memo<CartModalProps>(({
             </div>
 
             {/* Right Column - Summary and Actions */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Package Features */}
               {selectedPackage && (
                 <PackageFeatures selectedPackage={selectedPackage} />
               )}
               
-              <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-6">
+              <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-xl sm:rounded-2xl border border-white/10 p-3 sm:p-4 md:p-6">
                 <AdditionalServices
                   formData={formData}
                   onInputChange={updateFormField}

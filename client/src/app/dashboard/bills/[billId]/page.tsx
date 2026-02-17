@@ -111,29 +111,29 @@ export default function BillDetailsPage() {
       fallback={<DashboardSkeleton />}
     >
       <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
-        <div className="container mx-auto px-8 py-12">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8 md:py-12">
           
           {/* Back Button */}
           <Link
             href="/dashboard?tab=bills"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-gray-400 hover:text-white transition-colors mb-4 sm:mb-6 text-sm sm:text-base"
           >
-            <ArrowRight className="w-4 h-4 rotate-180" />
+            <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 rotate-180" />
             العودة للفواتير
           </Link>
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 text-[#C09B52] animate-spin" />
+            <div className="flex items-center justify-center py-12 sm:py-20">
+              <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 text-[#C09B52] animate-spin" />
             </div>
           ) : error || !bill ? (
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-red-500/20 p-8 text-center">
-              <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">الفاتورة غير موجودة</h2>
-              <p className="text-gray-400 mb-6">{error || 'الفاتورة المطلوبة غير متاحة أو تم حذفها'}</p>
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-red-500/20 p-4 sm:p-6 md:p-8 text-center">
+              <AlertCircle className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 text-red-400 mx-auto mb-3 sm:mb-4" />
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white mb-1 sm:mb-2">الفاتورة غير موجودة</h2>
+              <p className="text-gray-400 text-sm sm:text-base mb-4 sm:mb-6">{error || 'الفاتورة المطلوبة غير متاحة أو تم حذفها'}</p>
               <Link
                 href="/dashboard?tab=bills"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-[#C09B52] text-white font-medium rounded-lg hover:bg-[#B8935A] transition-colors"
+                className="inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-[#C09B52] text-white font-medium text-sm sm:text-base rounded-lg hover:bg-[#B8935A] transition-colors"
               >
                 العودة للفواتير
               </Link>
@@ -141,57 +141,57 @@ export default function BillDetailsPage() {
           ) : (
             <div className="max-w-4xl mx-auto">
               {/* Bill Header */}
-              <div className="bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm rounded-2xl border border-white/10 p-8 mb-6">
-                <div className="flex items-start justify-between mb-6">
+              <div className="bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
                   <div>
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-12 h-12 rounded-xl bg-[#C09B52]/20 flex items-center justify-center">
-                        <Receipt className="w-6 h-6 text-[#C09B52]" />
+                    <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-[#C09B52]/20 flex items-center justify-center flex-shrink-0">
+                        <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-[#C09B52]" />
                       </div>
                       <div>
-                        <h1 className="text-3xl font-bold text-white">تفاصيل الفاتورة</h1>
-                        <p className="text-gray-400">رقم الفاتورة: {bill.billNumber}</p>
+                        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white">تفاصيل الفاتورة</h1>
+                        <p className="text-gray-400 text-xs sm:text-sm">رقم الفاتورة: {bill.billNumber}</p>
                       </div>
                     </div>
                   </div>
                   {bill.emailSent && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg">
-                      <CheckCircle className="w-4 h-4" />
-                      <span className="text-sm">تم الإرسال</span>
+                    <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-green-500/20 text-green-400 rounded-lg self-start">
+                      <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span className="text-xs sm:text-sm">تم الإرسال</span>
                     </div>
                   )}
                 </div>
 
                 {/* Bill Info Grid */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-3 sm:space-y-4">
                     <div>
-                      <p className="text-gray-400 text-sm mb-1">تاريخ الدفع</p>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        <p className="text-white font-medium">{formatDate(bill.paymentDate)}</p>
+                      <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">تاريخ الدفع</p>
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
+                        <p className="text-white font-medium text-sm sm:text-base">{formatDate(bill.paymentDate)}</p>
                       </div>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm mb-1">معرف الدفع</p>
-                      <p className="text-white font-medium">{bill.paymentId}</p>
+                      <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">معرف الدفع</p>
+                      <p className="text-white font-medium text-sm sm:text-base break-all">{bill.paymentId}</p>
                     </div>
                     {bill.transactionId && (
                       <div>
-                        <p className="text-gray-400 text-sm mb-1">معرف المعاملة</p>
-                        <p className="text-white font-medium">{bill.transactionId}</p>
+                        <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">معرف المعاملة</p>
+                        <p className="text-white font-medium text-sm sm:text-base break-all">{bill.transactionId}</p>
                       </div>
                     )}
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <div>
-                      <p className="text-gray-400 text-sm mb-1">طريقة الدفع</p>
-                      <p className="text-white font-medium">{bill.paymentMethod === 'paymob' ? 'باي موب' : bill.paymentMethod}</p>
+                      <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">طريقة الدفع</p>
+                      <p className="text-white font-medium text-sm sm:text-base">{bill.paymentMethod === 'paymob' ? 'باي موب' : bill.paymentMethod}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-sm mb-1">إجمالي المبلغ</p>
+                      <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">إجمالي المبلغ</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-2xl font-bold text-[#C09B52]">
+                        <p className="text-xl sm:text-2xl font-bold text-[#C09B52]">
                           {bill.totalAmount.toLocaleString('ar-SA')} ر.س
                         </p>
                       </div>
@@ -201,106 +201,106 @@ export default function BillDetailsPage() {
               </div>
 
               {/* User Information */}
-              <div className="bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm rounded-2xl border border-white/10 p-8 mb-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <User className="w-5 h-5 text-[#C09B52]" />
-                  <h2 className="text-xl font-bold text-white">معلومات العميل</h2>
+              <div className="bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                  <User className="w-4 h-4 sm:w-5 sm:h-5 text-[#C09B52]" />
+                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-white">معلومات العميل</h2>
                 </div>
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
                   <div>
-                    <p className="text-gray-400 text-sm mb-1">الاسم</p>
-                    <p className="text-white font-medium">{bill.user.name}</p>
+                    <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">الاسم</p>
+                    <p className="text-white font-medium text-sm sm:text-base">{bill.user.name}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm mb-1">البريد الإلكتروني</p>
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-gray-500" />
-                      <p className="text-white font-medium">{bill.user.email || 'غير متوفر'}</p>
+                    <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">البريد الإلكتروني</p>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
+                      <p className="text-white font-medium text-sm sm:text-base break-all">{bill.user.email || 'غير متوفر'}</p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm mb-1">رقم الهاتف</p>
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-gray-500" />
-                      <p className="text-white font-medium">{bill.user.phone}</p>
+                    <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">رقم الهاتف</p>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
+                      <p className="text-white font-medium text-sm sm:text-base">{bill.user.phone}</p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm mb-1">المدينة</p>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-500" />
-                      <p className="text-white font-medium">{bill.user.city}</p>
+                    <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">المدينة</p>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
+                      <p className="text-white font-medium text-sm sm:text-base">{bill.user.city}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Events List */}
-              <div className="bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm rounded-2xl border border-white/10 p-8 mb-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <Package className="w-5 h-5 text-[#C09B52]" />
-                  <h2 className="text-xl font-bold text-white">المناسبات ({bill.events.length})</h2>
+              <div className="bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                  <Package className="w-4 h-4 sm:w-5 sm:h-5 text-[#C09B52]" />
+                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-white">المناسبات ({bill.events.length})</h2>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {bill.events.map((event, index) => (
                     <div
                       key={index}
-                      className="bg-white/5 rounded-xl border border-white/10 p-6 hover:border-white/20 transition-all"
+                      className="bg-white/5 rounded-lg sm:rounded-xl border border-white/10 p-3 sm:p-4 md:p-6 hover:border-white/20 transition-all"
                     >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-bold text-white">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-0 mb-3 sm:mb-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                            <h3 className="text-sm sm:text-base md:text-lg font-bold text-white truncate">
                               {event.eventName || event.hostName}
                             </h3>
-                            <span className={`px-3 py-1 rounded-lg text-sm font-medium ${getPackageColor(event.packageType)}`}>
+                            <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-xs md:text-sm font-medium ${getPackageColor(event.packageType)}`}>
                               {formatPackageType(event.packageType)}
                             </span>
                           </div>
                           {event.eventName && (
-                            <p className="text-gray-400 text-sm mb-2">المضيف: {event.hostName}</p>
+                            <p className="text-gray-400 text-xs sm:text-sm mb-1 sm:mb-2">المضيف: {event.hostName}</p>
                           )}
                         </div>
-                        <div className="text-left">
-                          <p className="text-2xl font-bold text-[#C09B52]">
+                        <div className="text-right sm:text-left">
+                          <p className="text-lg sm:text-xl md:text-2xl font-bold text-[#C09B52]">
                             {event.price.toLocaleString('ar-SA')} ر.س
                           </p>
                         </div>
                       </div>
-                      <div className="grid md:grid-cols-2 gap-4 pt-4 border-t border-white/10">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-gray-400 text-xs">تاريخ المناسبة</p>
-                            <p className="text-white text-sm font-medium">{formatDateShort(event.eventDate)}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 pt-3 sm:pt-4 border-t border-white/10">
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-gray-400 text-[10px] sm:text-xs">تاريخ المناسبة</p>
+                            <p className="text-white text-xs sm:text-sm font-medium truncate">{formatDateShort(event.eventDate)}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-gray-400 text-xs">المكان</p>
-                            <p className="text-white text-sm font-medium">
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-gray-400 text-[10px] sm:text-xs">المكان</p>
+                            <p className="text-white text-xs sm:text-sm font-medium truncate">
                               {(event as any).simpleLocation || event.eventLocation}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-gray-500" />
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
                           <div>
-                            <p className="text-gray-400 text-xs">عدد الدعوات</p>
-                            <p className="text-white text-sm font-medium">{event.inviteCount} دعوة</p>
+                            <p className="text-gray-400 text-[10px] sm:text-xs">عدد الدعوات</p>
+                            <p className="text-white text-xs sm:text-sm font-medium">{event.inviteCount} دعوة</p>
                           </div>
                         </div>
                       </div>
 
                       {/* Pricing Breakdown */}
                       {(event as any).pricingBreakdown && (
-                        <div className="mt-4 pt-4 border-t border-white/10">
-                          <p className="text-gray-400 text-sm font-medium mb-3">تفاصيل التسعير:</p>
-                          <div className="space-y-2 bg-white/5 rounded-lg p-4">
-                            <div className="flex items-center justify-between text-sm">
+                        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/10">
+                          <p className="text-gray-400 text-xs sm:text-sm font-medium mb-2 sm:mb-3">تفاصيل التسعير:</p>
+                          <div className="space-y-1.5 sm:space-y-2 bg-white/5 rounded-lg p-2.5 sm:p-3 md:p-4">
+                            <div className="flex items-center justify-between text-[10px] sm:text-xs md:text-sm">
                               <span className="text-gray-400">سعر الباقة الأساسي</span>
-                              <span className="text-white font-medium">
+                              <span className="text-white font-medium whitespace-nowrap">
                                 {(event as any).pricingBreakdown.basePrice.toLocaleString('ar-SA')} ر.س
                               </span>
                             </div>
@@ -308,50 +308,50 @@ export default function BillDetailsPage() {
                             {(event as any).pricingBreakdown.totalAdditionalCosts > 0 && (
                               <>
                                 {(event as any).pricingBreakdown.additionalCards.count > 0 && (
-                                  <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-400">
+                                  <div className="flex items-center justify-between text-[10px] sm:text-xs md:text-sm gap-2">
+                                    <span className="text-gray-400 truncate">
                                       بطاقات إضافية ({(event as any).pricingBreakdown.additionalCards.count} × {(event as any).pricingBreakdown.additionalCards.pricePerCard} ر.س)
                                     </span>
-                                    <span className="text-white font-medium">
+                                    <span className="text-white font-medium whitespace-nowrap">
                                       +{(event as any).pricingBreakdown.additionalCards.total.toLocaleString('ar-SA')} ر.س
                                     </span>
                                   </div>
                                 )}
                                 
                                 {(event as any).pricingBreakdown.gateSupervisors.count > 0 && (
-                                  <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-400">
+                                  <div className="flex items-center justify-between text-[10px] sm:text-xs md:text-sm gap-2">
+                                    <span className="text-gray-400 truncate">
                                       مشرفين البوابة ({(event as any).pricingBreakdown.gateSupervisors.count} × {(event as any).pricingBreakdown.gateSupervisors.pricePerSupervisor} ر.س)
                                     </span>
-                                    <span className="text-white font-medium">
+                                    <span className="text-white font-medium whitespace-nowrap">
                                       +{(event as any).pricingBreakdown.gateSupervisors.total.toLocaleString('ar-SA')} ر.س
                                     </span>
                                   </div>
                                 )}
                                 
                                 {(event as any).pricingBreakdown.fastDelivery.enabled && (
-                                  <div className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center justify-between text-[10px] sm:text-xs md:text-sm">
                                     <span className="text-gray-400">تسليم سريع</span>
-                                    <span className="text-white font-medium">
+                                    <span className="text-white font-medium whitespace-nowrap">
                                       +{(event as any).pricingBreakdown.fastDelivery.price.toLocaleString('ar-SA')} ر.س
                                     </span>
                                   </div>
                                 )}
                                 
                                 {(event as any).pricingBreakdown.extraHours.count > 0 && (
-                                  <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-400">
+                                  <div className="flex items-center justify-between text-[10px] sm:text-xs md:text-sm gap-2">
+                                    <span className="text-gray-400 truncate">
                                       ساعات إضافية ({(event as any).pricingBreakdown.extraHours.count} × {(event as any).pricingBreakdown.extraHours.pricePerHour} ر.س)
                                     </span>
-                                    <span className="text-white font-medium">
+                                    <span className="text-white font-medium whitespace-nowrap">
                                       +{(event as any).pricingBreakdown.extraHours.total.toLocaleString('ar-SA')} ر.س
                                     </span>
                                   </div>
                                 )}
                                 
-                                <div className="pt-2 mt-2 border-t border-white/10 flex items-center justify-between">
-                                  <span className="text-gray-300 font-medium">المجموع</span>
-                                  <span className="text-[#C09B52] font-bold text-lg">
+                                <div className="pt-1.5 sm:pt-2 mt-1.5 sm:mt-2 border-t border-white/10 flex items-center justify-between">
+                                  <span className="text-gray-300 font-medium text-xs sm:text-sm">المجموع</span>
+                                  <span className="text-[#C09B52] font-bold text-sm sm:text-base md:text-lg">
                                     {(event as any).pricingBreakdown.totalPrice.toLocaleString('ar-SA')} ر.س
                                   </span>
                                 </div>
@@ -366,17 +366,17 @@ export default function BillDetailsPage() {
               </div>
 
               {/* Summary */}
-              <div className="bg-gradient-to-br from-[#C09B52]/20 to-[#C09B52]/10 backdrop-blur-sm rounded-2xl border border-[#C09B52]/30 p-8">
-                <div className="flex items-center justify-between">
+              <div className="bg-gradient-to-br from-[#C09B52]/20 to-[#C09B52]/10 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-[#C09B52]/30 p-4 sm:p-6 md:p-8">
+                <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-gray-300 text-sm mb-1">إجمالي المبلغ</p>
-                    <p className="text-3xl font-bold text-white">
+                    <p className="text-gray-300 text-xs sm:text-sm mb-0.5 sm:mb-1">إجمالي المبلغ</p>
+                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">
                       {bill.totalAmount.toLocaleString('ar-SA')} ر.س
                     </p>
                   </div>
                   <div className="text-left">
-                    <p className="text-gray-300 text-sm mb-1">عدد المناسبات</p>
-                    <p className="text-2xl font-bold text-[#C09B52]">{bill.events.length}</p>
+                    <p className="text-gray-300 text-xs sm:text-sm mb-0.5 sm:mb-1">عدد المناسبات</p>
+                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-[#C09B52]">{bill.events.length}</p>
                   </div>
                 </div>
               </div>

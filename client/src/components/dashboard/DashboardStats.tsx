@@ -129,20 +129,20 @@ export function DashboardStats() {
 
   if (statsError && !isLoadingStats) {
     return (
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-red-500/20 p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="w-6 h-6 text-red-400" />
+      <div className="bg-white/5 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-red-500/20 p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-400 flex-shrink-0" />
             <div>
-              <h3 className="text-lg font-medium text-white">خطأ في تحميل الإحصائيات</h3>
-              <p className="text-red-400 text-sm">{statsError}</p>
+              <h3 className="text-sm sm:text-base md:text-lg font-medium text-white">خطأ في تحميل الإحصائيات</h3>
+              <p className="text-red-400 text-xs sm:text-sm">{statsError}</p>
             </div>
           </div>
           <button
             onClick={handleRetry}
-            className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-sm"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             إعادة المحاولة
           </button>
         </div>
@@ -151,21 +151,21 @@ export function DashboardStats() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header with refresh button */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">إحصائيات لوحة التحكم</h2>
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">إحصائيات لوحة التحكم</h2>
           {lastFetched && (
-            <p className="text-sm text-gray-400 mt-1 flex items-center gap-2">
-              آخر تحديث: {new Date(lastFetched).toLocaleString('ar-SA', {
+            <p className="text-xs sm:text-sm text-gray-400 mt-1 flex flex-wrap items-center gap-2">
+              <span>آخر تحديث: {new Date(lastFetched).toLocaleString('ar-SA', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
                 calendar: 'gregory'
-              })}
+              })}</span>
               {isBackgroundRefreshing && (
                 <span className="flex items-center gap-1 text-[#C09B52]">
                   <RefreshCw className="w-3 h-3 animate-spin" />
@@ -178,15 +178,15 @@ export function DashboardStats() {
         <button
           onClick={handleRefresh}
           disabled={isLoadingStats}
-          className="flex items-center gap-2 px-4 py-2 bg-[#C09B52]/20 text-[#C09B52] rounded-lg hover:bg-[#C09B52]/30 transition-colors disabled:opacity-50"
+          className="flex items-center justify-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#C09B52]/20 text-[#C09B52] rounded-lg hover:bg-[#C09B52]/30 transition-colors disabled:opacity-50 text-sm self-start sm:self-auto"
         >
-          <RefreshCw className={`w-4 h-4 ${isLoadingStats ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLoadingStats ? 'animate-spin' : ''}`} />
           تحديث
         </button>
       </div>
       
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
       {statsConfig.map((stat, index) => {
         const Icon = stat.icon;
         return (
@@ -198,42 +198,42 @@ export function DashboardStats() {
             style={{ transitionDelay: `${index * 100}ms` }}
           >
             {/* Glow Effect */}
-            <div className={`absolute -inset-0.5 bg-gradient-to-r ${stat.color} rounded-2xl blur opacity-0 group-hover:opacity-20 transition-all duration-500`}></div>
+            <div className={`absolute -inset-0.5 bg-gradient-to-r ${stat.color} rounded-xl sm:rounded-2xl blur opacity-0 group-hover:opacity-20 transition-all duration-500`}></div>
             
             {/* Card */}
-            <div className={`relative h-full bg-gradient-to-br ${stat.bgColor} backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-white/20 transition-all duration-500 group-hover:transform group-hover:scale-105`}>
+            <div className={`relative h-full bg-gradient-to-br ${stat.bgColor} backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 border border-white/10 hover:border-white/20 transition-all duration-500 group-hover:transform group-hover:scale-105`}>
               
               {/* Icon */}
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} p-0.5 group-hover:scale-110 transition-transform duration-500`}>
-                  <div className="w-full h-full bg-black rounded-xl flex items-center justify-center">
+              <div className="flex items-center justify-between mb-2 sm:mb-3 md:mb-4">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br ${stat.color} p-0.5 group-hover:scale-110 transition-transform duration-500`}>
+                  <div className="w-full h-full bg-black rounded-lg sm:rounded-xl flex items-center justify-center">
                     {isLoadingStats ? (
-                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white animate-spin" />
                     ) : (
-                      <Icon className="w-6 h-6 text-white" />
+                      <Icon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
                     )}
                   </div>
                 </div>
-                <div className={`w-2 h-2 rounded-full ${isLoadingStats ? 'bg-yellow-400 animate-pulse' : 'bg-green-400 animate-pulse'}`}></div>
+                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isLoadingStats ? 'bg-yellow-400 animate-pulse' : 'bg-green-400 animate-pulse'}`}></div>
               </div>
 
               {/* Content */}
-              <div className="space-y-2">
-                <h3 className="text-gray-400 text-sm font-medium">
+              <div className="space-y-1 sm:space-y-2">
+                <h3 className="text-gray-400 text-[10px] sm:text-xs md:text-sm font-medium">
                   {stat.title}
                 </h3>
-                <p className={`text-2xl font-bold transition-colors duration-300 ${
+                <p className={`text-sm sm:text-lg md:text-2xl font-bold transition-colors duration-300 truncate ${
                   isLoadingStats ? 'text-gray-400' : 'text-white group-hover:text-[#C09B52]'
                 }`}>
                   {stat.value}
                 </p>
-                <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors duration-300">
+                <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 group-hover:text-gray-400 transition-colors duration-300 line-clamp-1">
                   {stat.change}
                 </p>
               </div>
 
               {/* Floating Particle */}
-              <div className="absolute top-3 right-3 w-1 h-1 bg-gradient-to-r from-[#C09B52] to-amber-400 rounded-full opacity-0 group-hover:opacity-100 animate-ping"></div>
+              <div className="absolute top-2 sm:top-3 right-2 sm:right-3 w-1 h-1 bg-gradient-to-r from-[#C09B52] to-amber-400 rounded-full opacity-0 group-hover:opacity-100 animate-ping"></div>
             </div>
           </div>
         );

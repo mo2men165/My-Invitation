@@ -18,8 +18,15 @@ export interface QueuedJobResponse {
 
 export class WhatsappService {
   private static readonly WHATSAPP_API_URL = 'https://graph.facebook.com/v18.0';
-  private static readonly PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  private static readonly ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+  
+  // Lazy getters for environment variables - ensures they're read at runtime, not module load
+  private static get PHONE_NUMBER_ID(): string | undefined {
+    return process.env.WHATSAPP_PHONE_NUMBER_ID;
+  }
+  
+  private static get ACCESS_TOKEN(): string | undefined {
+    return process.env.WHATSAPP_ACCESS_TOKEN;
+  }
 
   /**
    * Sanitize template parameters to avoid WhatsApp API issues
