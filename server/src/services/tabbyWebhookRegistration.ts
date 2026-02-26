@@ -130,6 +130,87 @@ export async function registerTabbyWebhook(): Promise<{
 }
 
 /**
+ * Update existing webhook with Tabby API
+ * Use this when webhook URL needs to be changed
+ */
+export async function updateTabbyWebhook(webhookId: string): Promise<{
+  success: boolean;
+  message: string;
+  webhookId?: string;
+  webhookUrl?: string;
+}> {
+  const secretKey = process.env.TABBY_SECRET_KEY;
+  const merchantCode = process.env.TABBY_MERCHANT_CODE || 'TWS';
+  const apiUrl = process.env.TABBY_API_URL || 'https://api.tabby.ai';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const backendUrl = isProduction 
+    ? (process.env.BACKEND_URL_PRODUCTION || process.env.BACKEND_URL || 'http://localhost:5000')
+    : (process.env.BACKEND_URL || 'http://localhost:5000');
+
+  if (!secretKey) {
+    return {
+      success: false,
+      message: 'TABBY_SECRET_KEY not configured'
+    };
+  }
+
+  if (!webhookId) {
+    return {
+      success: false,
+      message: 'webhookId is required'
+    };
+  }
+
+  const webhookUrl = `${backendUrl}/api/payment/tabby/webhook`;
+
+  try {
+    logger.info('Updating Tabby webhook', {
+      webhookId,
+      webhookUrl,
+      merchantCode
+    });
+
+    const response = await axios.put<TabbyWebhookRegistrationResponse>(
+      `${apiUrl}/api/v1/webhooks/${webhookId}`,
+      { url: webhookUrl },
+      {
+        headers: {
+          'Authorization': `Bearer ${secretKey}`,
+          'Content-Type': 'application/json',
+          'X-Merchant-Code': merchantCode
+        },
+        timeout: 15000
+      }
+    );
+
+    logger.info('Tabby webhook updated successfully', {
+      webhookId: response.data.id,
+      webhookUrl: response.data.url
+    });
+
+    return {
+      success: true,
+      message: 'Webhook updated successfully',
+      webhookId: response.data.id,
+      webhookUrl: response.data.url
+    };
+
+  } catch (error: any) {
+    logger.error('Failed to update Tabby webhook', {
+      error: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      webhookId
+    });
+
+    return {
+      success: false,
+      message: `Failed to update webhook: ${error.response?.data?.error || error.message}`
+    };
+  }
+}
+
+/**
  * Initialize Tabby webhook registration on server startup
  * Only used in non-serverless environments (local development)
  * In serverless (Vercel), use the admin endpoint instead

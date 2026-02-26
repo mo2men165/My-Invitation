@@ -12,7 +12,7 @@ import { AdminNotification } from '../models/AdminNotification';
 import { emailService } from '../services/emailService';
 import { uploadSingleImage } from '../config/multer';
 import { CloudinaryService } from '../services/cloudinaryService';
-import { registerTabbyWebhook } from '../services/tabbyWebhookRegistration';
+import { registerTabbyWebhook, updateTabbyWebhook } from '../services/tabbyWebhookRegistration';
 
 
 const router = Router();
@@ -2503,6 +2503,46 @@ router.post('/tabby/register-webhook', withDB(async (req: Request, res: Response
     return res.status(500).json({
       success: false,
       error: { message: error.message || 'خطأ في تسجيل webhook' }
+    });
+  }
+}));
+
+/**
+ * PUT /api/admin/tabby/update-webhook/:webhookId
+ * Update existing Tabby webhook URL
+ */
+router.put('/tabby/update-webhook/:webhookId', withDB(async (req: Request, res: Response) => {
+  try {
+    const { webhookId } = req.params;
+    
+    if (!webhookId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'webhookId is required' }
+      });
+    }
+
+    const result = await updateTabbyWebhook(webhookId);
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        message: result.message,
+        webhookId: result.webhookId,
+        webhookUrl: result.webhookUrl
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: { message: result.message }
+      });
+    }
+
+  } catch (error: any) {
+    logger.error('Error updating Tabby webhook:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في تحديث webhook' }
     });
   }
 }));
