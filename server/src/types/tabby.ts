@@ -39,10 +39,13 @@ export interface TabbyOrder {
 }
 
 export interface TabbyOrderHistory {
-  purchased_at: string;
+  purchased_at: string;  // ISO 8601 datetime
   amount: string;
-  payment_method: string;
-  status: string;
+  payment_method: 'card' | 'cod';
+  status: 'new' | 'processing' | 'complete' | 'refunded' | 'canceled' | 'unknown';
+  buyer: TabbyBuyer;
+  shipping_address: TabbyShippingAddress;
+  items?: TabbyItem[];
 }
 
 export interface TabbyShippingAddress {
@@ -63,12 +66,12 @@ export interface TabbyAttachment {
 
 export interface TabbyPayment {
   amount: string;
-  currency: 'SAR';
-  description: string;
+  currency: 'SAR' | 'AED' | 'KWD';
+  description?: string;
   buyer: TabbyBuyer;
   buyer_history: TabbyBuyerHistory;
   order: TabbyOrder;
-  order_history?: TabbyOrderHistory[];
+  order_history: TabbyOrderHistory[];  // Required per API spec
   shipping_address: TabbyShippingAddress;
   meta?: TabbyMeta;
   attachment?: TabbyAttachment;
@@ -148,10 +151,11 @@ export interface TabbyPaymentResponse {
 
 export interface TabbyCaptureRequest {
   amount: string;
-  tax_amount: string;
-  shipping_amount: string;
-  discount_amount: string;
-  items: TabbyItem[];
+  reference_id: string;  // Required idempotency key
+  tax_amount?: string;
+  shipping_amount?: string;
+  discount_amount?: string;
+  items?: TabbyItem[];
 }
 
 export interface TabbyCaptureResponse {
@@ -162,7 +166,9 @@ export interface TabbyCaptureResponse {
 
 export interface TabbyRefundRequest {
   amount: string;
-  reason: string;
+  reference_id: string;  // Required idempotency key
+  reason?: string;
+  items?: TabbyItem[];
 }
 
 export interface TabbyRefundResponse {

@@ -100,6 +100,74 @@ function CartPageContent() {
 
   // State for item being edited
   const [itemToEdit, setItemToEdit] = useState<any>(null);
+  
+  // State for Tabby payment processing
+  const [isTabbyLoading, setIsTabbyLoading] = useState(false);
+
+  // Handle Tabby payment
+  const handleTabbyPayment = useCallback(async () => {
+    if (cartItems.length === 0) {
+      toast({
+        title: "السلة فارغة",
+        description: "يرجى إضافة عناصر للسلة قبل المتابعة",
+        variant: "destructive",
+        duration: 3000
+      });
+      return;
+    }
+
+    setIsTabbyLoading(true);
+
+    try {
+      // Get user profile information
+      const { authAPI } = await import('@/lib/api/auth');
+      const { paymentAPI } = await import('@/lib/api/payment');
+      
+      const userResponse = await authAPI.getCurrentUser();
+      
+      if (!userResponse.success || !userResponse.user) {
+        throw new Error('فشل في جلب بيانات المستخدم');
+      }
+
+      const user = userResponse.user;
+
+      // Create Tabby session
+      const result = await paymentAPI.createTabbySession({
+        customerInfo: {
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          city: (user.city === 'اخري' && user.customCity) ? user.customCity : (user.city || 'الرياض'),
+        },
+        selectedCartItemIds: cartItems.map(item => item._id)
+      });
+
+      if (result.success && result.checkoutUrl) {
+        // Redirect to Tabby checkout
+        window.location.href = result.checkoutUrl;
+      } else if (result.status === 'rejected') {
+        toast({
+          title: "تم رفض الطلب",
+          description: result.error?.rejectionReason || "لم يتم قبول الطلب من Tabby",
+          variant: "destructive",
+          duration: 5000
+        });
+      } else {
+        throw new Error(result.error?.message || 'فشل في إنشاء جلسة Tabby');
+      }
+    } catch (error: any) {
+      console.error('Tabby payment error:', error);
+      toast({
+        title: "خطأ في الدفع",
+        description: error.message || "حدث خطأ أثناء إنشاء جلسة الدفع",
+        variant: "destructive",
+        duration: 4000
+      });
+    } finally {
+      setIsTabbyLoading(false);
+    }
+  }, [cartItems, toast]);
 
   // Remove item handler with custom confirmation
   const handleRemoveItem = useCallback((itemId: string) => {
@@ -544,25 +612,21 @@ function CartPageContent() {
                     <div className="grid grid-cols-2 gap-3">
                       {/* Tabby Button */}
                       <button
-                        onClick={() => {
-                          // TODO: Implement Tabby payment
-                          toast({
-                            title: "قريباً",
-                            description: "خيار الدفع عبر Tabby قادم قريباً",
-                            variant: "default",
-                            duration: 3000
-                          });
-                        }}
-                        disabled={isLoading || cartItems.length === 0}
+                        onClick={handleTabbyPayment}
+                        disabled={isLoading || isTabbyLoading || cartItems.length === 0}
                         className="flex items-center justify-center p-3 bg-white rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border border-gray-200"
                       >
-                        <Image
-                          src="/tabby-logo.png"
-                          alt="Pay with Tabby"
-                          width={100}
-                          height={40}
-                          className="object-contain h-8 w-auto"
-                        />
+                        {isTabbyLoading ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-gray-600" />
+                        ) : (
+                          <Image
+                            src="/tabby-logo.png"
+                            alt="Pay with Tabby"
+                            width={100}
+                            height={40}
+                            className="object-contain h-8 w-auto"
+                          />
+                        )}
                       </button>
 
                       {/* Tamara Button */}

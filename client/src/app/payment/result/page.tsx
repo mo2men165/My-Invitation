@@ -71,14 +71,138 @@ const PaymentResultContent: React.FC = () => {
         setError(null);
         
         // Get parameters from URL
+        const provider = searchParams.get('provider');
         const merchantOrderId = searchParams.get('order_id') || searchParams.get('merchant_order_id');
         const reason = searchParams.get('reason');
         const message = searchParams.get('message');
         const callbackId = searchParams.get('callback_id');
+        const tabbyStatus = searchParams.get('status');
         
-        // Handle different scenarios
+        // Handle Tabby payment redirections
+        if (provider === 'tabby') {
+          console.log(`🔔 TABBY PAYMENT REDIRECT`, { tabbyStatus, merchantOrderId });
+          
+          if (tabbyStatus === 'cancel') {
+            setOrderData({
+              id: merchantOrderId || 'unknown',
+              merchantOrderId: merchantOrderId || 'unknown',
+              paymobOrderId: 0,
+              status: 'cancelled',
+              totalAmount: 0,
+              paymentMethod: 'tabby',
+              eventsCreated: 0,
+              events: [],
+              selectedItems: [],
+              createdAt: new Date().toISOString()
+            });
+            
+            toast({
+              title: "تم إلغاء الدفع",
+              description: "لم يتم إتمام عملية الدفع عبر تابي. يمكنك المحاولة مرة أخرى",
+              variant: "destructive",
+              duration: 5000
+            });
+            return;
+          }
+          
+          if (tabbyStatus === 'failure') {
+            setOrderData({
+              id: merchantOrderId || 'unknown',
+              merchantOrderId: merchantOrderId || 'unknown',
+              paymobOrderId: 0,
+              status: 'failed',
+              totalAmount: 0,
+              paymentMethod: 'tabby',
+              eventsCreated: 0,
+              events: [],
+              selectedItems: [],
+              createdAt: new Date().toISOString()
+            });
+            
+            toast({
+              title: "فشل في الدفع",
+              description: "لم يتم إتمام عملية الدفع عبر تابي",
+              variant: "destructive",
+              duration: 5000
+            });
+            return;
+          }
+          
+          // For success status, poll for order completion
+          if (tabbyStatus === 'success' && merchantOrderId) {
+            console.log(`✅ TABBY PAYMENT SUCCESS - POLLING FOR ORDER [${merchantOrderId}]`);
+            
+            // Poll for order completion (webhook should process it)
+            let attempts = 0;
+            const maxAttempts = 10;
+            const pollInterval = 2000;
+            
+            const pollForOrder = async (): Promise<boolean> => {
+              try {
+                const response = await paymentAPI.getOrderByMerchantId(merchantOrderId);
+                
+                if (response.success && response.order) {
+                  console.log(`📊 ORDER STATUS [${merchantOrderId}]`, {
+                    status: response.order.status,
+                    attempt: attempts + 1
+                  });
+                  
+                  if (response.order.status === 'completed') {
+                    setOrderData(response.order);
+                    toast({
+                      title: "تم الدفع بنجاح!",
+                      description: `تم إنشاء ${response.order.eventsCreated} مناسبة بنجاح`,
+                      variant: "default",
+                      duration: 5000
+                    });
+                    return true;
+                  } else if (response.order.status === 'failed') {
+                    setOrderData(response.order);
+                    toast({
+                      title: "فشل في الدفع",
+                      description: "لم يتم إتمام عملية الدفع بنجاح",
+                      variant: "destructive",
+                      duration: 5000
+                    });
+                    return true;
+                  }
+                }
+                return false;
+              } catch (err) {
+                console.error('Error polling for order:', err);
+                return false;
+              }
+            };
+            
+            // Try immediately first
+            if (await pollForOrder()) return;
+            
+            // Then poll with interval
+            while (attempts < maxAttempts) {
+              attempts++;
+              await new Promise(resolve => setTimeout(resolve, pollInterval));
+              if (await pollForOrder()) return;
+            }
+            
+            // If still pending after max attempts, show pending state
+            const finalResponse = await paymentAPI.getOrderByMerchantId(merchantOrderId);
+            if (finalResponse.success && finalResponse.order) {
+              setOrderData(finalResponse.order);
+              toast({
+                title: "جاري معالجة الدفع",
+                description: "سيتم تأكيد الدفع قريباً. يمكنك متابعة حالة الطلب من لوحة التحكم",
+                variant: "default",
+                duration: 7000
+              });
+            } else {
+              setError('فشل في تحميل بيانات الطلب');
+            }
+            return;
+          }
+        }
+        
+        // Handle Paymob/default payment flow
         if (reason === 'cancelled' || reason === 'user_cancelled') {
-          // User cancelled payment
           console.log(`🚫 PAYMENT CANCELLED [${merchantOrderId}]`, { reason, callbackId });
           setOrderData({
             id: merchantOrderId || 'unknown',
@@ -86,7 +210,7 @@ const PaymentResultContent: React.FC = () => {
             paymobOrderId: 0,
             status: 'cancelled',
             totalAmount: 0,
-            paymentMethod: 'unknown',
+            paymentMethod: 'paymob',
             eventsCreated: 0,
             events: [],
             selectedItems: [],
@@ -103,7 +227,6 @@ const PaymentResultContent: React.FC = () => {
         }
         
         if (message || callbackId) {
-          // Payment error occurred
           console.log(`💥 PAYMENT ERROR [${merchantOrderId}]`, { message, callbackId });
           setOrderData({
             id: merchantOrderId || 'unknown',
@@ -111,7 +234,7 @@ const PaymentResultContent: React.FC = () => {
             paymobOrderId: 0,
             status: 'failed',
             totalAmount: 0,
-            paymentMethod: 'unknown',
+            paymentMethod: 'paymob',
             eventsCreated: 0,
             events: [],
             selectedItems: [],
@@ -150,7 +273,6 @@ const PaymentResultContent: React.FC = () => {
           
           setOrderData(response.order);
           
-          // Show appropriate toast based on status
           if (response.order.status === 'completed') {
             toast({
               title: "تم الدفع بنجاح!",

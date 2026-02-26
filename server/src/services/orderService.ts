@@ -116,8 +116,9 @@ export class OrderService {
       // Create order with cart snapshot
       const orderData = {
         userId: new Types.ObjectId(userId),
-        paymobOrderId,
         merchantOrderId,
+        paymentProvider: 'paymob' as const,
+        paymobOrderId,
         selectedCartItems: selectedCartItems.map(item => ({
           cartItemId: item._id!,
           cartItemData: item
@@ -427,6 +428,295 @@ export class OrderService {
     } catch (error: any) {
       logger.error('Error getting pending cart item IDs:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Create a new Tabby order with selected cart items
+   */
+  static async createTabbyOrder(
+    userId: string,
+    selectedCartItemIds: string[],
+    tabbySessionId: string,
+    tabbyPaymentId: string,
+    merchantOrderId: string,
+    totalAmount: number
+  ): Promise<IOrder> {
+    const orderCreationId = `tabby_order_create_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    try {
+      logger.info(`📝 TABBY ORDER CREATION STARTED [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        tabbySessionId,
+        tabbyPaymentId,
+        merchantOrderId,
+        selectedCartItemIds,
+        totalAmount,
+        timestamp: new Date().toISOString()
+      });
+
+      // Get user and validate cart items
+      const user = await User.findById(userId);
+      if (!user) {
+        logger.error(`❌ USER NOT FOUND [${orderCreationId}]`, { orderCreationId, userId });
+        throw new Error('المستخدم غير موجود');
+      }
+
+      // Find selected cart items
+      const selectedCartItems = user.cart.filter(item => 
+        selectedCartItemIds.includes(item._id!.toString())
+      );
+
+      if (selectedCartItems.length !== selectedCartItemIds.length) {
+        logger.error(`❌ CART ITEMS VALIDATION FAILED [${orderCreationId}]`, {
+          orderCreationId,
+          userId,
+          requestedCount: selectedCartItemIds.length,
+          foundCount: selectedCartItems.length
+        });
+        throw new Error('بعض العناصر المحددة غير موجودة في السلة');
+      }
+
+      // Check for existing pending orders with these items
+      const pendingOrders = await Order.find({
+        userId: new Types.ObjectId(userId),
+        status: 'pending',
+        'selectedCartItems.cartItemId': { $in: selectedCartItemIds.map(id => new Types.ObjectId(id)) }
+      });
+
+      if (pendingOrders.length > 0) {
+        logger.error(`❌ CONFLICTING PENDING ORDERS FOUND [${orderCreationId}]`, {
+          orderCreationId,
+          conflictingOrderIds: pendingOrders.map(order => order._id)
+        });
+        throw new Error('بعض العناصر المحددة في طلبات معلقة بالفعل');
+      }
+
+      // Create order with cart snapshot
+      const orderData = {
+        userId: new Types.ObjectId(userId),
+        merchantOrderId,
+        paymentProvider: 'tabby' as const,
+        tabbySessionId,
+        tabbyPaymentId,
+        selectedCartItems: selectedCartItems.map(item => ({
+          cartItemId: item._id!,
+          cartItemData: item
+        })),
+        totalAmount,
+        status: 'pending' as const,
+        paymentMethod: 'tabby'
+      };
+
+      const order = new Order(orderData);
+      const savedOrder = await order.save();
+
+      logger.info(`✅ TABBY ORDER CREATED SUCCESSFULLY [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        tabbySessionId,
+        tabbyPaymentId,
+        merchantOrderId,
+        ourOrderId: savedOrder._id,
+        selectedItemsCount: savedOrder.selectedCartItems.length,
+        totalAmount: savedOrder.totalAmount
+      });
+
+      return savedOrder;
+
+    } catch (error: any) {
+      logger.error(`💥 TABBY ORDER CREATION FAILED [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        tabbySessionId,
+        tabbyPaymentId,
+        merchantOrderId,
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Process successful Tabby payment and create events
+   */
+  static async processSuccessfulTabbyPayment(
+    tabbyPaymentId: string,
+    tabbyStatus: string
+  ): Promise<{
+    success: boolean;
+    orderId?: string;
+    eventsCreated?: number;
+    events?: any[];
+    error?: string;
+  }> {
+    const processId = `tabby_process_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    try {
+      logger.info(`🔄 PROCESSING TABBY PAYMENT [${processId}]`, {
+        processId,
+        tabbyPaymentId,
+        tabbyStatus
+      });
+
+      // Find order by Tabby payment ID
+      const order = await Order.findOne({ tabbyPaymentId });
+      if (!order) {
+        logger.error(`❌ ORDER NOT FOUND FOR TABBY PAYMENT [${processId}]`, { tabbyPaymentId });
+        return { success: false, error: 'Order not found' };
+      }
+
+      if (order.status !== 'pending') {
+        logger.warn(`⚠️ ORDER NOT PENDING [${processId}]`, {
+          orderId: order._id,
+          currentStatus: order.status
+        });
+        return { success: false, error: 'Order is not pending' };
+      }
+
+      // Update tabby status
+      order.tabbyStatus = tabbyStatus;
+      
+      // Process using existing successful payment logic
+      const paymentCompletedAt = new Date();
+      const createdEvents = [];
+
+      // Create events from cart snapshot
+      for (const selectedItem of order.selectedCartItems) {
+        const cartItem = selectedItem.cartItemData;
+        
+        const eventData = {
+          userId: order.userId,
+          designId: cartItem.designId,
+          packageType: cartItem.packageType,
+          details: {
+            ...cartItem.details,
+            eventDate: new Date(cartItem.details.eventDate),
+            isCustomDesign: cartItem.details.isCustomDesign || false,
+            customDesignNotes: cartItem.details.customDesignNotes || ''
+          },
+          totalPrice: cartItem.totalPrice,
+          status: 'upcoming' as const,
+          approvalStatus: 'pending' as const,
+          guests: [],
+          paymentCompletedAt
+        };
+
+        const newEvent = new Event(eventData);
+        const savedEvent = await newEvent.save();
+        createdEvents.push(savedEvent);
+
+        // Send notification
+        try {
+          await NotificationService.notifyNewEventPending(
+            (savedEvent._id as Types.ObjectId).toString(),
+            order.userId.toString(),
+            {
+              hostName: savedEvent.details.hostName,
+              eventDate: savedEvent.details.eventDate.toLocaleDateString('ar-SA')
+            }
+          );
+        } catch (notificationError: any) {
+          logger.error(`Failed to send notification for event ${savedEvent._id}:`, notificationError.message);
+        }
+      }
+
+      // Update order status
+      order.status = 'completed';
+      order.completedAt = paymentCompletedAt;
+      order.eventsCreated = createdEvents.map(event => event._id as Types.ObjectId);
+      await order.save();
+
+      // Remove paid cart items from user's cart
+      const user = await User.findById(order.userId);
+      if (user) {
+        const cartItemIdsToRemove = order.selectedCartItems.map(item => item.cartItemId.toString());
+        user.cart = user.cart.filter(item => !cartItemIdsToRemove.includes(item._id!.toString()));
+        await user.save();
+
+        try {
+          await CacheService.invalidateUserCartCache((order.userId as Types.ObjectId).toString());
+        } catch (cacheError: any) {
+          // Cache failure shouldn't stop the process
+        }
+      }
+
+      logger.info(`✅ TABBY PAYMENT PROCESSED SUCCESSFULLY [${processId}]`, {
+        processId,
+        orderId: order._id,
+        eventsCreated: createdEvents.length
+      });
+
+      // Create bill (non-blocking)
+      BillService.createBillFromOrder((order._id as Types.ObjectId).toString())
+        .then((bill) => {
+          if (bill) {
+            logger.info(`Bill created for Tabby order ${order._id}:`, { billId: bill._id });
+          }
+        })
+        .catch((billError) => {
+          logger.error(`Failed to create bill for Tabby order ${order._id}:`, billError);
+        });
+
+      return {
+        success: true,
+        orderId: (order._id as Types.ObjectId).toString(),
+        eventsCreated: createdEvents.length,
+        events: createdEvents
+      };
+
+    } catch (error: any) {
+      logger.error(`💥 TABBY PAYMENT PROCESSING FAILED [${processId}]`, {
+        processId,
+        tabbyPaymentId,
+        error: error.message
+      });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Find order by Tabby payment ID
+   */
+  static async findByTabbyPaymentId(tabbyPaymentId: string): Promise<IOrder | null> {
+    try {
+      return await Order.findOne({ tabbyPaymentId });
+    } catch (error: any) {
+      logger.error('Error finding order by Tabby payment ID:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark Tabby order as failed
+   */
+  static async markTabbyOrderAsFailed(tabbyPaymentId: string, tabbyStatus: string): Promise<boolean> {
+    try {
+      const order = await Order.findOne({ tabbyPaymentId });
+      if (!order) {
+        logger.error(`Order not found for Tabby payment ID: ${tabbyPaymentId}`);
+        return false;
+      }
+
+      if (order.status === 'pending') {
+        order.status = 'failed';
+        order.failedAt = new Date();
+        order.tabbyStatus = tabbyStatus;
+        await order.save();
+
+        logger.info(`Tabby order marked as failed:`, {
+          orderId: order._id,
+          tabbyPaymentId,
+          tabbyStatus
+        });
+      }
+
+      return true;
+    } catch (error: any) {
+      logger.error('Error marking Tabby order as failed:', error);
+      return false;
     }
   }
 }

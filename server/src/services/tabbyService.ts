@@ -152,13 +152,16 @@ export class TabbyService {
         product_url: item.productUrl
       }));
 
+      // Prepare buyer info with phone normalization
+      const buyerPhone = params.buyer.phone.replace(/^\+966/, '').replace(/^966/, '').replace(/^0/, '');
+      
       const sessionRequest: TabbySessionRequest = {
         payment: {
           amount: this.formatAmount(params.amount),
           currency: 'SAR',
           description: params.description,
           buyer: {
-            phone: params.buyer.phone.replace(/^\+966/, ''),
+            phone: buyerPhone,
             email: params.buyer.email,
             name: params.buyer.name,
             dob: params.buyer.dob
@@ -178,9 +181,11 @@ export class TabbyService {
             reference_id: params.orderReferenceId,
             items: tabbyItems
           },
+          // order_history is required by Tabby API - empty array for new customers
+          order_history: [],
           shipping_address: {
             city: params.shippingAddress.city,
-            address: params.shippingAddress.address,
+            address: params.shippingAddress.address || params.shippingAddress.city,
             zip: params.shippingAddress.zip || '00000'
           },
           meta: {
@@ -191,9 +196,9 @@ export class TabbyService {
         lang: params.lang || 'ar',
         merchant_code: this.config.merchantCode,
         merchant_urls: {
-          success: `${this.config.frontendUrl}/payment/success?provider=tabby`,
-          cancel: `${this.config.frontendUrl}/payment/cancel?provider=tabby`,
-          failure: `${this.config.frontendUrl}/payment/failure?provider=tabby`
+          success: `${this.config.frontendUrl}/payment/result?provider=tabby&status=success&merchant_order_id=${params.orderReferenceId}`,
+          cancel: `${this.config.frontendUrl}/payment/result?provider=tabby&status=cancel&merchant_order_id=${params.orderReferenceId}`,
+          failure: `${this.config.frontendUrl}/payment/result?provider=tabby&status=failure&merchant_order_id=${params.orderReferenceId}`
         }
       };
 
@@ -233,6 +238,7 @@ export class TabbyService {
         };
       }
 
+      // Check if installments are available
       const installments = sessionData.configuration?.available_products?.installments;
       if (!installments || installments.length === 0) {
         logger.error(`[${requestId}] No installment products available`, {
@@ -248,19 +254,36 @@ export class TabbyService {
         };
       }
 
+      // Get checkout URL from installments and payment ID from payment object
       const installment = installments[0];
+      const paymentId = sessionData.payment?.id;
+      const webUrl = installment.web_url;
+
+      if (!webUrl) {
+        logger.error(`[${requestId}] No checkout URL in response`, {
+          sessionId: sessionData.id,
+          installment
+        });
+
+        return {
+          success: false,
+          sessionId: sessionData.id,
+          status: 'rejected',
+          rejectionReason: 'No checkout URL available'
+        };
+      }
 
       logger.info(`[${requestId}] Tabby session created successfully`, {
         sessionId: sessionData.id,
-        paymentId: installment.payment_id,
-        webUrl: installment.web_url
+        paymentId,
+        webUrl
       });
 
       return {
         success: true,
         sessionId: sessionData.id,
-        paymentId: installment.payment_id,
-        webUrl: installment.web_url,
+        paymentId: paymentId || installment.payment_id, // Fallback to installment.payment_id if available
+        webUrl,
         status: 'created'
       };
 
@@ -312,11 +335,13 @@ export class TabbyService {
    * Method 3: Capture payment
    * Endpoint: POST /api/v2/payments/{payment_id}/captures
    * Must capture the full amount - Tabby requires full capture
+   * reference_id is required for idempotency
    */
   async capturePayment(params: {
     paymentId: string;
     amount: number;
-    items: Array<{
+    referenceId?: string;  // Idempotency key
+    items?: Array<{
       title: string;
       description: string;
       id: string;
@@ -330,14 +355,16 @@ export class TabbyService {
     }>;
   }): Promise<TabbyCaptureResponse> {
     const requestId = `tabby_capture_${Date.now()}`;
+    const idempotencyKey = params.referenceId || `capture_${params.paymentId}_${Date.now()}`;
 
     try {
       logger.info(`[${requestId}] Capturing Tabby payment`, {
         paymentId: params.paymentId,
-        amount: params.amount
+        amount: params.amount,
+        referenceId: idempotencyKey
       });
 
-      const tabbyItems: TabbyItem[] = params.items.map(item => ({
+      const tabbyItems: TabbyItem[] | undefined = params.items?.map(item => ({
         title: item.title,
         description: item.description,
         id: item.id,
@@ -353,6 +380,7 @@ export class TabbyService {
 
       const captureRequest: TabbyCaptureRequest = {
         amount: this.formatAmount(params.amount),
+        reference_id: idempotencyKey,
         tax_amount: '0.00',
         shipping_amount: '0.00',
         discount_amount: '0.00',
@@ -387,23 +415,28 @@ export class TabbyService {
    * Method 4: Refund payment
    * Endpoint: POST /api/v2/payments/{payment_id}/refunds
    * Only callable after status is CLOSED
+   * reference_id is required for idempotency
    */
   async refundPayment(params: {
     paymentId: string;
     amount: number;
-    reason: string;
+    reason?: string;
+    referenceId?: string;  // Idempotency key
   }): Promise<TabbyRefundResponse> {
     const requestId = `tabby_refund_${Date.now()}`;
+    const idempotencyKey = params.referenceId || `refund_${params.paymentId}_${Date.now()}`;
 
     try {
       logger.info(`[${requestId}] Refunding Tabby payment`, {
         paymentId: params.paymentId,
         amount: params.amount,
-        reason: params.reason
+        reason: params.reason,
+        referenceId: idempotencyKey
       });
 
       const refundRequest: TabbyRefundRequest = {
         amount: this.formatAmount(params.amount),
+        reference_id: idempotencyKey,
         reason: params.reason
       };
 
@@ -432,28 +465,36 @@ export class TabbyService {
   }
 
   /**
-   * Method 5: Cancel session
-   * Endpoint: POST /api/v2/checkout/{session_id}/cancel
-   * Only callable when payment status is CREATED
+   * Method 5: Close payment
+   * Endpoint: POST /api/v2/payments/{payment_id}/close
+   * Use to close a payment without full capture (partial order cancellation)
+   * If order is fully cancelled, close without capturing - customer will be refunded
    */
-  async cancelSession(sessionId: string): Promise<void> {
-    const requestId = `tabby_cancel_${Date.now()}`;
+  async closePayment(paymentId: string): Promise<TabbyPaymentResponse> {
+    const requestId = `tabby_close_${Date.now()}`;
 
     try {
-      logger.info(`[${requestId}] Cancelling Tabby session`, { sessionId });
+      logger.info(`[${requestId}] Closing Tabby payment`, { paymentId });
 
-      await this.axiosInstance.post(`/api/v2/checkout/${sessionId}/cancel`);
+      const response = await this.axiosInstance.post<TabbyPaymentResponse>(
+        `/api/v2/payments/${paymentId}/close`
+      );
 
-      logger.info(`[${requestId}] Tabby session cancelled successfully`, { sessionId });
+      logger.info(`[${requestId}] Tabby payment closed successfully`, {
+        paymentId,
+        status: response.data.status
+      });
+
+      return response.data;
 
     } catch (error: any) {
-      logger.error(`[${requestId}] Failed to cancel Tabby session`, {
-        sessionId,
+      logger.error(`[${requestId}] Failed to close Tabby payment`, {
+        paymentId,
         error: error.message,
         response: error.response?.data,
         status: error.response?.status
       });
-      throw new Error(`Failed to cancel Tabby session: ${error.response?.data?.error || error.message}`);
+      throw new Error(`Failed to close Tabby payment: ${error.response?.data?.error || error.message}`);
     }
   }
 
@@ -489,8 +530,8 @@ export const tabbyService = {
     getTabbyService().capturePayment(...args),
   refundPayment: (...args: Parameters<TabbyService['refundPayment']>) =>
     getTabbyService().refundPayment(...args),
-  cancelSession: (...args: Parameters<TabbyService['cancelSession']>) =>
-    getTabbyService().cancelSession(...args),
+  closePayment: (...args: Parameters<TabbyService['closePayment']>) =>
+    getTabbyService().closePayment(...args),
   getMerchantCode: () => getTabbyService().getMerchantCode(),
   getConfig: () => getTabbyService().getConfig()
 };

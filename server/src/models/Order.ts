@@ -4,8 +4,11 @@ import { ICartItem } from './User';
 
 export interface IOrder extends Document {
   userId: Types.ObjectId;
-  paymobOrderId: number;           // Paymob's order ID from webhook
-  merchantOrderId: string;         // What we sent to Paymob
+  merchantOrderId: string;         // Our internal order reference
+  paymentProvider: 'paymob' | 'tabby';  // Payment provider used
+  paymobOrderId?: number;          // Paymob's order ID (for paymob payments)
+  tabbyPaymentId?: string;         // Tabby's payment ID (for tabby payments)
+  tabbySessionId?: string;         // Tabby's session ID
   selectedCartItems: {
     cartItemId: Types.ObjectId;    // Unique cart item ID
     cartItemData: ICartItem;       // Full cart item data snapshot
@@ -18,8 +21,9 @@ export interface IOrder extends Document {
   completedAt?: Date;
   failedAt?: Date;
   cancelledAt?: Date;
-  paymobTransactionId?: string;    // Transaction ID from webhook
-  adminNotes?: string;              // Admin notes for manual status changes
+  paymobTransactionId?: string;    // Transaction ID from Paymob webhook
+  tabbyStatus?: string;            // Tabby payment status
+  adminNotes?: string;             // Admin notes for manual status changes
 }
 
 const selectedCartItemSchema = new Schema({
@@ -171,16 +175,31 @@ const orderSchema = new Schema<IOrder>({
     required: true,
     index: true
   },
-  paymobOrderId: {
-    type: Number,
+  merchantOrderId: {
+    type: String,
     required: true,
     unique: true,
     index: true
   },
-  merchantOrderId: {
+  paymentProvider: {
     type: String,
+    enum: ['paymob', 'tabby'],
     required: true,
+    default: 'paymob'
+  },
+  paymobOrderId: {
+    type: Number,
+    sparse: true,
     index: true
+  },
+  tabbyPaymentId: {
+    type: String,
+    sparse: true,
+    index: true
+  },
+  tabbySessionId: {
+    type: String,
+    sparse: true
   },
   selectedCartItems: {
     type: [selectedCartItemSchema],
@@ -224,6 +243,9 @@ const orderSchema = new Schema<IOrder>({
   paymobTransactionId: {
     type: String
   },
+  tabbyStatus: {
+    type: String
+  },
   adminNotes: {
     type: String,
     maxlength: 1000
@@ -234,5 +256,7 @@ const orderSchema = new Schema<IOrder>({
 orderSchema.index({ userId: 1, status: 1 });
 orderSchema.index({ status: 1, createdAt: 1 });
 orderSchema.index({ 'selectedCartItems.cartItemId': 1 });
+orderSchema.index({ tabbyPaymentId: 1 }, { sparse: true });
+orderSchema.index({ paymentProvider: 1, status: 1 });
 
 export const Order = mongoose.model<IOrder>('Order', orderSchema);

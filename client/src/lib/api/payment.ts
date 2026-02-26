@@ -162,6 +162,63 @@ class PaymentAPI {
 
     return result;
   }
+
+  async createTabbySession(data: {
+    customerInfo: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      city: string;
+      address?: string;
+      zip?: string;
+      dob?: string;
+    };
+    selectedCartItemIds?: string[];
+  }): Promise<{
+    success: boolean;
+    sessionId?: string;
+    paymentId?: string;
+    checkoutUrl?: string;
+    merchantOrderId?: string;
+    amount?: number;
+    currency?: string;
+    error?: { message: string; rejectionReason?: string };
+    status?: string;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/create-tabby-session`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في إنشاء جلسة Tabby');
+    }
+
+    return result;
+  }
+
+  async getTabbyPaymentStatus(paymentId: string): Promise<{
+    success: boolean;
+    payment?: any;
+    error?: { message: string };
+  }> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/tabby/${paymentId}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في جلب حالة الدفع');
+    }
+
+    return result;
+  }
 }
 
 export const paymentAPI = new PaymentAPI();

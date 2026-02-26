@@ -1710,17 +1710,37 @@ router.post('/tabby/webhook', cors(), withDB(async (req: Request, res: Response)
       });
     }
 
-    // TODO: Verify payment_id exists in your DB
-    // const order = await Order.findOne({ tabbyPaymentId: paymentId });
-    // if (!order) {
-    //   logger.error(`❌ TABBY WEBHOOK - PAYMENT NOT FOUND [${webhookId}]`, { paymentId });
-    //   return res.status(404).json({ success: false, error: 'Payment not found' });
-    // }
+    // Verify payment exists in our DB
+    const order = await OrderService.findByTabbyPaymentId(paymentId);
+    if (!order) {
+      logger.error(`❌ TABBY WEBHOOK - PAYMENT NOT FOUND [${webhookId}]`, { paymentId });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Payment not found',
+        webhookId 
+      });
+    }
+
+    logger.info(`✅ ORDER FOUND FOR TABBY PAYMENT [${webhookId}]`, {
+      webhookId,
+      paymentId,
+      orderId: order._id,
+      orderStatus: order.status
+    });
 
     // Handle different statuses (note: webhook statuses are lowercase)
     switch (status) {
       case 'authorized':
         logger.info(`✅ TABBY PAYMENT AUTHORIZED [${webhookId}]`, { paymentId, amount });
+
+        // Only process if order is still pending
+        if (order.status !== 'pending') {
+          logger.warn(`⚠️ ORDER ALREADY PROCESSED [${webhookId}]`, {
+            paymentId,
+            orderStatus: order.status
+          });
+          break;
+        }
 
         try {
           // Verify payment status via API before capturing
@@ -1729,30 +1749,48 @@ router.post('/tabby/webhook', cors(), withDB(async (req: Request, res: Response)
           if (paymentDetails.status === 'AUTHORIZED') {
             logger.info(`✅ TABBY PAYMENT VERIFIED - CAPTURING [${webhookId}]`, { paymentId });
 
-            // TODO: Get items from your order in DB for capture
-            // For now, using a placeholder - you'll need to fetch actual order items
-            // const captureResult = await tabbyService.capturePayment({
-            //   paymentId,
-            //   amount: parseFloat(amount),
-            //   items: order.items.map(item => ({
-            //     title: item.name,
-            //     description: item.description || item.name,
-            //     id: item.id,
-            //     sku: item.sku || item.id,
-            //     category: 'Invitations',
-            //     quantity: item.quantity || 1,
-            //     unitPrice: item.unitPrice,
-            //     referenceId: item.id
-            //   }))
-            // });
+            // Prepare items for capture from order data
+            const captureItems = order.selectedCartItems.map((item, index) => ({
+              title: `دعوة ${item.cartItemData.details.hostName}`,
+              description: `دعوة ${item.cartItemData.packageType} لـ ${item.cartItemData.details.hostName}`,
+              id: item.cartItemId.toString(),
+              sku: `INV-${item.cartItemData.packageType.toUpperCase()}-${index + 1}`,
+              category: 'Invitations',
+              quantity: 1,
+              unitPrice: item.cartItemData.totalPrice,
+              referenceId: item.cartItemId.toString()
+            }));
 
-            logger.info(`✅ TABBY PAYMENT CAPTURE INITIATED [${webhookId}]`, { paymentId });
+            // Capture the payment
+            const captureResult = await tabbyService.capturePayment({
+              paymentId,
+              amount: parseFloat(amount),
+              items: captureItems
+            });
 
-            // TODO: Update order status in DB
-            // await Order.findOneAndUpdate(
-            //   { tabbyPaymentId: paymentId },
-            //   { tabbyStatus: 'captured', status: 'completed', completedAt: new Date() }
-            // );
+            logger.info(`✅ TABBY PAYMENT CAPTURED [${webhookId}]`, {
+              paymentId,
+              captureResult
+            });
+
+            // Process the successful payment and create events
+            const processResult = await OrderService.processSuccessfulTabbyPayment(
+              paymentId,
+              'captured'
+            );
+
+            if (processResult.success) {
+              logger.info(`✅ EVENTS CREATED SUCCESSFULLY [${webhookId}]`, {
+                paymentId,
+                orderId: processResult.orderId,
+                eventsCreated: processResult.eventsCreated
+              });
+            } else {
+              logger.error(`❌ FAILED TO CREATE EVENTS [${webhookId}]`, {
+                paymentId,
+                error: processResult.error
+              });
+            }
 
           } else {
             logger.warn(`⚠️ TABBY PAYMENT STATUS MISMATCH [${webhookId}]`, {
@@ -1771,29 +1809,32 @@ router.post('/tabby/webhook', cors(), withDB(async (req: Request, res: Response)
 
       case 'closed':
         logger.info(`✅ TABBY PAYMENT CLOSED (CAPTURED) [${webhookId}]`, { paymentId, amount });
-        // TODO: Update order status in DB
-        // await Order.findOneAndUpdate(
-        //   { tabbyPaymentId: paymentId },
-        //   { tabbyStatus: 'closed', status: 'completed', completedAt: new Date() }
-        // );
+        
+        // Process if order is still pending (in case we missed the authorized webhook)
+        if (order.status === 'pending') {
+          const processResult = await OrderService.processSuccessfulTabbyPayment(
+            paymentId,
+            'closed'
+          );
+
+          if (processResult.success) {
+            logger.info(`✅ ORDER COMPLETED ON CLOSED STATUS [${webhookId}]`, {
+              paymentId,
+              orderId: processResult.orderId,
+              eventsCreated: processResult.eventsCreated
+            });
+          }
+        }
         break;
 
       case 'rejected':
         logger.warn(`⚠️ TABBY PAYMENT REJECTED [${webhookId}]`, { paymentId });
-        // TODO: Update order status in DB
-        // await Order.findOneAndUpdate(
-        //   { tabbyPaymentId: paymentId },
-        //   { tabbyStatus: 'rejected', status: 'failed', failedAt: new Date() }
-        // );
+        await OrderService.markTabbyOrderAsFailed(paymentId, 'rejected');
         break;
 
       case 'expired':
         logger.warn(`⚠️ TABBY PAYMENT EXPIRED [${webhookId}]`, { paymentId });
-        // TODO: Update order status in DB
-        // await Order.findOneAndUpdate(
-        //   { tabbyPaymentId: paymentId },
-        //   { tabbyStatus: 'expired', status: 'failed', failedAt: new Date() }
-        // );
+        await OrderService.markTabbyOrderAsFailed(paymentId, 'expired');
         break;
 
       default:
@@ -1970,15 +2011,23 @@ router.post('/create-tabby-session', withDB(async (req: Request, res: Response) 
       webUrl: sessionResponse.webUrl
     });
 
-    // TODO: Create internal order record with Tabby session info
-    // const order = await OrderService.createTabbyOrder(
-    //   userId,
-    //   finalSelectedCartItemIds,
-    //   sessionResponse.sessionId!,
-    //   sessionResponse.paymentId!,
-    //   merchantOrderId,
-    //   cartSummary.summary.totalAmount
-    // );
+    // Create internal order record with Tabby session info
+    const order = await OrderService.createTabbyOrder(
+      userId,
+      finalSelectedCartItemIds,
+      sessionResponse.sessionId!,
+      sessionResponse.paymentId!,
+      merchantOrderId,
+      cartSummary.summary.totalAmount
+    );
+
+    logger.info(`✅ TABBY ORDER RECORD CREATED [${sessionCreationId}]`, {
+      sessionCreationId,
+      userId,
+      orderId: order._id,
+      tabbyPaymentId: sessionResponse.paymentId,
+      merchantOrderId
+    });
 
     const totalProcessingTime = Date.now() - sessionCreationStartTime;
 
@@ -1987,6 +2036,7 @@ router.post('/create-tabby-session', withDB(async (req: Request, res: Response) 
       userId,
       sessionId: sessionResponse.sessionId,
       paymentId: sessionResponse.paymentId,
+      orderId: order._id,
       totalAmount: cartSummary.summary.totalAmount,
       totalProcessingTime
     });
@@ -1997,6 +2047,7 @@ router.post('/create-tabby-session', withDB(async (req: Request, res: Response) 
       paymentId: sessionResponse.paymentId,
       checkoutUrl: sessionResponse.webUrl,
       merchantOrderId: merchantOrderId,
+      orderId: (order._id as any).toString(),
       amount: cartSummary.summary.totalAmount,
       currency: 'SAR',
       sessionCreationId: sessionCreationId,
@@ -2158,36 +2209,38 @@ router.post('/tabby/refund/:paymentId', withDB(async (req: Request, res: Respons
 }));
 
 /**
- * POST /api/payment/tabby/cancel/:sessionId
- * Cancel a Tabby session (only when status is CREATED)
+ * POST /api/payment/tabby/close/:paymentId
+ * Close a Tabby payment (cancels order if not captured)
+ * If order is fully cancelled, close without capturing - customer will be refunded
  */
-router.post('/tabby/cancel/:sessionId', withDB(async (req: Request, res: Response) => {
+router.post('/tabby/close/:paymentId', withDB(async (req: Request, res: Response) => {
   try {
-    const sessionId = Array.isArray(req.params.sessionId)
-      ? req.params.sessionId[0]
-      : req.params.sessionId;
+    const paymentId = Array.isArray(req.params.paymentId)
+      ? req.params.paymentId[0]
+      : req.params.paymentId;
 
-    if (!sessionId) {
+    if (!paymentId) {
       return res.status(400).json({
         success: false,
-        error: { message: 'معرف الجلسة مطلوب' }
+        error: { message: 'معرف الدفع مطلوب' }
       });
     }
 
-    await tabbyService.cancelSession(sessionId);
+    const result = await tabbyService.closePayment(paymentId);
 
-    logger.info('Tabby session cancelled successfully', { sessionId });
+    logger.info('Tabby payment closed successfully', { paymentId, status: result.status });
 
     return res.json({
       success: true,
-      message: 'تم إلغاء الجلسة بنجاح'
+      message: 'تم إغلاق الدفع بنجاح',
+      payment: result
     });
 
   } catch (error: any) {
-    logger.error('Error cancelling Tabby session:', error);
+    logger.error('Error closing Tabby payment:', error);
     return res.status(500).json({
       success: false,
-      error: { message: error.message || 'خطأ في إلغاء الجلسة' }
+      error: { message: error.message || 'خطأ في إغلاق الدفع' }
     });
   }
 }));
