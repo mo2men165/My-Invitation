@@ -533,6 +533,62 @@ function CartPageContent() {
                       )}
                     </button>
 
+                    {/* Payment Options Divider */}
+                    <div className="flex items-center gap-3 py-2">
+                      <div className="flex-1 h-px bg-white/10"></div>
+                      <span className="text-gray-400 text-sm">أو ادفع عبر</span>
+                      <div className="flex-1 h-px bg-white/10"></div>
+                    </div>
+
+                    {/* Tabby & Tamara Payment Options */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Tabby Button */}
+                      <button
+                        onClick={() => {
+                          // TODO: Implement Tabby payment
+                          toast({
+                            title: "قريباً",
+                            description: "خيار الدفع عبر Tabby قادم قريباً",
+                            variant: "default",
+                            duration: 3000
+                          });
+                        }}
+                        disabled={isLoading || cartItems.length === 0}
+                        className="flex items-center justify-center p-3 bg-white rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border border-gray-200"
+                      >
+                        <Image
+                          src="/tabby-logo.png"
+                          alt="Pay with Tabby"
+                          width={100}
+                          height={40}
+                          className="object-contain h-8 w-auto"
+                        />
+                      </button>
+
+                      {/* Tamara Button */}
+                      <button
+                        onClick={() => {
+                          // TODO: Implement Tamara payment
+                          toast({
+                            title: "قريباً",
+                            description: "خيار الدفع عبر Tamara قادم قريباً",
+                            variant: "default",
+                            duration: 3000
+                          });
+                        }}
+                        disabled={isLoading || cartItems.length === 0}
+                        className="flex items-center justify-center p-3 bg-white rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border border-gray-200"
+                      >
+                        <Image
+                          src="/tamara-logo.png"
+                          alt="Pay with Tamara"
+                          width={100}
+                          height={40}
+                          className="object-contain h-8 w-auto"
+                        />
+                      </button>
+                    </div>
+
                     {/* Continue Shopping */}
                     <button
                       onClick={() => router.push('/packages')}

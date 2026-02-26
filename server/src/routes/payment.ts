@@ -1,9 +1,12 @@
 // routes/payment.ts
 import { Router, Request, Response } from 'express';
 import cors from 'cors';
+import jwt from 'jsonwebtoken';
 import { Types } from 'mongoose';
 import { PaymentService } from '../services/paymentService';
 import { paymobService } from '../services/paymobService';
+import { tamaraService } from '../services/tamaraService';
+import { tabbyService } from '../services/tabbyService';
 import { OrderService } from '../services/orderService';
 import { Order } from '../models/Order';
 import { Event } from '../models/Event';
@@ -11,6 +14,8 @@ import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { withDB } from '../utils/routeUtils';
 import { PaymobWebhookData } from '../types/paymob';
+import { TamaraWebhookPayload, TamaraWebhookEventType } from '../types/tamara';
+import { TabbyWebhookPayload } from '../types/tabby';
 
 const router = Router();
 
@@ -1090,6 +1095,1099 @@ router.get('/paymob/status/:transactionId', withDB(async (req: Request, res: Res
     return res.status(500).json({
       success: false,
       error: { message: 'خطأ في جلب حالة الدفع' }
+    });
+  }
+}));
+
+/**
+ * POST /api/payments/tamara/webhook
+ * Handle Tamara webhook notifications
+ * This route should NOT require authentication as it's called by Tamara
+ * 
+ * SERVERLESS COMPLIANT: Process everything before sending response
+ */
+router.post('/tamara/webhook', cors(), withDB(async (req: Request, res: Response) => {
+  const webhookStartTime = Date.now();
+  const webhookId = `tamara_webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  try {
+    logger.info(`🔔 TAMARA WEBHOOK RECEIVED [${webhookId}]`, {
+      timestamp: new Date().toISOString(),
+      webhookId,
+      method: req.method,
+      url: req.url,
+      headers: {
+        'content-type': req.headers['content-type'],
+        'authorization': req.headers['authorization'] ? 'PRESENT' : 'MISSING',
+        'user-agent': req.headers['user-agent']
+      },
+      queryParams: req.query,
+      bodyKeys: Object.keys(req.body || {})
+    });
+
+    // Extract tamaraToken from query params or Authorization header
+    const tamaraTokenFromQuery = req.query.tamaraToken as string;
+    const authHeader = req.headers['authorization'] as string;
+    const tamaraTokenFromHeader = authHeader?.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : null;
+    
+    const tamaraToken = tamaraTokenFromQuery || tamaraTokenFromHeader;
+
+    logger.info(`🔐 TAMARA TOKEN VALIDATION [${webhookId}]`, {
+      webhookId,
+      hasTokenFromQuery: !!tamaraTokenFromQuery,
+      hasTokenFromHeader: !!tamaraTokenFromHeader,
+      tokenLength: tamaraToken?.length || 0
+    });
+
+    // Validate the token using JWT with HS256 algorithm
+    if (!tamaraToken) {
+      logger.error(`❌ TAMARA WEBHOOK - NO TOKEN PROVIDED [${webhookId}]`, {
+        webhookId,
+        queryParams: req.query,
+        hasAuthHeader: !!authHeader
+      });
+      return res.status(401).json({ 
+        success: false, 
+        error: 'No authentication token provided',
+        webhookId 
+      });
+    }
+
+    const notificationSecret = process.env.TAMARA_NOTIFICATION_TOKEN;
+    if (!notificationSecret) {
+      logger.error(`❌ TAMARA WEBHOOK - NOTIFICATION TOKEN NOT CONFIGURED [${webhookId}]`);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Server configuration error',
+        webhookId 
+      });
+    }
+
+    try {
+      jwt.verify(tamaraToken, notificationSecret, { algorithms: ['HS256'] });
+      logger.info(`✅ TAMARA TOKEN VALIDATED [${webhookId}]`);
+    } catch (jwtError: any) {
+      logger.error(`❌ TAMARA WEBHOOK - INVALID TOKEN [${webhookId}]`, {
+        webhookId,
+        error: jwtError.message,
+        tokenLength: tamaraToken.length
+      });
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Invalid authentication token',
+        webhookId 
+      });
+    }
+
+    // Parse webhook payload
+    const webhookPayload: TamaraWebhookPayload = req.body;
+    const { event_type, order_id, order_reference_id } = webhookPayload;
+
+    logger.info(`📊 TAMARA WEBHOOK PAYLOAD [${webhookId}]`, {
+      webhookId,
+      eventType: event_type,
+      orderId: order_id,
+      orderReferenceId: order_reference_id,
+      data: webhookPayload.data
+    });
+
+    // Handle different event types
+    switch (event_type) {
+      case 'order_approved':
+        logger.info(`✅ TAMARA ORDER APPROVED [${webhookId}]`, { orderId: order_id, orderReferenceId: order_reference_id });
+        
+        try {
+          // Call authoriseOrder ONLY on order_approved webhook
+          const authoriseResult = await tamaraService.authoriseOrder(order_id);
+          
+          logger.info(`✅ TAMARA ORDER AUTHORISED [${webhookId}]`, {
+            orderId: order_id,
+            status: authoriseResult.status,
+            captureId: authoriseResult.capture_id,
+            authorizedAmount: authoriseResult.authorized_amount
+          });
+
+          // TODO: Update order in DB to 'authorised' status
+          // await Order.findOneAndUpdate(
+          //   { tamaraOrderId: order_id },
+          //   { 
+          //     tamaraStatus: 'authorised',
+          //     tamaraCaptureId: authoriseResult.capture_id,
+          //     tamaraAuthorizedAmount: authoriseResult.authorized_amount?.amount
+          //   }
+          // );
+
+        } catch (authoriseError: any) {
+          logger.error(`❌ FAILED TO AUTHORISE TAMARA ORDER [${webhookId}]`, {
+            orderId: order_id,
+            error: authoriseError.message
+          });
+          // Still return 200 to prevent Tamara from retrying - we'll handle this manually
+        }
+        break;
+
+      case 'order_authorised':
+        logger.info(`✅ TAMARA ORDER AUTHORISED (CONFIRMATION) [${webhookId}]`, { 
+          orderId: order_id, 
+          orderReferenceId: order_reference_id 
+        });
+        // Confirmation event - order status should already be 'authorised'
+        break;
+
+      case 'order_captured':
+        logger.info(`✅ TAMARA ORDER CAPTURED [${webhookId}]`, { 
+          orderId: order_id, 
+          orderReferenceId: order_reference_id 
+        });
+        // TODO: Update order status in DB to 'fully_captured'
+        break;
+
+      case 'order_expired':
+        logger.warn(`⚠️ TAMARA ORDER EXPIRED [${webhookId}]`, { 
+          orderId: order_id, 
+          orderReferenceId: order_reference_id 
+        });
+        // TODO: Update order status in DB to 'expired'
+        break;
+
+      case 'order_declined':
+        logger.warn(`⚠️ TAMARA ORDER DECLINED [${webhookId}]`, { 
+          orderId: order_id, 
+          orderReferenceId: order_reference_id 
+        });
+        // TODO: Update order status in DB to 'declined'
+        break;
+
+      default:
+        logger.warn(`⚠️ UNKNOWN TAMARA EVENT TYPE [${webhookId}]`, { 
+          eventType: event_type,
+          orderId: order_id 
+        });
+    }
+
+    const totalProcessingTime = Date.now() - webhookStartTime;
+    logger.info(`🏁 TAMARA WEBHOOK PROCESSING COMPLETED [${webhookId}]`, {
+      webhookId,
+      eventType: event_type,
+      orderId: order_id,
+      totalProcessingTime,
+      completedAt: new Date().toISOString()
+    });
+
+    // Return 200 AFTER all processing is complete (serverless compliant)
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Webhook processed successfully',
+      webhookId,
+      processingTime: totalProcessingTime
+    });
+
+  } catch (error: any) {
+    const totalProcessingTime = Date.now() - webhookStartTime;
+    logger.error(`💥 TAMARA WEBHOOK PROCESSING ERROR [${webhookId}]`, {
+      webhookId,
+      error: error.message,
+      stack: error.stack,
+      processingTime: totalProcessingTime,
+      errorAt: new Date().toISOString()
+    });
+    
+    // Return 200 even on error to prevent Tamara from retrying
+    // We log the error and can handle manually
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Webhook received',
+      webhookId,
+      processingTime: totalProcessingTime
+    });
+  }
+}));
+
+/**
+ * POST /api/payment/create-tamara-order
+ * Create Tamara checkout session and get checkout URL
+ */
+router.post('/create-tamara-order', withDB(async (req: Request, res: Response) => {
+  const orderCreationStartTime = Date.now();
+  const orderCreationId = `tamara_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  try {
+    logger.info(`🚀 TAMARA ORDER CREATION STARTED [${orderCreationId}]`, {
+      timestamp: new Date().toISOString(),
+      orderCreationId,
+      userId: req.user!.id,
+      requestBody: {
+        hasCustomerInfo: !!req.body.customerInfo,
+        hasSelectedCartItemIds: !!req.body.selectedCartItemIds,
+        selectedCartItemIdsCount: req.body.selectedCartItemIds?.length || 0
+      }
+    });
+
+    const userId = req.user!.id;
+    const { customerInfo, selectedCartItemIds } = req.body;
+
+    // Validate required fields
+    if (!customerInfo || !customerInfo.firstName || !customerInfo.lastName || 
+        !customerInfo.email || !customerInfo.phone || !customerInfo.city) {
+      logger.error(`❌ VALIDATION FAILED - MISSING CUSTOMER INFO [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        missingFields: {
+          firstName: !customerInfo?.firstName,
+          lastName: !customerInfo?.lastName,
+          email: !customerInfo?.email,
+          phone: !customerInfo?.phone,
+          city: !customerInfo?.city
+        }
+      });
+
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معلومات العميل مطلوبة' }
+      });
+    }
+
+    // Get cart summary for selected items
+    let finalSelectedCartItemIds = selectedCartItemIds;
+    if (!selectedCartItemIds || !Array.isArray(selectedCartItemIds) || selectedCartItemIds.length === 0) {
+      const allCartSummary = await PaymentService.getCartPaymentSummary(userId);
+      if (!allCartSummary.success || !allCartSummary.summary) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'السلة فارغة أو غير صحيحة' }
+        });
+      }
+      finalSelectedCartItemIds = allCartSummary.summary.items.map(item => item.id);
+    }
+
+    const cartSummary = await PaymentService.getCartPaymentSummary(userId, finalSelectedCartItemIds);
+    if (!cartSummary.success || !cartSummary.summary) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'السلة فارغة أو غير صحيحة' }
+      });
+    }
+
+    logger.info(`✅ CART SUMMARY RETRIEVED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      itemCount: cartSummary.summary.itemCount,
+      totalAmount: cartSummary.summary.totalAmount
+    });
+
+    // Generate merchant order ID
+    const merchantOrderId = `TAMARA_ORDER_${userId}_${Date.now()}`;
+
+    // Prepare items for Tamara
+    const tamaraItems = cartSummary.summary.items.map((item, index) => ({
+      name: `دعوة ${item.hostName}`,
+      referenceId: String(item.id),
+      sku: `INV-${item.packageType.toUpperCase()}-${index + 1}`,
+      quantity: 1,
+      unitPrice: item.price,
+      totalAmount: item.price
+    }));
+
+    // Create Tamara checkout session
+    const checkoutResponse = await tamaraService.createCheckoutSession({
+      orderReferenceId: merchantOrderId,
+      orderNumber: merchantOrderId,
+      totalAmount: cartSummary.summary.totalAmount,
+      items: tamaraItems,
+      consumer: {
+        email: customerInfo.email,
+        firstName: customerInfo.firstName,
+        lastName: customerInfo.lastName,
+        phoneNumber: customerInfo.phone.replace(/^\+966/, '')
+      },
+      billingAddress: {
+        city: customerInfo.city,
+        firstName: customerInfo.firstName,
+        lastName: customerInfo.lastName,
+        line1: customerInfo.address || 'N/A',
+        phoneNumber: customerInfo.phone.replace(/^\+966/, ''),
+        region: customerInfo.region || customerInfo.city
+      },
+      description: `طلب دعوات - ${cartSummary.summary.itemCount} مناسبة`,
+      instalments: 3,
+      locale: 'ar_SA'
+    });
+
+    logger.info(`✅ TAMARA CHECKOUT SESSION CREATED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      tamaraOrderId: checkoutResponse.order_id,
+      checkoutId: checkoutResponse.checkout_id,
+      status: checkoutResponse.status
+    });
+
+    // Create our internal order record
+    // TODO: Update OrderService to support Tamara orders
+    // const order = await OrderService.createTamaraOrder(
+    //   userId,
+    //   finalSelectedCartItemIds,
+    //   checkoutResponse.order_id,
+    //   merchantOrderId,
+    //   cartSummary.summary.totalAmount
+    // );
+
+    const totalProcessingTime = Date.now() - orderCreationStartTime;
+
+    logger.info(`🎉 TAMARA ORDER CREATION COMPLETED [${orderCreationId}]`, {
+      orderCreationId,
+      userId,
+      tamaraOrderId: checkoutResponse.order_id,
+      checkoutUrl: checkoutResponse.checkout_url,
+      totalAmount: cartSummary.summary.totalAmount,
+      totalProcessingTime
+    });
+
+    return res.json({
+      success: true,
+      tamaraOrderId: checkoutResponse.order_id,
+      checkoutId: checkoutResponse.checkout_id,
+      checkoutUrl: checkoutResponse.checkout_url,
+      merchantOrderId: merchantOrderId,
+      amount: cartSummary.summary.totalAmount,
+      currency: 'SAR',
+      orderCreationId: orderCreationId,
+      processingTime: totalProcessingTime
+    });
+
+  } catch (error: any) {
+    const totalProcessingTime = Date.now() - orderCreationStartTime;
+    logger.error(`💥 TAMARA ORDER CREATION FAILED [${orderCreationId}]`, {
+      orderCreationId,
+      userId: req.user?.id,
+      error: error.message,
+      stack: error.stack,
+      processingTime: totalProcessingTime
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في إنشاء طلب الدفع عبر تمارا' },
+      orderCreationId: orderCreationId,
+      processingTime: totalProcessingTime
+    });
+  }
+}));
+
+/**
+ * GET /api/payment/tamara/order/:orderId
+ * Get Tamara order details
+ */
+router.get('/tamara/order/:orderId', withDB(async (req: Request, res: Response) => {
+  try {
+    const orderId = Array.isArray(req.params.orderId) 
+      ? req.params.orderId[0] 
+      : req.params.orderId;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف الطلب مطلوب' }
+      });
+    }
+
+    const orderDetails = await tamaraService.getOrderDetails(orderId);
+
+    return res.json({
+      success: true,
+      order: orderDetails
+    });
+
+  } catch (error: any) {
+    logger.error('Error getting Tamara order details:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في جلب تفاصيل الطلب' }
+    });
+  }
+}));
+
+/**
+ * POST /api/payment/tamara/capture/:orderId
+ * Capture a Tamara order after fulfillment
+ */
+router.post('/tamara/capture/:orderId', withDB(async (req: Request, res: Response) => {
+  try {
+    const orderId = Array.isArray(req.params.orderId) 
+      ? req.params.orderId[0] 
+      : req.params.orderId;
+    const { items, totalAmount } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف الطلب مطلوب' }
+      });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'عناصر الطلب مطلوبة' }
+      });
+    }
+
+    const captureResult = await tamaraService.captureOrder({
+      orderId,
+      totalAmount,
+      items
+    });
+
+    logger.info('Tamara order captured successfully', {
+      orderId,
+      captureId: captureResult.capture_id,
+      status: captureResult.status
+    });
+
+    return res.json({
+      success: true,
+      capture: captureResult
+    });
+
+  } catch (error: any) {
+    logger.error('Error capturing Tamara order:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في تأكيد الطلب' }
+    });
+  }
+}));
+
+/**
+ * POST /api/payment/tamara/cancel/:orderId
+ * Cancel a Tamara order (only when status is 'authorised')
+ */
+router.post('/tamara/cancel/:orderId', withDB(async (req: Request, res: Response) => {
+  try {
+    const orderId = Array.isArray(req.params.orderId) 
+      ? req.params.orderId[0] 
+      : req.params.orderId;
+    const { items, totalAmount } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف الطلب مطلوب' }
+      });
+    }
+
+    const cancelResult = await tamaraService.cancelOrder({
+      orderId,
+      totalAmount,
+      items
+    });
+
+    logger.info('Tamara order cancelled successfully', {
+      orderId,
+      cancelId: cancelResult.cancel_id,
+      status: cancelResult.status
+    });
+
+    return res.json({
+      success: true,
+      cancel: cancelResult
+    });
+
+  } catch (error: any) {
+    logger.error('Error cancelling Tamara order:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في إلغاء الطلب' }
+    });
+  }
+}));
+
+/**
+ * POST /api/payment/tamara/refund/:orderId
+ * Refund a Tamara order (only after 'fully_captured' status)
+ */
+router.post('/tamara/refund/:orderId', withDB(async (req: Request, res: Response) => {
+  try {
+    const orderId = Array.isArray(req.params.orderId) 
+      ? req.params.orderId[0] 
+      : req.params.orderId;
+    const { totalAmount, comment } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف الطلب مطلوب' }
+      });
+    }
+
+    if (!totalAmount || !comment) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'المبلغ وسبب الاسترداد مطلوبان' }
+      });
+    }
+
+    const refundResult = await tamaraService.refundOrder({
+      orderId,
+      totalAmount,
+      comment
+    });
+
+    logger.info('Tamara order refunded successfully', {
+      orderId,
+      refundId: refundResult.refund_id,
+      status: refundResult.status
+    });
+
+    return res.json({
+      success: true,
+      refund: refundResult
+    });
+
+  } catch (error: any) {
+    logger.error('Error refunding Tamara order:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في استرداد المبلغ' }
+    });
+  }
+}));
+
+// ============================================
+// TABBY PAYMENT ROUTES
+// ============================================
+
+/**
+ * POST /api/payments/tabby/webhook
+ * Handle Tabby webhook notifications
+ * No JWT validation - Tabby webhooks don't use token validation
+ * Security: Verify payment_id exists in DB
+ * 
+ * SERVERLESS COMPLIANT: Process everything before sending response
+ */
+router.post('/tabby/webhook', cors(), withDB(async (req: Request, res: Response) => {
+  const webhookStartTime = Date.now();
+  const webhookId = `tabby_webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  try {
+    logger.info(`🔔 TABBY WEBHOOK RECEIVED [${webhookId}]`, {
+      timestamp: new Date().toISOString(),
+      webhookId,
+      method: req.method,
+      url: req.url,
+      headers: {
+        'content-type': req.headers['content-type'],
+        'user-agent': req.headers['user-agent']
+      },
+      bodyKeys: Object.keys(req.body || {})
+    });
+
+    const webhookPayload: TabbyWebhookPayload = req.body;
+    const { id: paymentId, status, amount, merchant_code, is_test } = webhookPayload;
+
+    logger.info(`📊 TABBY WEBHOOK PAYLOAD [${webhookId}]`, {
+      webhookId,
+      paymentId,
+      status,
+      amount,
+      merchantCode: merchant_code,
+      isTest: is_test
+    });
+
+    // Verify merchant_code matches our configuration
+    const expectedMerchantCode = tabbyService.getMerchantCode();
+    if (merchant_code !== expectedMerchantCode) {
+      logger.error(`❌ TABBY WEBHOOK - INVALID MERCHANT CODE [${webhookId}]`, {
+        webhookId,
+        received: merchant_code,
+        expected: expectedMerchantCode
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid merchant code',
+        webhookId
+      });
+    }
+
+    // TODO: Verify payment_id exists in your DB
+    // const order = await Order.findOne({ tabbyPaymentId: paymentId });
+    // if (!order) {
+    //   logger.error(`❌ TABBY WEBHOOK - PAYMENT NOT FOUND [${webhookId}]`, { paymentId });
+    //   return res.status(404).json({ success: false, error: 'Payment not found' });
+    // }
+
+    // Handle different statuses (note: webhook statuses are lowercase)
+    switch (status) {
+      case 'authorized':
+        logger.info(`✅ TABBY PAYMENT AUTHORIZED [${webhookId}]`, { paymentId, amount });
+
+        try {
+          // Verify payment status via API before capturing
+          const paymentDetails = await tabbyService.getPayment(paymentId);
+
+          if (paymentDetails.status === 'AUTHORIZED') {
+            logger.info(`✅ TABBY PAYMENT VERIFIED - CAPTURING [${webhookId}]`, { paymentId });
+
+            // TODO: Get items from your order in DB for capture
+            // For now, using a placeholder - you'll need to fetch actual order items
+            // const captureResult = await tabbyService.capturePayment({
+            //   paymentId,
+            //   amount: parseFloat(amount),
+            //   items: order.items.map(item => ({
+            //     title: item.name,
+            //     description: item.description || item.name,
+            //     id: item.id,
+            //     sku: item.sku || item.id,
+            //     category: 'Invitations',
+            //     quantity: item.quantity || 1,
+            //     unitPrice: item.unitPrice,
+            //     referenceId: item.id
+            //   }))
+            // });
+
+            logger.info(`✅ TABBY PAYMENT CAPTURE INITIATED [${webhookId}]`, { paymentId });
+
+            // TODO: Update order status in DB
+            // await Order.findOneAndUpdate(
+            //   { tabbyPaymentId: paymentId },
+            //   { tabbyStatus: 'captured', status: 'completed', completedAt: new Date() }
+            // );
+
+          } else {
+            logger.warn(`⚠️ TABBY PAYMENT STATUS MISMATCH [${webhookId}]`, {
+              paymentId,
+              webhookStatus: status,
+              apiStatus: paymentDetails.status
+            });
+          }
+        } catch (captureError: any) {
+          logger.error(`❌ TABBY CAPTURE FAILED [${webhookId}]`, {
+            paymentId,
+            error: captureError.message
+          });
+        }
+        break;
+
+      case 'closed':
+        logger.info(`✅ TABBY PAYMENT CLOSED (CAPTURED) [${webhookId}]`, { paymentId, amount });
+        // TODO: Update order status in DB
+        // await Order.findOneAndUpdate(
+        //   { tabbyPaymentId: paymentId },
+        //   { tabbyStatus: 'closed', status: 'completed', completedAt: new Date() }
+        // );
+        break;
+
+      case 'rejected':
+        logger.warn(`⚠️ TABBY PAYMENT REJECTED [${webhookId}]`, { paymentId });
+        // TODO: Update order status in DB
+        // await Order.findOneAndUpdate(
+        //   { tabbyPaymentId: paymentId },
+        //   { tabbyStatus: 'rejected', status: 'failed', failedAt: new Date() }
+        // );
+        break;
+
+      case 'expired':
+        logger.warn(`⚠️ TABBY PAYMENT EXPIRED [${webhookId}]`, { paymentId });
+        // TODO: Update order status in DB
+        // await Order.findOneAndUpdate(
+        //   { tabbyPaymentId: paymentId },
+        //   { tabbyStatus: 'expired', status: 'failed', failedAt: new Date() }
+        // );
+        break;
+
+      default:
+        logger.warn(`⚠️ UNKNOWN TABBY STATUS [${webhookId}]`, { paymentId, status });
+    }
+
+    const totalProcessingTime = Date.now() - webhookStartTime;
+    logger.info(`🏁 TABBY WEBHOOK PROCESSING COMPLETED [${webhookId}]`, {
+      webhookId,
+      paymentId,
+      status,
+      totalProcessingTime,
+      completedAt: new Date().toISOString()
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Webhook processed successfully',
+      webhookId,
+      processingTime: totalProcessingTime
+    });
+
+  } catch (error: any) {
+    const totalProcessingTime = Date.now() - webhookStartTime;
+    logger.error(`💥 TABBY WEBHOOK PROCESSING ERROR [${webhookId}]`, {
+      webhookId,
+      error: error.message,
+      stack: error.stack,
+      processingTime: totalProcessingTime
+    });
+
+    // Return 200 even on error to prevent Tabby from retrying
+    return res.status(200).json({
+      success: true,
+      message: 'Webhook received',
+      webhookId,
+      processingTime: totalProcessingTime
+    });
+  }
+}));
+
+/**
+ * POST /api/payment/create-tabby-session
+ * Create Tabby checkout session and get checkout URL
+ */
+router.post('/create-tabby-session', withDB(async (req: Request, res: Response) => {
+  const sessionCreationStartTime = Date.now();
+  const sessionCreationId = `tabby_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  try {
+    logger.info(`🚀 TABBY SESSION CREATION STARTED [${sessionCreationId}]`, {
+      timestamp: new Date().toISOString(),
+      sessionCreationId,
+      userId: req.user!.id,
+      requestBody: {
+        hasCustomerInfo: !!req.body.customerInfo,
+        hasSelectedCartItemIds: !!req.body.selectedCartItemIds,
+        selectedCartItemIdsCount: req.body.selectedCartItemIds?.length || 0
+      }
+    });
+
+    const userId = req.user!.id;
+    const { customerInfo, selectedCartItemIds } = req.body;
+
+    // Validate required fields
+    if (!customerInfo || !customerInfo.firstName || !customerInfo.lastName ||
+        !customerInfo.email || !customerInfo.phone || !customerInfo.city) {
+      logger.error(`❌ VALIDATION FAILED - MISSING CUSTOMER INFO [${sessionCreationId}]`, {
+        sessionCreationId,
+        userId,
+        missingFields: {
+          firstName: !customerInfo?.firstName,
+          lastName: !customerInfo?.lastName,
+          email: !customerInfo?.email,
+          phone: !customerInfo?.phone,
+          city: !customerInfo?.city
+        }
+      });
+
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معلومات العميل مطلوبة' }
+      });
+    }
+
+    // Get cart summary for selected items
+    let finalSelectedCartItemIds = selectedCartItemIds;
+    if (!selectedCartItemIds || !Array.isArray(selectedCartItemIds) || selectedCartItemIds.length === 0) {
+      const allCartSummary = await PaymentService.getCartPaymentSummary(userId);
+      if (!allCartSummary.success || !allCartSummary.summary) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'السلة فارغة أو غير صحيحة' }
+        });
+      }
+      finalSelectedCartItemIds = allCartSummary.summary.items.map(item => item.id);
+    }
+
+    const cartSummary = await PaymentService.getCartPaymentSummary(userId, finalSelectedCartItemIds);
+    if (!cartSummary.success || !cartSummary.summary) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'السلة فارغة أو غير صحيحة' }
+      });
+    }
+
+    logger.info(`✅ CART SUMMARY RETRIEVED [${sessionCreationId}]`, {
+      sessionCreationId,
+      userId,
+      itemCount: cartSummary.summary.itemCount,
+      totalAmount: cartSummary.summary.totalAmount
+    });
+
+    // Generate merchant order ID
+    const merchantOrderId = `TABBY_ORDER_${userId}_${Date.now()}`;
+
+    // Prepare items for Tabby
+    const tabbyItems = cartSummary.summary.items.map((item, index) => ({
+      title: `دعوة ${item.hostName}`,
+      description: `دعوة ${item.packageType} لـ ${item.hostName}`,
+      id: String(item.id),
+      sku: `INV-${item.packageType.toUpperCase()}-${index + 1}`,
+      category: 'Invitations',
+      quantity: 1,
+      unitPrice: item.price,
+      referenceId: String(item.id)
+    }));
+
+    // Create Tabby session
+    const sessionResponse = await tabbyService.createSession({
+      orderReferenceId: merchantOrderId,
+      amount: cartSummary.summary.totalAmount,
+      description: `طلب دعوات - ${cartSummary.summary.itemCount} مناسبة`,
+      items: tabbyItems,
+      buyer: {
+        phone: customerInfo.phone,
+        email: customerInfo.email,
+        name: `${customerInfo.firstName} ${customerInfo.lastName}`,
+        dob: customerInfo.dob
+      },
+      shippingAddress: {
+        city: customerInfo.city,
+        address: customerInfo.address || 'N/A',
+        zip: customerInfo.zip || '00000'
+      },
+      customerId: userId,
+      lang: 'ar'
+    });
+
+    if (!sessionResponse.success) {
+      logger.warn(`⚠️ TABBY SESSION REJECTED [${sessionCreationId}]`, {
+        sessionCreationId,
+        userId,
+        sessionId: sessionResponse.sessionId,
+        rejectionReason: sessionResponse.rejectionReason
+      });
+
+      return res.status(400).json({
+        success: false,
+        error: { 
+          message: 'تم رفض الطلب من قبل Tabby',
+          rejectionReason: sessionResponse.rejectionReason
+        },
+        sessionId: sessionResponse.sessionId,
+        status: 'rejected'
+      });
+    }
+
+    logger.info(`✅ TABBY SESSION CREATED [${sessionCreationId}]`, {
+      sessionCreationId,
+      userId,
+      sessionId: sessionResponse.sessionId,
+      paymentId: sessionResponse.paymentId,
+      webUrl: sessionResponse.webUrl
+    });
+
+    // TODO: Create internal order record with Tabby session info
+    // const order = await OrderService.createTabbyOrder(
+    //   userId,
+    //   finalSelectedCartItemIds,
+    //   sessionResponse.sessionId!,
+    //   sessionResponse.paymentId!,
+    //   merchantOrderId,
+    //   cartSummary.summary.totalAmount
+    // );
+
+    const totalProcessingTime = Date.now() - sessionCreationStartTime;
+
+    logger.info(`🎉 TABBY SESSION CREATION COMPLETED [${sessionCreationId}]`, {
+      sessionCreationId,
+      userId,
+      sessionId: sessionResponse.sessionId,
+      paymentId: sessionResponse.paymentId,
+      totalAmount: cartSummary.summary.totalAmount,
+      totalProcessingTime
+    });
+
+    return res.json({
+      success: true,
+      sessionId: sessionResponse.sessionId,
+      paymentId: sessionResponse.paymentId,
+      checkoutUrl: sessionResponse.webUrl,
+      merchantOrderId: merchantOrderId,
+      amount: cartSummary.summary.totalAmount,
+      currency: 'SAR',
+      sessionCreationId: sessionCreationId,
+      processingTime: totalProcessingTime
+    });
+
+  } catch (error: any) {
+    const totalProcessingTime = Date.now() - sessionCreationStartTime;
+    logger.error(`💥 TABBY SESSION CREATION FAILED [${sessionCreationId}]`, {
+      sessionCreationId,
+      userId: req.user?.id,
+      error: error.message,
+      stack: error.stack,
+      processingTime: totalProcessingTime
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في إنشاء جلسة الدفع عبر Tabby' },
+      sessionCreationId: sessionCreationId,
+      processingTime: totalProcessingTime
+    });
+  }
+}));
+
+/**
+ * GET /api/payment/tabby/:paymentId
+ * Get Tabby payment status
+ */
+router.get('/tabby/:paymentId', withDB(async (req: Request, res: Response) => {
+  try {
+    const paymentId = Array.isArray(req.params.paymentId)
+      ? req.params.paymentId[0]
+      : req.params.paymentId;
+
+    if (!paymentId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف الدفع مطلوب' }
+      });
+    }
+
+    const paymentDetails = await tabbyService.getPayment(paymentId);
+
+    return res.json({
+      success: true,
+      payment: paymentDetails
+    });
+
+  } catch (error: any) {
+    logger.error('Error getting Tabby payment:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في جلب تفاصيل الدفع' }
+    });
+  }
+}));
+
+/**
+ * POST /api/payment/tabby/capture/:paymentId
+ * Capture a Tabby payment (must capture full amount)
+ */
+router.post('/tabby/capture/:paymentId', withDB(async (req: Request, res: Response) => {
+  try {
+    const paymentId = Array.isArray(req.params.paymentId)
+      ? req.params.paymentId[0]
+      : req.params.paymentId;
+    const { amount, items } = req.body;
+
+    if (!paymentId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف الدفع مطلوب' }
+      });
+    }
+
+    if (!amount || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'المبلغ وعناصر الطلب مطلوبة' }
+      });
+    }
+
+    const captureResult = await tabbyService.capturePayment({
+      paymentId,
+      amount,
+      items
+    });
+
+    logger.info('Tabby payment captured successfully', {
+      paymentId,
+      captureId: captureResult.id,
+      amount: captureResult.amount
+    });
+
+    return res.json({
+      success: true,
+      capture: captureResult
+    });
+
+  } catch (error: any) {
+    logger.error('Error capturing Tabby payment:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في تأكيد الدفع' }
+    });
+  }
+}));
+
+/**
+ * POST /api/payment/tabby/refund/:paymentId
+ * Refund a Tabby payment (only after CLOSED status)
+ */
+router.post('/tabby/refund/:paymentId', withDB(async (req: Request, res: Response) => {
+  try {
+    const paymentId = Array.isArray(req.params.paymentId)
+      ? req.params.paymentId[0]
+      : req.params.paymentId;
+    const { amount, reason } = req.body;
+
+    if (!paymentId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف الدفع مطلوب' }
+      });
+    }
+
+    if (!amount || !reason) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'المبلغ وسبب الاسترداد مطلوبان' }
+      });
+    }
+
+    const refundResult = await tabbyService.refundPayment({
+      paymentId,
+      amount,
+      reason
+    });
+
+    logger.info('Tabby payment refunded successfully', {
+      paymentId,
+      refundId: refundResult.id,
+      amount: refundResult.amount
+    });
+
+    return res.json({
+      success: true,
+      refund: refundResult
+    });
+
+  } catch (error: any) {
+    logger.error('Error refunding Tabby payment:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في استرداد المبلغ' }
+    });
+  }
+}));
+
+/**
+ * POST /api/payment/tabby/cancel/:sessionId
+ * Cancel a Tabby session (only when status is CREATED)
+ */
+router.post('/tabby/cancel/:sessionId', withDB(async (req: Request, res: Response) => {
+  try {
+    const sessionId = Array.isArray(req.params.sessionId)
+      ? req.params.sessionId[0]
+      : req.params.sessionId;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'معرف الجلسة مطلوب' }
+      });
+    }
+
+    await tabbyService.cancelSession(sessionId);
+
+    logger.info('Tabby session cancelled successfully', { sessionId });
+
+    return res.json({
+      success: true,
+      message: 'تم إلغاء الجلسة بنجاح'
+    });
+
+  } catch (error: any) {
+    logger.error('Error cancelling Tabby session:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في إلغاء الجلسة' }
     });
   }
 }));

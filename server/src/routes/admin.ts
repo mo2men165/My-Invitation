@@ -2470,4 +2470,42 @@ router.delete('/users/:userId/cart/:cartItemId/price-modification', withDB(async
   }
 }));
 
+// ============================================
+// PAYMENT PROVIDER MANAGEMENT
+// ============================================
+
+/**
+ * POST /api/admin/tabby/register-webhook
+ * Manually register Tabby webhook (one-time operation)
+ * Required for serverless environments where auto-registration doesn't work
+ */
+router.post('/tabby/register-webhook', withDB(async (req: Request, res: Response) => {
+  try {
+    const { registerTabbyWebhook } = await import('../services/tabbyWebhookRegistration');
+    
+    const result = await registerTabbyWebhook();
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        message: result.message,
+        webhookId: result.webhookId,
+        webhookUrl: result.webhookUrl
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: { message: result.message }
+      });
+    }
+
+  } catch (error: any) {
+    logger.error('Error registering Tabby webhook:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في تسجيل webhook' }
+    });
+  }
+}));
+
 export default router;
