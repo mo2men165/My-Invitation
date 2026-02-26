@@ -10,7 +10,7 @@
  * 2. Or run: curl -X POST https://your-backend.com/api/admin/tabby/register-webhook
  * 3. Or use the Tabby merchant dashboard
  * 
- * The webhook URL will be: ${BACKEND_URL}/api/payments/tabby/webhook
+ * The webhook URL will be: ${BACKEND_URL}/api/payment/tabby/webhook
  */
 
 import axios from 'axios';
@@ -57,7 +57,7 @@ export async function registerTabbyWebhook(): Promise<{
     };
   }
 
-  const webhookUrl = `${backendUrl}/api/payments/tabby/webhook`;
+  const webhookUrl = `${backendUrl}/api/payment/tabby/webhook`;
 
   try {
     logger.info('Registering Tabby webhook', {
