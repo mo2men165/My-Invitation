@@ -67,18 +67,17 @@ export async function registerTabbyWebhook(): Promise<{
     });
 
     const registrationRequest: TabbyWebhookRegistrationRequest = {
-      url: webhookUrl,
-      merchant_code: merchantCode,
-      is_test: isTest
+      url: webhookUrl
     };
 
     const response = await axios.post<TabbyWebhookRegistrationResponse>(
-      `${apiUrl}/api/v2/webhooks`,
+      `${apiUrl}/api/v1/webhooks`,
       registrationRequest,
       {
         headers: {
           'Authorization': `Bearer ${secretKey}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Merchant-Code': merchantCode
         },
         timeout: 15000
       }

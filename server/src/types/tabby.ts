@@ -183,8 +183,11 @@ export interface TabbyWebhookPayload {
 
 export interface TabbyWebhookRegistrationRequest {
   url: string;
-  merchant_code: string;
-  is_test: boolean;
+  is_test?: boolean;
+  header?: {
+    title: string;
+    value: string;
+  };
 }
 
 export interface TabbyWebhookRegistrationResponse {
