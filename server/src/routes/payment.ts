@@ -1684,33 +1684,17 @@ router.post('/tabby/webhook', cors(), withDB(async (req: Request, res: Response)
     });
 
     const webhookPayload: TabbyWebhookPayload = req.body;
-    const { id: paymentId, status, amount, merchant_code, is_test } = webhookPayload;
+    const { id: paymentId, status, amount, is_test } = webhookPayload;
 
     logger.info(`📊 TABBY WEBHOOK PAYLOAD [${webhookId}]`, {
       webhookId,
       paymentId,
       status,
       amount,
-      merchantCode: merchant_code,
       isTest: is_test
     });
 
-    // Verify merchant_code matches our configuration
-    const expectedMerchantCode = tabbyService.getMerchantCode();
-    if (merchant_code !== expectedMerchantCode) {
-      logger.error(`❌ TABBY WEBHOOK - INVALID MERCHANT CODE [${webhookId}]`, {
-        webhookId,
-        received: merchant_code,
-        expected: expectedMerchantCode
-      });
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid merchant code',
-        webhookId
-      });
-    }
-
-    // Verify payment exists in our DB
+    // Verify payment exists in our DB (this is the primary validation)
     const order = await OrderService.findByTabbyPaymentId(paymentId);
     if (!order) {
       logger.error(`❌ TABBY WEBHOOK - PAYMENT NOT FOUND [${webhookId}]`, { paymentId });

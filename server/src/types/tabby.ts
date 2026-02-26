@@ -180,11 +180,19 @@ export interface TabbyRefundResponse {
 
 export interface TabbyWebhookPayload {
   id: string;
+  created_at?: string;
+  expires_at?: string;
+  closed_at?: string;
   status: 'authorized' | 'rejected' | 'expired' | 'closed';
-  currency: string;
-  amount: string;
-  merchant_code: string;
   is_test: boolean;
+  is_expired?: boolean;
+  amount: string;
+  currency: string;
+  order?: any;
+  meta?: any;
+  captures?: any[];
+  refunds?: any[];
+  token?: string;
 }
 
 export interface TabbyWebhookRegistrationRequest {
