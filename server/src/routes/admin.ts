@@ -12,6 +12,7 @@ import { AdminNotification } from '../models/AdminNotification';
 import { emailService } from '../services/emailService';
 import { uploadSingleImage } from '../config/multer';
 import { CloudinaryService } from '../services/cloudinaryService';
+import { registerTabbyWebhook } from '../services/tabbyWebhookRegistration';
 
 
 const router = Router();
@@ -2481,8 +2482,6 @@ router.delete('/users/:userId/cart/:cartItemId/price-modification', withDB(async
  */
 router.post('/tabby/register-webhook', withDB(async (req: Request, res: Response) => {
   try {
-    const { registerTabbyWebhook } = await import('../services/tabbyWebhookRegistration');
-    
     const result = await registerTabbyWebhook();
 
     if (result.success) {
