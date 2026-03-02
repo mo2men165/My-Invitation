@@ -256,7 +256,6 @@ const orderSchema = new Schema<IOrder>({
 orderSchema.index({ userId: 1, status: 1 });
 orderSchema.index({ status: 1, createdAt: 1 });
 orderSchema.index({ 'selectedCartItems.cartItemId': 1 });
-orderSchema.index({ tabbyPaymentId: 1 }, { sparse: true });
 orderSchema.index({ paymentProvider: 1, status: 1 });
 
 export const Order = mongoose.model<IOrder>('Order', orderSchema);

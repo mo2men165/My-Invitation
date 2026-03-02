@@ -2513,7 +2513,9 @@ router.post('/tabby/register-webhook', withDB(async (req: Request, res: Response
  */
 router.put('/tabby/update-webhook/:webhookId', withDB(async (req: Request, res: Response) => {
   try {
-    const { webhookId } = req.params;
+    const webhookId = Array.isArray(req.params.webhookId) 
+      ? req.params.webhookId[0] 
+      : req.params.webhookId;
     
     if (!webhookId) {
       return res.status(400).json({
