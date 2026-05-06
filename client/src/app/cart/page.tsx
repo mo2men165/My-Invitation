@@ -104,6 +104,9 @@ function CartPageContent() {
   // State for Tabby payment processing
   const [isTabbyLoading, setIsTabbyLoading] = useState(false);
 
+  // State for Tamara payment processing
+  const [isTamaraLoading, setIsTamaraLoading] = useState(false);
+
   // Handle Tabby payment
   const handleTabbyPayment = useCallback(async () => {
     if (cartItems.length === 0) {
@@ -166,6 +169,61 @@ function CartPageContent() {
       });
     } finally {
       setIsTabbyLoading(false);
+    }
+  }, [cartItems, toast]);
+
+  // Handle Tamara payment
+  const handleTamaraPayment = useCallback(async () => {
+    if (cartItems.length === 0) {
+      toast({
+        title: "السلة فارغة",
+        description: "يرجى إضافة عناصر للسلة قبل المتابعة",
+        variant: "destructive",
+        duration: 3000
+      });
+      return;
+    }
+
+    setIsTamaraLoading(true);
+
+    try {
+      const { authAPI } = await import('@/lib/api/auth');
+      const { paymentAPI } = await import('@/lib/api/payment');
+      
+      const userResponse = await authAPI.getCurrentUser();
+      
+      if (!userResponse.success || !userResponse.user) {
+        throw new Error('فشل في جلب بيانات المستخدم');
+      }
+
+      const user = userResponse.user;
+
+      const result = await paymentAPI.createTamaraOrder({
+        customerInfo: {
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          city: (user.city === 'اخري' && user.customCity) ? user.customCity : (user.city || 'الرياض'),
+        },
+        selectedCartItemIds: cartItems.map(item => item._id)
+      });
+
+      if (result.success && result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+      } else {
+        throw new Error(result.error?.message || 'فشل في إنشاء طلب تمارا');
+      }
+    } catch (error: any) {
+      console.error('Tamara payment error:', error);
+      toast({
+        title: "خطأ في الدفع",
+        description: error.message || "حدث خطأ أثناء إنشاء طلب الدفع عبر تمارا",
+        variant: "destructive",
+        duration: 4000
+      });
+    } finally {
+      setIsTamaraLoading(false);
     }
   }, [cartItems, toast]);
 
@@ -631,25 +689,21 @@ function CartPageContent() {
 
                       {/* Tamara Button */}
                       <button
-                        onClick={() => {
-                          // TODO: Implement Tamara payment
-                          toast({
-                            title: "قريباً",
-                            description: "خيار الدفع عبر Tamara قادم قريباً",
-                            variant: "default",
-                            duration: 3000
-                          });
-                        }}
-                        disabled={isLoading || cartItems.length === 0}
+                        onClick={handleTamaraPayment}
+                        disabled={isLoading || isTamaraLoading || cartItems.length === 0}
                         className="flex items-center justify-center p-3 bg-white rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border border-gray-200"
                       >
-                        <Image
-                          src="/tamara-logo.png"
-                          alt="Pay with Tamara"
-                          width={100}
-                          height={40}
-                          className="object-contain h-8 w-auto"
-                        />
+                        {isTamaraLoading ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-gray-600" />
+                        ) : (
+                          <Image
+                            src="/tamara-logo.png"
+                            alt="Pay with Tamara"
+                            width={100}
+                            height={40}
+                            className="object-contain h-8 w-auto"
+                          />
+                        )}
                       </button>
                     </div>
 

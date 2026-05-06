@@ -14,7 +14,6 @@ import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { withDB } from '../utils/routeUtils';
 import { PaymobWebhookData } from '../types/paymob';
-import { TamaraWebhookPayload, TamaraWebhookEventType } from '../types/tamara';
 import { TabbyWebhookPayload } from '../types/tabby';
 
 const router = Router();
@@ -1100,208 +1099,133 @@ router.get('/paymob/status/:transactionId', withDB(async (req: Request, res: Res
 }));
 
 /**
- * POST /api/payments/tamara/webhook
- * Handle Tamara webhook notifications
- * This route should NOT require authentication as it's called by Tamara
- * 
- * SERVERLESS COMPLIANT: Process everything before sending response
+ * POST /api/payment/tamara/webhook
+ * JWT verification only may return non-200.
  */
 router.post('/tamara/webhook', cors(), withDB(async (req: Request, res: Response) => {
-  const webhookStartTime = Date.now();
   const webhookId = `tamara_webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+  logger.info(`🔔 TAMARA WEBHOOK RECEIVED [${webhookId}]`, {
+    webhookId,
+    bodyKeys: Object.keys(req.body || {})
+  });
+
+  const token =
+    (req.query.tamaraToken as string) ||
+    req.headers.authorization?.replace(/^Bearer /, '');
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
   try {
-    logger.info(`🔔 TAMARA WEBHOOK RECEIVED [${webhookId}]`, {
-      timestamp: new Date().toISOString(),
-      webhookId,
-      method: req.method,
-      url: req.url,
-      headers: {
-        'content-type': req.headers['content-type'],
-        'authorization': req.headers['authorization'] ? 'PRESENT' : 'MISSING',
-        'user-agent': req.headers['user-agent']
-      },
-      queryParams: req.query,
-      bodyKeys: Object.keys(req.body || {})
+    jwt.verify(token, process.env.TAMARA_NOTIFICATION_TOKEN!, {
+      algorithms: ['HS256']
     });
+  } catch {
+    return res.status(401).json({ error: 'Invalid webhook signature' });
+  }
 
-    // Extract tamaraToken from query params or Authorization header
-    const tamaraTokenFromQuery = req.query.tamaraToken as string;
-    const authHeader = req.headers['authorization'] as string;
-    const tamaraTokenFromHeader = authHeader?.startsWith('Bearer ') 
-      ? authHeader.substring(7) 
-      : null;
-    
-    const tamaraToken = tamaraTokenFromQuery || tamaraTokenFromHeader;
-
-    logger.info(`🔐 TAMARA TOKEN VALIDATION [${webhookId}]`, {
-      webhookId,
-      hasTokenFromQuery: !!tamaraTokenFromQuery,
-      hasTokenFromHeader: !!tamaraTokenFromHeader,
-      tokenLength: tamaraToken?.length || 0
-    });
-
-    // Validate the token using JWT with HS256 algorithm
-    if (!tamaraToken) {
-      logger.error(`❌ TAMARA WEBHOOK - NO TOKEN PROVIDED [${webhookId}]`, {
-        webhookId,
-        queryParams: req.query,
-        hasAuthHeader: !!authHeader
-      });
-      return res.status(401).json({ 
-        success: false, 
-        error: 'No authentication token provided',
-        webhookId 
-      });
-    }
-
-    const notificationSecret = process.env.TAMARA_NOTIFICATION_TOKEN;
-    if (!notificationSecret) {
-      logger.error(`❌ TAMARA WEBHOOK - NOTIFICATION TOKEN NOT CONFIGURED [${webhookId}]`);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Server configuration error',
-        webhookId 
-      });
-    }
-
-    try {
-      jwt.verify(tamaraToken, notificationSecret, { algorithms: ['HS256'] });
-      logger.info(`✅ TAMARA TOKEN VALIDATED [${webhookId}]`);
-    } catch (jwtError: any) {
-      logger.error(`❌ TAMARA WEBHOOK - INVALID TOKEN [${webhookId}]`, {
-        webhookId,
-        error: jwtError.message,
-        tokenLength: tamaraToken.length
-      });
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Invalid authentication token',
-        webhookId 
-      });
-    }
-
-    // Parse webhook payload
-    const webhookPayload: TamaraWebhookPayload = req.body;
-    const { event_type, order_id, order_reference_id } = webhookPayload;
+  try {
+    const raw = (req.body || {}) as Record<string, unknown>;
+    const order_id = String(raw.order_id ?? raw.orderId ?? '');
+    const order_reference_id = String(
+      raw.order_reference_id ?? raw.orderReferenceId ?? ''
+    );
 
     logger.info(`📊 TAMARA WEBHOOK PAYLOAD [${webhookId}]`, {
       webhookId,
-      eventType: event_type,
-      orderId: order_id,
-      orderReferenceId: order_reference_id,
-      data: webhookPayload.data
+      order_id,
+      order_reference_id,
+      event_type: raw.event_type ?? raw.eventType,
+      payload: raw
     });
 
-    // Handle different event types
+    const event_type =
+      typeof raw.event_type === 'string'
+        ? raw.event_type
+        : typeof raw.eventType === 'string'
+          ? raw.eventType
+          : '';
+
     switch (event_type) {
-      case 'order_approved':
-        logger.info(`✅ TAMARA ORDER APPROVED [${webhookId}]`, { orderId: order_id, orderReferenceId: order_reference_id });
-        
-        try {
-          // Call authoriseOrder ONLY on order_approved webhook
-          const authoriseResult = await tamaraService.authoriseOrder(order_id);
-          
-          logger.info(`✅ TAMARA ORDER AUTHORISED [${webhookId}]`, {
-            orderId: order_id,
-            status: authoriseResult.status,
-            captureId: authoriseResult.capture_id,
-            authorizedAmount: authoriseResult.authorized_amount
-          });
-
-          // TODO: Update order in DB to 'authorised' status
-          // await Order.findOneAndUpdate(
-          //   { tamaraOrderId: order_id },
-          //   { 
-          //     tamaraStatus: 'authorised',
-          //     tamaraCaptureId: authoriseResult.capture_id,
-          //     tamaraAuthorizedAmount: authoriseResult.authorized_amount?.amount
-          //   }
-          // );
-
-        } catch (authoriseError: any) {
-          logger.error(`❌ FAILED TO AUTHORISE TAMARA ORDER [${webhookId}]`, {
-            orderId: order_id,
-            error: authoriseError.message
-          });
-          // Still return 200 to prevent Tamara from retrying - we'll handle this manually
+      case 'order_approved': {
+        await tamaraService.authoriseOrder(order_id);
+        await Order.findOneAndUpdate(
+          { tamaraOrderId: order_id },
+          { tamaraStatus: 'authorised' }
+        );
+        break;
+      }
+      case 'order_authorised': {
+        const dbOrder = await OrderService.findByTamaraOrderId(order_id);
+        const amount = dbOrder?.totalAmount ?? 0;
+        const cap = await tamaraService.captureOrder(order_id, amount, 'SAR');
+        await Order.findOneAndUpdate(
+          { tamaraOrderId: order_id },
+          { tamaraStatus: 'captured', tamaraCaptureId: cap.captureId }
+        );
+        if (order_reference_id) {
+          await OrderService.processSuccessfulTamaraPaymentByMerchantOrderId(
+            order_reference_id,
+            'captured'
+          );
+        } else {
+          await OrderService.processSuccessfulTamaraPayment(order_id, 'captured');
         }
         break;
-
-      case 'order_authorised':
-        logger.info(`✅ TAMARA ORDER AUTHORISED (CONFIRMATION) [${webhookId}]`, { 
-          orderId: order_id, 
-          orderReferenceId: order_reference_id 
-        });
-        // Confirmation event - order status should already be 'authorised'
+      }
+      case 'order_captured': {
+        await Order.findOneAndUpdate(
+          { tamaraOrderId: order_id },
+          { tamaraStatus: 'fully_captured' }
+        );
+        await OrderService.processSuccessfulTamaraPayment(
+          order_id,
+          'fully_captured'
+        );
         break;
-
-      case 'order_captured':
-        logger.info(`✅ TAMARA ORDER CAPTURED [${webhookId}]`, { 
-          orderId: order_id, 
-          orderReferenceId: order_reference_id 
-        });
-        // TODO: Update order status in DB to 'fully_captured'
+      }
+      case 'order_expired': {
+        if (order_reference_id) {
+          await Order.findOneAndUpdate(
+            { merchantOrderId: order_reference_id },
+            { tamaraStatus: 'expired' }
+          );
+          await OrderService.markTamaraOrderAsFailedByMerchantOrderId(
+            order_reference_id,
+            'expired'
+          );
+        }
         break;
-
-      case 'order_expired':
-        logger.warn(`⚠️ TAMARA ORDER EXPIRED [${webhookId}]`, { 
-          orderId: order_id, 
-          orderReferenceId: order_reference_id 
-        });
-        // TODO: Update order status in DB to 'expired'
+      }
+      case 'order_declined': {
+        if (order_reference_id) {
+          await Order.findOneAndUpdate(
+            { merchantOrderId: order_reference_id },
+            { tamaraStatus: 'declined' }
+          );
+          await OrderService.markTamaraOrderAsFailedByMerchantOrderId(
+            order_reference_id,
+            'declined'
+          );
+        }
         break;
-
-      case 'order_declined':
-        logger.warn(`⚠️ TAMARA ORDER DECLINED [${webhookId}]`, { 
-          orderId: order_id, 
-          orderReferenceId: order_reference_id 
+      }
+      default: {
+        logger.warn(`⚠️ UNKNOWN OR EMPTY TAMARA EVENT [${webhookId}]`, {
+          webhookId,
+          event_type,
+          order_id
         });
-        // TODO: Update order status in DB to 'declined'
-        break;
-
-      default:
-        logger.warn(`⚠️ UNKNOWN TAMARA EVENT TYPE [${webhookId}]`, { 
-          eventType: event_type,
-          orderId: order_id 
-        });
+      }
     }
 
-    const totalProcessingTime = Date.now() - webhookStartTime;
-    logger.info(`🏁 TAMARA WEBHOOK PROCESSING COMPLETED [${webhookId}]`, {
-      webhookId,
-      eventType: event_type,
-      orderId: order_id,
-      totalProcessingTime,
-      completedAt: new Date().toISOString()
-    });
-
-    // Return 200 AFTER all processing is complete (serverless compliant)
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Webhook processed successfully',
-      webhookId,
-      processingTime: totalProcessingTime
-    });
-
-  } catch (error: any) {
-    const totalProcessingTime = Date.now() - webhookStartTime;
-    logger.error(`💥 TAMARA WEBHOOK PROCESSING ERROR [${webhookId}]`, {
-      webhookId,
-      error: error.message,
-      stack: error.stack,
-      processingTime: totalProcessingTime,
-      errorAt: new Date().toISOString()
-    });
-    
-    // Return 200 even on error to prevent Tamara from retrying
-    // We log the error and can handle manually
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Webhook received',
-      webhookId,
-      processingTime: totalProcessingTime
-    });
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('Tamara webhook processing error:', err);
+    return res
+      .status(200)
+      .json({ received: true, note: 'error logged internally' });
   }
 }));
 
@@ -1380,75 +1304,84 @@ router.post('/create-tamara-order', withDB(async (req: Request, res: Response) =
     // Generate merchant order ID
     const merchantOrderId = `TAMARA_ORDER_${userId}_${Date.now()}`;
 
-    // Prepare items for Tamara
-    const tamaraItems = cartSummary.summary.items.map((item, index) => ({
-      name: `دعوة ${item.hostName}`,
-      referenceId: String(item.id),
-      sku: `INV-${item.packageType.toUpperCase()}-${index + 1}`,
-      quantity: 1,
-      unitPrice: item.price,
-      totalAmount: item.price
-    }));
+    const taxFree: { amount: number; currency: 'SAR' } = {
+      amount: 0,
+      currency: 'SAR'
+    };
 
-    // Create Tamara checkout session
     const checkoutResponse = await tamaraService.createCheckoutSession({
-      orderReferenceId: merchantOrderId,
-      orderNumber: merchantOrderId,
-      totalAmount: cartSummary.summary.totalAmount,
-      items: tamaraItems,
+      total_amount: {
+        amount: cartSummary.summary.totalAmount,
+        currency: 'SAR'
+      },
+      shipping_amount: taxFree,
+      tax_amount: taxFree,
+      order_reference_id: merchantOrderId,
+      country_code: 'SA',
+      description: `طلب دعوات - ${cartSummary.summary.itemCount} مناسبة`,
+      items: cartSummary.summary.items.map((item, index) => ({
+        name: `دعوة ${item.hostName}`,
+        quantity: 1,
+        reference_id: String(item.id),
+        type: 'Digital' as const,
+        sku: `INV-${item.packageType.toUpperCase()}-${index + 1}`,
+        unit_price: { amount: item.price, currency: 'SAR' as const },
+        total_amount: { amount: item.price, currency: 'SAR' as const }
+      })),
       consumer: {
         email: customerInfo.email,
-        firstName: customerInfo.firstName,
-        lastName: customerInfo.lastName,
-        phoneNumber: customerInfo.phone.replace(/^\+966/, '')
+        first_name: customerInfo.firstName,
+        last_name: customerInfo.lastName,
+        phone_number: customerInfo.phone.replace(/^\+966/, '')
       },
-      billingAddress: {
-        city: customerInfo.city,
-        firstName: customerInfo.firstName,
-        lastName: customerInfo.lastName,
+      shipping_address: {
+        first_name: customerInfo.firstName,
+        last_name: customerInfo.lastName,
         line1: customerInfo.address || 'N/A',
-        phoneNumber: customerInfo.phone.replace(/^\+966/, ''),
-        region: customerInfo.region || customerInfo.city
+        city:
+          typeof customerInfo.city === 'string' && customerInfo.city
+            ? customerInfo.city
+            : 'الرياض',
+        country_code: 'SA'
       },
-      description: `طلب دعوات - ${cartSummary.summary.itemCount} مناسبة`,
-      instalments: 3,
-      locale: 'ar_SA'
+      locale: 'ar_SA',
+      payment_type: 'PAY_BY_INSTALMENTS',
+      instalments: 3
     });
 
     logger.info(`✅ TAMARA CHECKOUT SESSION CREATED [${orderCreationId}]`, {
       orderCreationId,
       userId,
-      tamaraOrderId: checkoutResponse.order_id,
-      checkoutId: checkoutResponse.checkout_id,
-      status: checkoutResponse.status
+      tamaraOrderId: checkoutResponse.orderId,
+      checkoutId: checkoutResponse.checkoutId
     });
 
-    // Create our internal order record
-    // TODO: Update OrderService to support Tamara orders
-    // const order = await OrderService.createTamaraOrder(
-    //   userId,
-    //   finalSelectedCartItemIds,
-    //   checkoutResponse.order_id,
-    //   merchantOrderId,
-    //   cartSummary.summary.totalAmount
-    // );
+    const order = await OrderService.createTamaraOrder(
+      userId,
+      finalSelectedCartItemIds,
+      checkoutResponse.orderId,
+      checkoutResponse.checkoutId,
+      merchantOrderId,
+      cartSummary.summary.totalAmount
+    );
 
     const totalProcessingTime = Date.now() - orderCreationStartTime;
 
     logger.info(`🎉 TAMARA ORDER CREATION COMPLETED [${orderCreationId}]`, {
       orderCreationId,
       userId,
-      tamaraOrderId: checkoutResponse.order_id,
-      checkoutUrl: checkoutResponse.checkout_url,
+      tamaraOrderId: checkoutResponse.orderId,
+      checkoutUrl: checkoutResponse.checkoutUrl,
+      ourOrderId: order._id,
       totalAmount: cartSummary.summary.totalAmount,
       totalProcessingTime
     });
 
     return res.json({
       success: true,
-      tamaraOrderId: checkoutResponse.order_id,
-      checkoutId: checkoutResponse.checkout_id,
-      checkoutUrl: checkoutResponse.checkout_url,
+      tamaraOrderId: checkoutResponse.orderId,
+      checkoutId: checkoutResponse.checkoutId,
+      checkoutUrl: checkoutResponse.checkoutUrl,
       merchantOrderId: merchantOrderId,
       amount: cartSummary.summary.totalAmount,
       currency: 'SAR',
@@ -1514,10 +1447,10 @@ router.get('/tamara/order/:orderId', withDB(async (req: Request, res: Response) 
  */
 router.post('/tamara/capture/:orderId', withDB(async (req: Request, res: Response) => {
   try {
-    const orderId = Array.isArray(req.params.orderId) 
-      ? req.params.orderId[0] 
+    const orderId = Array.isArray(req.params.orderId)
+      ? req.params.orderId[0]
       : req.params.orderId;
-    const { items, totalAmount } = req.body;
+    const { totalAmount } = req.body;
 
     if (!orderId) {
       return res.status(400).json({
@@ -1526,22 +1459,22 @@ router.post('/tamara/capture/:orderId', withDB(async (req: Request, res: Respons
       });
     }
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    if (totalAmount == null || Number.isNaN(Number(totalAmount))) {
       return res.status(400).json({
         success: false,
-        error: { message: 'عناصر الطلب مطلوبة' }
+        error: { message: 'المبلغ الإجمالي مطلوب' }
       });
     }
 
-    const captureResult = await tamaraService.captureOrder({
+    const captureResult = await tamaraService.captureOrder(
       orderId,
-      totalAmount,
-      items
-    });
+      Number(totalAmount),
+      'SAR'
+    );
 
     logger.info('Tamara order captured successfully', {
       orderId,
-      captureId: captureResult.capture_id,
+      captureId: captureResult.captureId,
       status: captureResult.status
     });
 
@@ -1549,7 +1482,6 @@ router.post('/tamara/capture/:orderId', withDB(async (req: Request, res: Respons
       success: true,
       capture: captureResult
     });
-
   } catch (error: any) {
     logger.error('Error capturing Tamara order:', error);
     return res.status(500).json({
@@ -1565,8 +1497,8 @@ router.post('/tamara/capture/:orderId', withDB(async (req: Request, res: Respons
  */
 router.post('/tamara/cancel/:orderId', withDB(async (req: Request, res: Response) => {
   try {
-    const orderId = Array.isArray(req.params.orderId) 
-      ? req.params.orderId[0] 
+    const orderId = Array.isArray(req.params.orderId)
+      ? req.params.orderId[0]
       : req.params.orderId;
     const { items, totalAmount } = req.body;
 
@@ -1577,23 +1509,106 @@ router.post('/tamara/cancel/:orderId', withDB(async (req: Request, res: Response
       });
     }
 
-    const cancelResult = await tamaraService.cancelOrder({
-      orderId,
-      totalAmount,
-      items
+    if (totalAmount == null || Number.isNaN(Number(totalAmount))) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'المبلغ الإجمالي مطلوب' }
+      });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'عناصر الطلب مطلوبة' }
+      });
+    }
+
+    const baseUrl = (process.env.TAMARA_API_URL || 'https://api-sandbox.tamara.co').replace(
+      /\/$/,
+      ''
+    );
+    const cancelUrl = `${baseUrl}/orders/${encodeURIComponent(orderId)}/cancel`;
+
+    const taxFree = { amount: 0, currency: 'SAR' as const };
+    const tamaraItems = items.map((item: any) => {
+      const totalAmt =
+        typeof item.total_amount === 'object' && item.total_amount?.amount !== undefined
+          ? Number(item.total_amount.amount)
+          : Number(item.totalAmount);
+      const unitAmt =
+        typeof item.unit_price === 'object' && item.unit_price?.amount !== undefined
+          ? Number(item.unit_price.amount)
+          : Number(item.unitPrice);
+      return {
+        reference_id: String(item.reference_id ?? item.referenceId),
+        type: item.type || 'Digital',
+        name: String(item.name),
+        sku: String(item.sku),
+        quantity: Number(item.quantity) || 1,
+        total_amount: { amount: totalAmt, currency: 'SAR' as const },
+        unit_price: { amount: Number.isFinite(unitAmt) ? unitAmt : 0, currency: 'SAR' as const },
+        tax_amount: taxFree,
+        discount_amount: taxFree
+      };
     });
+
+    const resTamara = await fetch(cancelUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.TAMARA_API_TOKEN}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify({
+        total_amount: { amount: Number(totalAmount), currency: 'SAR' },
+        shipping_amount: taxFree,
+        tax_amount: taxFree,
+        discount_amount: taxFree,
+        items: tamaraItems
+      })
+    });
+
+    const errorBodyRaw = await resTamara.text();
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = errorBodyRaw ? JSON.parse(errorBodyRaw) : {};
+    } catch {
+      parsed = { raw: errorBodyRaw };
+    }
+
+    logger.info('Tamara cancel API call', {
+      endpoint: cancelUrl,
+      statusCode: resTamara.status,
+      responseBody: parsed
+    });
+
+    if (!resTamara.ok) {
+      throw new Error(
+        `Tamara API error [${resTamara.status}] ${cancelUrl}: ${errorBodyRaw}`
+      );
+    }
+
+    const cancelResult = parsed as {
+      cancel_id?: string;
+      cancelId?: string;
+      order_id?: string;
+      status?: string;
+    };
 
     logger.info('Tamara order cancelled successfully', {
       orderId,
-      cancelId: cancelResult.cancel_id,
+      cancelId: cancelResult.cancel_id ?? cancelResult.cancelId,
       status: cancelResult.status
     });
 
     return res.json({
       success: true,
-      cancel: cancelResult
+      cancel: {
+        cancel_id: cancelResult.cancel_id ?? cancelResult.cancelId,
+        order_id: cancelResult.order_id,
+        status: cancelResult.status
+      }
     });
-
   } catch (error: any) {
     logger.error('Error cancelling Tamara order:', error);
     return res.status(500).json({
@@ -1628,15 +1643,16 @@ router.post('/tamara/refund/:orderId', withDB(async (req: Request, res: Response
       });
     }
 
-    const refundResult = await tamaraService.refundOrder({
+    const refundResult = await tamaraService.refundOrder(
       orderId,
-      totalAmount,
+      Number(totalAmount),
+      'SAR',
       comment
-    });
+    );
 
     logger.info('Tamara order refunded successfully', {
       orderId,
-      refundId: refundResult.refund_id,
+      refundId: refundResult.refundId,
       status: refundResult.status
     });
 

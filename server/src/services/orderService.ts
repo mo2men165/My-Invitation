@@ -690,6 +690,345 @@ export class OrderService {
   }
 
   /**
+   * Create a new Tamara order with selected cart items
+   */
+  static async createTamaraOrder(
+    userId: string,
+    selectedCartItemIds: string[],
+    tamaraOrderId: string,
+    tamaraCheckoutId: string,
+    merchantOrderId: string,
+    totalAmount: number
+  ): Promise<IOrder> {
+    const orderCreationId = `tamara_order_create_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    try {
+      logger.info(`📝 TAMARA ORDER CREATION STARTED [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        tamaraOrderId,
+        tamaraCheckoutId,
+        merchantOrderId,
+        selectedCartItemIds,
+        totalAmount,
+        timestamp: new Date().toISOString()
+      });
+
+      const user = await User.findById(userId);
+      if (!user) {
+        logger.error(`❌ USER NOT FOUND [${orderCreationId}]`, { orderCreationId, userId });
+        throw new Error('المستخدم غير موجود');
+      }
+
+      const selectedCartItems = user.cart.filter(item => 
+        selectedCartItemIds.includes(item._id!.toString())
+      );
+
+      if (selectedCartItems.length !== selectedCartItemIds.length) {
+        logger.error(`❌ CART ITEMS VALIDATION FAILED [${orderCreationId}]`, {
+          orderCreationId,
+          userId,
+          requestedCount: selectedCartItemIds.length,
+          foundCount: selectedCartItems.length
+        });
+        throw new Error('بعض العناصر المحددة غير موجودة في السلة');
+      }
+
+      const pendingOrders = await Order.find({
+        userId: new Types.ObjectId(userId),
+        status: 'pending',
+        'selectedCartItems.cartItemId': { $in: selectedCartItemIds.map(id => new Types.ObjectId(id)) }
+      });
+
+      if (pendingOrders.length > 0) {
+        logger.error(`❌ CONFLICTING PENDING ORDERS FOUND [${orderCreationId}]`, {
+          orderCreationId,
+          conflictingOrderIds: pendingOrders.map(order => order._id)
+        });
+        throw new Error('بعض العناصر المحددة في طلبات معلقة بالفعل');
+      }
+
+      const orderData = {
+        userId: new Types.ObjectId(userId),
+        merchantOrderId,
+        paymentProvider: 'tamara' as const,
+        tamaraOrderId,
+        tamaraCheckoutId,
+        tamaraStatus: 'pending',
+        selectedCartItems: selectedCartItems.map(item => ({
+          cartItemId: item._id!,
+          cartItemData: item
+        })),
+        totalAmount,
+        status: 'pending' as const,
+        paymentMethod: 'tamara'
+      };
+
+      const order = new Order(orderData);
+      const savedOrder = await order.save();
+
+      logger.info(`✅ TAMARA ORDER CREATED SUCCESSFULLY [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        tamaraOrderId,
+        tamaraCheckoutId,
+        merchantOrderId,
+        ourOrderId: savedOrder._id,
+        selectedItemsCount: savedOrder.selectedCartItems.length,
+        totalAmount: savedOrder.totalAmount
+      });
+
+      return savedOrder;
+
+    } catch (error: any) {
+      logger.error(`💥 TAMARA ORDER CREATION FAILED [${orderCreationId}]`, {
+        orderCreationId,
+        userId,
+        tamaraOrderId,
+        merchantOrderId,
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Process successful Tamara payment and create events
+   */
+  /**
+   * Complete Tamara checkout using our merchant order reference (Tamara webhook order_reference_id).
+   */
+  static async processSuccessfulTamaraPaymentByMerchantOrderId(
+    merchantOrderId: string,
+    tamaraStatus: string
+  ): Promise<{
+    success: boolean;
+    orderId?: string;
+    eventsCreated?: number;
+    events?: any[];
+    error?: string;
+  }> {
+    try {
+      const order = await Order.findOne({
+        merchantOrderId,
+        paymentProvider: 'tamara'
+      });
+      if (!order?.tamaraOrderId) {
+        return { success: false, error: 'Order not found' };
+      }
+      return OrderService.processSuccessfulTamaraPayment(
+        order.tamaraOrderId,
+        tamaraStatus
+      );
+    } catch (error: any) {
+      logger.error('processSuccessfulTamaraPaymentByMerchantOrderId failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async processSuccessfulTamaraPayment(
+    tamaraOrderId: string,
+    tamaraStatus: string
+  ): Promise<{
+    success: boolean;
+    orderId?: string;
+    eventsCreated?: number;
+    events?: any[];
+    error?: string;
+  }> {
+    const processId = `tamara_process_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    try {
+      logger.info(`🔄 PROCESSING TAMARA PAYMENT [${processId}]`, {
+        processId,
+        tamaraOrderId,
+        tamaraStatus
+      });
+
+      const order = await Order.findOne({ tamaraOrderId });
+      if (!order) {
+        logger.error(`❌ ORDER NOT FOUND FOR TAMARA ORDER [${processId}]`, { tamaraOrderId });
+        return { success: false, error: 'Order not found' };
+      }
+
+      if (order.status !== 'pending') {
+        logger.warn(`⚠️ ORDER NOT PENDING [${processId}]`, {
+          orderId: order._id,
+          currentStatus: order.status
+        });
+        return { success: false, error: 'Order is not pending' };
+      }
+
+      order.tamaraStatus = tamaraStatus as IOrder['tamaraStatus'];
+      
+      const paymentCompletedAt = new Date();
+      const createdEvents = [];
+
+      for (const selectedItem of order.selectedCartItems) {
+        const cartItem = selectedItem.cartItemData;
+        
+        const eventData = {
+          userId: order.userId,
+          designId: cartItem.designId,
+          packageType: cartItem.packageType,
+          details: {
+            ...cartItem.details,
+            eventDate: new Date(cartItem.details.eventDate),
+            isCustomDesign: cartItem.details.isCustomDesign || false,
+            customDesignNotes: cartItem.details.customDesignNotes || ''
+          },
+          totalPrice: cartItem.totalPrice,
+          status: 'upcoming' as const,
+          approvalStatus: 'pending' as const,
+          guests: [],
+          paymentCompletedAt
+        };
+
+        const newEvent = new Event(eventData);
+        const savedEvent = await newEvent.save();
+        createdEvents.push(savedEvent);
+
+        try {
+          await NotificationService.notifyNewEventPending(
+            (savedEvent._id as Types.ObjectId).toString(),
+            order.userId.toString(),
+            {
+              hostName: savedEvent.details.hostName,
+              eventDate: savedEvent.details.eventDate.toLocaleDateString('ar-SA')
+            }
+          );
+        } catch (notificationError: any) {
+          logger.error(`Failed to send notification for event ${savedEvent._id}:`, notificationError.message);
+        }
+      }
+
+      order.status = 'completed';
+      order.completedAt = paymentCompletedAt;
+      order.eventsCreated = createdEvents.map(event => event._id as Types.ObjectId);
+      await order.save();
+
+      const user = await User.findById(order.userId);
+      if (user) {
+        const cartItemIdsToRemove = order.selectedCartItems.map(item => item.cartItemId.toString());
+        user.cart = user.cart.filter(item => !cartItemIdsToRemove.includes(item._id!.toString()));
+        await user.save();
+
+        try {
+          await CacheService.invalidateUserCartCache((order.userId as Types.ObjectId).toString());
+        } catch (cacheError: any) {
+          // Cache failure shouldn't stop the process
+        }
+      }
+
+      logger.info(`✅ TAMARA PAYMENT PROCESSED SUCCESSFULLY [${processId}]`, {
+        processId,
+        orderId: order._id,
+        eventsCreated: createdEvents.length
+      });
+
+      BillService.createBillFromOrder((order._id as Types.ObjectId).toString())
+        .then((bill) => {
+          if (bill) {
+            logger.info(`Bill created for Tamara order ${order._id}:`, { billId: bill._id });
+          }
+        })
+        .catch((billError) => {
+          logger.error(`Failed to create bill for Tamara order ${order._id}:`, billError);
+        });
+
+      return {
+        success: true,
+        orderId: (order._id as Types.ObjectId).toString(),
+        eventsCreated: createdEvents.length,
+        events: createdEvents
+      };
+
+    } catch (error: any) {
+      logger.error(`💥 TAMARA PAYMENT PROCESSING FAILED [${processId}]`, {
+        processId,
+        tamaraOrderId,
+        error: error.message
+      });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Find order by Tamara order ID
+   */
+  static async findByTamaraOrderId(tamaraOrderId: string): Promise<IOrder | null> {
+    try {
+      return await Order.findOne({ tamaraOrderId });
+    } catch (error: any) {
+      logger.error('Error finding order by Tamara order ID:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark Tamara order as failed
+   */
+  static async markTamaraOrderAsFailed(tamaraOrderId: string, tamaraStatus: string): Promise<boolean> {
+    try {
+      const order = await Order.findOne({ tamaraOrderId });
+      if (!order) {
+        logger.error(`Order not found for Tamara order ID: ${tamaraOrderId}`);
+        return false;
+      }
+
+      if (order.status === 'pending') {
+        order.status = 'failed';
+        order.failedAt = new Date();
+        order.tamaraStatus = tamaraStatus as IOrder['tamaraStatus'];
+        await order.save();
+
+        logger.info(`Tamara order marked as failed:`, {
+          orderId: order._id,
+          tamaraOrderId,
+          tamaraStatus
+        });
+      }
+
+      return true;
+    } catch (error: any) {
+      logger.error('Error marking Tamara order as failed:', error);
+      return false;
+    }
+  }
+
+  static async markTamaraOrderAsFailedByMerchantOrderId(
+    merchantOrderId: string,
+    tamaraStatus: string
+  ): Promise<boolean> {
+    try {
+      const order = await Order.findOne({ merchantOrderId, paymentProvider: 'tamara' });
+      if (!order) {
+        logger.error(`Order not found for Tamara merchant order ID: ${merchantOrderId}`);
+        return false;
+      }
+
+      if (order.status === 'pending') {
+        order.status = 'failed';
+        order.failedAt = new Date();
+        order.tamaraStatus = tamaraStatus as IOrder['tamaraStatus'];
+        await order.save();
+
+        logger.info(`Tamara order marked as failed by merchant reference:`, {
+          orderId: order._id,
+          merchantOrderId,
+          tamaraStatus
+        });
+      }
+
+      return true;
+    } catch (error: any) {
+      logger.error('Error marking Tamara order as failed by merchant ref:', error);
+      return false;
+    }
+  }
+
+  /**
    * Mark Tabby order as failed
    */
   static async markTabbyOrderAsFailed(tabbyPaymentId: string, tabbyStatus: string): Promise<boolean> {

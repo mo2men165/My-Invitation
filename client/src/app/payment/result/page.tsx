@@ -78,6 +78,125 @@ const PaymentResultContent: React.FC = () => {
         const callbackId = searchParams.get('callback_id');
         const tabbyStatus = searchParams.get('status');
         
+        // Handle Tamara payment redirections
+        if (provider === 'tamara') {
+          const tamaraStatus = searchParams.get('status');
+          console.log(`🔔 TAMARA PAYMENT REDIRECT`, { tamaraStatus, merchantOrderId });
+          
+          if (tamaraStatus === 'cancel') {
+            setOrderData({
+              id: merchantOrderId || 'unknown',
+              merchantOrderId: merchantOrderId || 'unknown',
+              paymobOrderId: 0,
+              status: 'cancelled',
+              totalAmount: 0,
+              paymentMethod: 'tamara',
+              eventsCreated: 0,
+              events: [],
+              selectedItems: [],
+              createdAt: new Date().toISOString()
+            });
+            
+            toast({
+              title: "تم إلغاء الدفع",
+              description: "لم يتم إتمام عملية الدفع عبر تمارا. يمكنك المحاولة مرة أخرى",
+              variant: "destructive",
+              duration: 5000
+            });
+            return;
+          }
+          
+          if (tamaraStatus === 'failure') {
+            setOrderData({
+              id: merchantOrderId || 'unknown',
+              merchantOrderId: merchantOrderId || 'unknown',
+              paymobOrderId: 0,
+              status: 'failed',
+              totalAmount: 0,
+              paymentMethod: 'tamara',
+              eventsCreated: 0,
+              events: [],
+              selectedItems: [],
+              createdAt: new Date().toISOString()
+            });
+            
+            toast({
+              title: "فشل في الدفع",
+              description: "لم يتم إتمام عملية الدفع عبر تمارا",
+              variant: "destructive",
+              duration: 5000
+            });
+            return;
+          }
+          
+          if (tamaraStatus === 'success' && merchantOrderId) {
+            console.log(`✅ TAMARA PAYMENT SUCCESS - POLLING FOR ORDER [${merchantOrderId}]`);
+            
+            let attempts = 0;
+            const maxAttempts = 15;
+            const pollInterval = 2000;
+            
+            const pollForOrder = async (): Promise<boolean> => {
+              try {
+                const response = await paymentAPI.getOrderByMerchantId(merchantOrderId);
+                
+                if (response.success && response.order) {
+                  console.log(`📊 ORDER STATUS [${merchantOrderId}]`, {
+                    status: response.order.status,
+                    attempt: attempts + 1
+                  });
+                  
+                  if (response.order.status === 'completed') {
+                    setOrderData(response.order);
+                    toast({
+                      title: "تم الدفع بنجاح!",
+                      description: `تم إنشاء ${response.order.eventsCreated} مناسبة بنجاح`,
+                      variant: "default",
+                      duration: 5000
+                    });
+                    return true;
+                  } else if (response.order.status === 'failed') {
+                    setOrderData(response.order);
+                    toast({
+                      title: "فشل في الدفع",
+                      description: "لم يتم إتمام عملية الدفع بنجاح",
+                      variant: "destructive",
+                      duration: 5000
+                    });
+                    return true;
+                  }
+                }
+                return false;
+              } catch (err) {
+                console.error('Error polling for order:', err);
+                return false;
+              }
+            };
+            
+            if (await pollForOrder()) return;
+            
+            while (attempts < maxAttempts) {
+              attempts++;
+              await new Promise(resolve => setTimeout(resolve, pollInterval));
+              if (await pollForOrder()) return;
+            }
+            
+            const finalResponse = await paymentAPI.getOrderByMerchantId(merchantOrderId);
+            if (finalResponse.success && finalResponse.order) {
+              setOrderData(finalResponse.order);
+              toast({
+                title: "جاري معالجة الدفع",
+                description: "سيتم تأكيد الدفع قريباً. يمكنك متابعة حالة الطلب من لوحة التحكم",
+                variant: "default",
+                duration: 7000
+              });
+            } else {
+              setError('فشل في تحميل بيانات الطلب');
+            }
+            return;
+          }
+        }
+
         // Handle Tabby payment redirections
         if (provider === 'tabby') {
           console.log(`🔔 TABBY PAYMENT REDIRECT`, { tabbyStatus, merchantOrderId });

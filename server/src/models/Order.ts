@@ -5,10 +5,12 @@ import { ICartItem } from './User';
 export interface IOrder extends Document {
   userId: Types.ObjectId;
   merchantOrderId: string;         // Our internal order reference
-  paymentProvider: 'paymob' | 'tabby';  // Payment provider used
+  paymentProvider: 'paymob' | 'tabby' | 'tamara';  // Payment provider used
   paymobOrderId?: number;          // Paymob's order ID (for paymob payments)
   tabbyPaymentId?: string;         // Tabby's payment ID (for tabby payments)
   tabbySessionId?: string;         // Tabby's session ID
+  tamaraOrderId?: string;          // Tamara's order ID (for tamara payments)
+  tamaraCheckoutId?: string;     // Tamara checkout_session id
   selectedCartItems: {
     cartItemId: Types.ObjectId;    // Unique cart item ID
     cartItemData: ICartItem;       // Full cart item data snapshot
@@ -23,6 +25,15 @@ export interface IOrder extends Document {
   cancelledAt?: Date;
   paymobTransactionId?: string;    // Transaction ID from Paymob webhook
   tabbyStatus?: string;            // Tabby payment status
+  tamaraStatus?:
+    | 'pending'
+    | 'authorised'
+    | 'captured'
+    | 'fully_captured'
+    | 'expired'
+    | 'declined'
+    | 'failed';                     // Tamara order status
+  tamaraCaptureId?: string;        // Tamara capture ID after authorisation
   adminNotes?: string;             // Admin notes for manual status changes
 }
 
@@ -183,7 +194,7 @@ const orderSchema = new Schema<IOrder>({
   },
   paymentProvider: {
     type: String,
-    enum: ['paymob', 'tabby'],
+    enum: ['paymob', 'tabby', 'tamara'],
     required: true,
     default: 'paymob'
   },
@@ -198,6 +209,15 @@ const orderSchema = new Schema<IOrder>({
     index: true
   },
   tabbySessionId: {
+    type: String,
+    sparse: true
+  },
+  tamaraOrderId: {
+    type: String,
+    sparse: true,
+    index: true
+  },
+  tamaraCheckoutId: {
     type: String,
     sparse: true
   },
@@ -244,6 +264,21 @@ const orderSchema = new Schema<IOrder>({
     type: String
   },
   tabbyStatus: {
+    type: String
+  },
+  tamaraStatus: {
+    type: String,
+    enum: [
+      'pending',
+      'authorised',
+      'captured',
+      'fully_captured',
+      'expired',
+      'declined',
+      'failed'
+    ]
+  },
+  tamaraCaptureId: {
     type: String
   },
   adminNotes: {

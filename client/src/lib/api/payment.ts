@@ -201,6 +201,42 @@ class PaymentAPI {
     return result;
   }
 
+  async createTamaraOrder(data: {
+    customerInfo: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      city: string;
+      address?: string;
+      region?: string;
+    };
+    selectedCartItemIds?: string[];
+  }): Promise<{
+    success: boolean;
+    tamaraOrderId?: string;
+    checkoutId?: string;
+    checkoutUrl?: string;
+    merchantOrderId?: string;
+    amount?: number;
+    currency?: string;
+    error?: { message: string };
+  }> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/create-tamara-order`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في إنشاء طلب تمارا');
+    }
+
+    return result;
+  }
+
   async getTabbyPaymentStatus(paymentId: string): Promise<{
     success: boolean;
     payment?: any;
