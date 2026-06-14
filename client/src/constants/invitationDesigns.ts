@@ -1,7 +1,8 @@
 // client/src/constants/invitationDesigns.ts - Invitation designs constants
 import { InvitationDesign } from '@/types';
+import { newInvitationDesigns } from './newInvitationDesigns';
 
-export const invitationDesigns: InvitationDesign[] = [
+const legacyInvitationDesigns: InvitationDesign[] = [
   // Birthday Invites
   { id: "66c7e1a1b8f3c4d5e6f7a8b1", name: 'دعوة عيد ميلاد فاطمة', category: 'عيد ميلاد', image: '/birthday invites/Design - Front.webp' },
   { id: "66c7e1a2b8f3c4d5e6f7a8b2", name: 'دعوة بلون البني والأزرق البسيط', category: 'عيد ميلاد', image: '/birthday invites/دعوة بلون البنى و الازرق بسيط عن حضور حفل مولود جديد.webp' },
@@ -49,4 +50,13 @@ export const invitationDesigns: InvitationDesign[] = [
     isCustom: true,
     availableFor: ['premium', 'vip']
   }
+];
+
+const customDesign = legacyInvitationDesigns.find((d) => d.isCustom)!;
+const legacyCatalogDesigns = legacyInvitationDesigns.filter((d) => !d.isCustom);
+
+export const invitationDesigns: InvitationDesign[] = [
+  ...newInvitationDesigns,
+  ...legacyCatalogDesigns,
+  customDesign,
 ];

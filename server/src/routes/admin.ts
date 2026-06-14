@@ -2471,6 +2471,8 @@ router.delete('/users/:userId/cart/:cartItemId/price-modification', withDB(async
   }
 }));
 
+// TEMPORARILY DISABLED - Tabby webhook management
+if (false) {
 // ============================================
 // PAYMENT PROVIDER MANAGEMENT
 // ============================================
@@ -2548,5 +2550,7 @@ router.put('/tabby/update-webhook/:webhookId', withDB(async (req: Request, res: 
     });
   }
 }));
+
+} // END TEMPORARILY DISABLED - Tabby webhook management
 
 export default router;

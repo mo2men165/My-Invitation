@@ -1,6 +1,7 @@
 // routes/payment.ts
 import { Router, Request, Response } from 'express';
 import cors from 'cors';
+// TEMPORARILY DISABLED - Tamara & Tabby (set to true to re-enable)
 import jwt from 'jsonwebtoken';
 import { Types } from 'mongoose';
 import { PaymentService } from '../services/paymentService';
@@ -1098,6 +1099,8 @@ router.get('/paymob/status/:transactionId', withDB(async (req: Request, res: Res
   }
 }));
 
+// TEMPORARILY DISABLED - Tamara & Tabby payment routes
+if (false) {
 /**
  * POST /api/payment/tamara/webhook
  * JWT verification only may return non-200.
@@ -2244,5 +2247,7 @@ router.post('/tabby/close/:paymentId', withDB(async (req: Request, res: Response
     });
   }
 }));
+
+} // END TEMPORARILY DISABLED - Tamara & Tabby
 
 export default router;

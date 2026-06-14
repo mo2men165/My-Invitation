@@ -47,7 +47,7 @@ export default function PackagesPage() {
     designMode,
     selectCategory,
     setDesignMode
-  } = usePackagesLogic();
+  } = usePackagesLogic(activeTab);
 
   // Reset design mode to regular when switching to Classic package
   useEffect(() => {
@@ -105,22 +105,28 @@ export default function PackagesPage() {
             {/* Category Filter */}
             <div className="mb-8">
               <h3 className="text-xl font-semibold text-white mb-4 text-center">
-                اختر <span className="text-[#C09B52]">نوع الحدث</span> المطلوب
+                {selectedCategory === null ? (
+                  <>تصاميم <span className="text-[#C09B52]">باقة {currentPackage.name}</span></>
+                ) : (
+                  <>تصاميم <span className="text-[#C09B52]">{selectedCategory}</span></>
+                )}
               </h3>
+              <p className="text-gray-400 text-center mb-4 text-sm">
+                {selectedCategory === null
+                  ? 'تصاميم حصرية لهذه الباقة — أو اختر نوع الحدث أدناه'
+                  : 'عرض تصاميم حسب نوع الحدث — اضغط مرة أخرى للعودة لتصاميم الباقة'}
+              </p>
               <CategoryFilter
                 selectedCategory={selectedCategory}
                 onSelectCategory={selectCategory}
                 categories={[
                   { value: 'عيد ميلاد', label: 'عيد ميلاد' },
                   { value: 'حفل تخرج', label: 'حفل تخرج' },
-                  { value: 'حفل زفاف', label: 'حفل زفاف' }
+                  { value: 'حفل زفاف', label: 'حفل زفاف' },
                 ]}
               />
               <p className="text-gray-400 text-center mt-2 text-sm">
-                {selectedCategory === null 
-                  ? 'الرجاء اختيار نوع الحدث لعرض التصاميم المتاحة' 
-                  : `عدد التصاميم المعروضة: ${filteredDesigns.length}`
-                }
+                عدد التصاميم المعروضة: {filteredDesigns.length}
               </p>
             </div>
             

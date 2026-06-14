@@ -1,6 +1,28 @@
 import { invitationDesigns, packageData } from '@/constants';
 import { InvitationDesign, PackageData } from '@/types';
 
+export const isDesignAvailableForPackage = (
+  design: InvitationDesign,
+  packageType: keyof PackageData
+): boolean => {
+  if (design.packageTier) return design.packageTier === packageType;
+  if (!design.availableFor) return true;
+  return design.availableFor.includes(packageType);
+};
+
+export const isPackageTierDesign = (design: InvitationDesign): boolean =>
+  !!design.packageTier;
+
+export const matchesPackageView = (
+  design: InvitationDesign,
+  packageType: keyof PackageData
+): boolean => design.packageTier === packageType;
+
+export const matchesCategoryView = (
+  design: InvitationDesign,
+  category: string
+): boolean => !design.packageTier && !design.isCustom && design.category === category;
+
 export const getDesignById = (designId: string): InvitationDesign | undefined => {
   return invitationDesigns.find(design => design.id === designId);
 };

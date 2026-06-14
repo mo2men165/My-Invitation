@@ -8,12 +8,14 @@ function RedirectBody() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const q = searchParams.toString();
-    router.replace(
-      q
-        ? `/payment/result?provider=tamara&status=cancel&${q}`
-        : '/payment/result?provider=tamara&status=cancel'
-    );
+    // TEMPORARILY DISABLED - Tamara payment redirect
+    // const q = searchParams.toString();
+    // router.replace(
+    //   q
+    //     ? `/payment/result?provider=tamara&status=cancel&${q}`
+    //     : '/payment/result?provider=tamara&status=cancel'
+    // );
+    router.replace('/cart');
   }, [router, searchParams]);
 
   return (

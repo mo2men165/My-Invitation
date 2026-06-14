@@ -32,7 +32,7 @@ const DesignGrid: React.FC<DesignGridProps> = ({
         اختر <span className="text-[#C09B52]">تصميمك</span> المفضل
       </h2>
       
-      <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
         {designs.map((design) => (
           <DesignCard 
             key={design.id} 

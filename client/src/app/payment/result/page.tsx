@@ -76,8 +76,9 @@ const PaymentResultContent: React.FC = () => {
         const reason = searchParams.get('reason');
         const message = searchParams.get('message');
         const callbackId = searchParams.get('callback_id');
-        const tabbyStatus = searchParams.get('status');
+        // const tabbyStatus = searchParams.get('status');
         
+        /* TEMPORARILY DISABLED - Tamara payment redirections
         // Handle Tamara payment redirections
         if (provider === 'tamara') {
           const tamaraStatus = searchParams.get('status');
@@ -319,6 +320,7 @@ const PaymentResultContent: React.FC = () => {
             return;
           }
         }
+        */ // END TEMPORARILY DISABLED - Tamara & Tabby payment redirections
         
         // Handle Paymob/default payment flow
         if (reason === 'cancelled' || reason === 'user_cancelled') {

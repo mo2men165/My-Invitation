@@ -1,6 +1,6 @@
 'use client';
 import React, { memo, useCallback } from 'react';
-import { Heart, ShoppingCart, Eye, GitCompare, Check } from 'lucide-react';
+import { Heart, ShoppingCart, Eye, GitCompare } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { InvitationDesign, PackageData } from '@/types';
@@ -48,29 +48,23 @@ const DesignCard = memo<DesignCardProps>(({
   }, [packageType, design, onAddToCart]);
 
   return (
-    <div className="group relative bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 hover:border-white/30 transition-all duration-500 overflow-hidden break-inside-avoid mb-6">
+    <div className="group relative flex h-full flex-col bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 hover:border-white/30 transition-all duration-500">
       
       {/* Image Section */}
-      <div className="relative">
+      <div className="relative w-full aspect-[9/16] shrink-0 overflow-hidden rounded-t-2xl bg-black/20">
         <Image 
           src={design.image} 
           alt={design.name}
-          width={400}
-          height={600}
-          className="w-full h-auto"
-          style={{ 
-            width: '100%', 
-            height: 'auto',
-            display: 'block'
-          }}
-          onError={() => {
-          }}
+          fill
+          className="object-contain"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          onError={() => {}}
           priority={false}
         />
         
-        {/* Overlay */}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-          <div className="absolute inset-0 bg-black/50"></div>
+        {/* Hover overlay actions */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none group-hover:pointer-events-auto">
+          <div className="absolute inset-0 bg-black/50" />
           <div className="absolute inset-0 flex items-center justify-center gap-3">
             <button
               onClick={handleImageClick}
@@ -103,7 +97,7 @@ const DesignCard = memo<DesignCardProps>(({
 
         <button
           onClick={handleWishlistClick}
-          className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+          className={`absolute top-3 right-3 z-30 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
             isInWishlist 
               ? 'bg-red-500 text-white' 
               : 'bg-black/50 hover:bg-red-500 text-white'
@@ -114,31 +108,10 @@ const DesignCard = memo<DesignCardProps>(({
       </div>
 
       {/* Content */}
-      <div className="p-6">
-        <h3 className="text-lg font-bold text-white mb-2">{design.name}</h3>
-        <span className="px-3 py-1 bg-[#C09B52]/20 text-[#C09B52] text-xs rounded-full border border-[#C09B52]/30 mb-4 inline-block">
-          {design.category}
-        </span>
+      <div className="flex flex-1 flex-col p-6">
+        <h3 className="text-lg font-bold text-white mb-4 line-clamp-2">{design.name}</h3>
 
-        {/* <div className="mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <currentPackage.icon className="w-5 h-5 text-[#C09B52]" />
-            <span className="text-white font-medium">مميزات باقة {currentPackage.name}</span>
-          </div>
-          <div className="space-y-1">
-            {currentPackage.features.slice(0, 3).map((feature, index) => (
-              <div key={index} className="flex items-center gap-2 text-sm text-gray-300">
-                <Check className="w-4 h-4 text-green-400" />
-                <span>{feature}</span>
-              </div>
-            ))}
-            {currentPackage.features.length > 3 && (
-              <span className="text-xs text-gray-400">+{currentPackage.features.length - 3} مميزات أخرى</span>
-            )}
-          </div>
-        </div> */}
-
-        <div className="mb-4">
+        <div className="mb-4 mt-auto">
           <div className="text-sm text-gray-400 mb-2">يبدأ من:</div>
           <div className="text-2xl font-bold text-[#C09B52]">
             {currentPackage.pricing[0].price.toLocaleString('ar-SA')} ر.س

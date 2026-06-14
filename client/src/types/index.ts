@@ -47,6 +47,8 @@ export interface PricingOption {
     category: string;
     image: string;
     isCustom?: boolean;
+    /** Shown on the package tab (Classic / Premium / VIP) — not under event categories */
+    packageTier?: 'classic' | 'premium' | 'vip';
     availableFor?: ('classic' | 'premium' | 'vip')[];
   }
   

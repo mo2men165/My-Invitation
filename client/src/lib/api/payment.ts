@@ -163,6 +163,7 @@ class PaymentAPI {
     return result;
   }
 
+  /* TEMPORARILY DISABLED - Tabby & Tamara payment API
   async createTabbySession(data: {
     customerInfo: {
       firstName: string;
@@ -255,6 +256,7 @@ class PaymentAPI {
 
     return result;
   }
+  */ // END TEMPORARILY DISABLED - Tabby & Tamara payment API
 }
 
 export const paymentAPI = new PaymentAPI();

@@ -101,6 +101,7 @@ function CartPageContent() {
   // State for item being edited
   const [itemToEdit, setItemToEdit] = useState<any>(null);
   
+  /* TEMPORARILY DISABLED - Tabby & Tamara payment
   // State for Tabby payment processing
   const [isTabbyLoading, setIsTabbyLoading] = useState(false);
 
@@ -226,6 +227,7 @@ function CartPageContent() {
       setIsTamaraLoading(false);
     }
   }, [cartItems, toast]);
+  */ // END TEMPORARILY DISABLED - Tabby & Tamara payment
 
   // Remove item handler with custom confirmation
   const handleRemoveItem = useCallback((itemId: string) => {
@@ -659,53 +661,43 @@ function CartPageContent() {
                       )}
                     </button>
 
-                    {/* Payment Options Divider */}
+                    {false && (
+                    <>
                     <div className="flex items-center gap-3 py-2">
                       <div className="flex-1 h-px bg-white/10"></div>
                       <span className="text-gray-400 text-sm">أو ادفع عبر</span>
                       <div className="flex-1 h-px bg-white/10"></div>
                     </div>
 
-                    {/* Tabby & Tamara Payment Options */}
                     <div className="grid grid-cols-2 gap-3">
-                      {/* Tabby Button */}
                       <button
-                        onClick={handleTabbyPayment}
-                        disabled={isLoading || isTabbyLoading || cartItems.length === 0}
-                        className="flex items-center justify-center p-3 bg-white rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border border-gray-200"
+                        disabled
+                        className="flex items-center justify-center p-3 bg-white rounded-xl border border-gray-200 opacity-50"
                       >
-                        {isTabbyLoading ? (
-                          <Loader2 className="w-6 h-6 animate-spin text-gray-600" />
-                        ) : (
-                          <Image
-                            src="/tabby-logo.png"
-                            alt="Pay with Tabby"
-                            width={100}
-                            height={40}
-                            className="object-contain h-8 w-auto"
-                          />
-                        )}
+                        <Image
+                          src="/tabby-logo.png"
+                          alt="Pay with Tabby"
+                          width={100}
+                          height={40}
+                          className="object-contain h-8 w-auto"
+                        />
                       </button>
 
-                      {/* Tamara Button */}
                       <button
-                        onClick={handleTamaraPayment}
-                        disabled={isLoading || isTamaraLoading || cartItems.length === 0}
-                        className="flex items-center justify-center p-3 bg-white rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border border-gray-200"
+                        disabled
+                        className="flex items-center justify-center p-3 bg-white rounded-xl border border-gray-200 opacity-50"
                       >
-                        {isTamaraLoading ? (
-                          <Loader2 className="w-6 h-6 animate-spin text-gray-600" />
-                        ) : (
-                          <Image
-                            src="/tamara-logo.png"
-                            alt="Pay with Tamara"
-                            width={100}
-                            height={40}
-                            className="object-contain h-8 w-auto"
-                          />
-                        )}
+                        <Image
+                          src="/tamara-logo.png"
+                          alt="Pay with Tamara"
+                          width={100}
+                          height={40}
+                          className="object-contain h-8 w-auto"
+                        />
                       </button>
                     </div>
+                    </>
+                    )}
 
                     {/* Continue Shopping */}
                     <button
