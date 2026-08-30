@@ -1,7 +1,7 @@
 // Re-export from split files
 export { packageData } from './packageData';
 export { additionalServices } from './additionalServices';
-export { invitationDesigns } from './invitationDesigns';
+export { customDesignSentinel } from './customDesign';
 
 // Re-export from new data files
 export { quickActions, statsConfig, orderStatusConfig } from './dashboardData';

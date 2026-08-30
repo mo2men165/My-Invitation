@@ -13,6 +13,7 @@ import { emailService } from '../services/emailService';
 import { uploadSingleImage } from '../config/multer';
 import { CloudinaryService } from '../services/cloudinaryService';
 import { registerTabbyWebhook, updateTabbyWebhook } from '../services/tabbyWebhookRegistration';
+import { PackageImage } from '../models/PackageImage';
 
 
 const router = Router();
@@ -2208,9 +2209,6 @@ router.put('/users/:userId/cart/:cartItemId/price', withDB(async (req: Request, 
 
     await user.save();
 
-    // Invalidate cache
-    const { CacheService } = await import('../services/cacheService.js');
-    await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} modified price for cart item ${cartItemId} of user ${userId} to ${price}`);
 
@@ -2288,9 +2286,6 @@ router.post('/users/:userId/cart/:cartItemId/discount', withDB(async (req: Reque
 
     await user.save();
 
-    // Invalidate cache
-    const { CacheService } = await import('../services/cacheService.js');
-    await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} applied ${percentage}% discount to cart item ${cartItemId} of user ${userId}`);
 
@@ -2380,9 +2375,6 @@ router.post('/users/:userId/cart/discount-all', withDB(async (req: Request, res:
 
     await user.save();
 
-    // Invalidate cache
-    const { CacheService } = await import('../services/cacheService.js');
-    await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} applied ${percentage}% discount to all cart items of user ${userId}`);
 
@@ -2448,9 +2440,6 @@ router.delete('/users/:userId/cart/:cartItemId/price-modification', withDB(async
 
     await user.save();
 
-    // Invalidate cache
-    const { CacheService } = await import('../services/cacheService.js');
-    await CacheService.invalidateUserCartCache(userIdString);
 
     logger.info(`Admin ${adminId} removed price modification for cart item ${cartItemId} of user ${userId}`);
 
@@ -2552,5 +2541,188 @@ router.put('/tabby/update-webhook/:webhookId', withDB(async (req: Request, res: 
 }));
 
 } // END TEMPORARILY DISABLED - Tabby webhook management
+
+// ============================================
+// PACKAGE IMAGE MANAGEMENT
+// ============================================
+
+/**
+ * GET /api/admin/package-images
+ * List package images, optionally filtered by packageTier or category
+ */
+router.get('/package-images', withDB(async (req: Request, res: Response) => {
+  try {
+    const { packageTier, category } = req.query;
+    const filter: Record<string, string> = {};
+    if (packageTier) filter.packageTier = packageTier as string;
+    if (category) filter.category = category as string;
+
+    const images = await PackageImage.find(filter).sort({ createdAt: -1 });
+
+    return res.json({
+      success: true,
+      data: images
+    });
+  } catch (error) {
+    logger.error('Error fetching package images:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في جلب صور الباقات' }
+    });
+  }
+}));
+
+/**
+ * POST /api/admin/package-images
+ * Upload a new package image (either package-tier tagged or event-category tagged)
+ */
+router.post('/package-images', uploadSingleImage, withDB(async (req: Request, res: Response) => {
+  try {
+    const adminId = req.user!.id;
+    const file = req.file;
+    const { name, packageTier, category } = req.body;
+
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'الصورة مطلوبة' }
+      });
+    }
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'اسم التصميم مطلوب' }
+      });
+    }
+
+    const hasTier = !!packageTier;
+    const hasCategory = !!category;
+    if (hasTier === hasCategory) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'يجب تحديد إما نوع الباقة أو نوع المناسبة (وليس كلاهما)' }
+      });
+    }
+
+    const validation = CloudinaryService.validateImageFile(file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: { message: validation.error || 'صورة غير صالحة' }
+      });
+    }
+
+    const uploadResult = await CloudinaryService.uploadFile(
+      file.buffer,
+      file.originalname,
+      { folder: 'packages', resource_type: 'image' }
+    );
+
+    const packageImage = await PackageImage.create({
+      name: name.trim(),
+      image: uploadResult,
+      packageTier: hasTier ? packageTier : undefined,
+      category: hasCategory ? category : undefined
+    });
+
+    logger.info(`Admin ${adminId} created package image ${packageImage._id}`);
+
+    return res.status(201).json({
+      success: true,
+      message: 'تم إضافة التصميم بنجاح',
+      data: packageImage
+    });
+  } catch (error: any) {
+    logger.error('Error creating package image:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: `فشل إضافة التصميم: ${error.message}` }
+    });
+  }
+}));
+
+/**
+ * PATCH /api/admin/package-images/:id
+ * Rename or retag an existing package image
+ */
+router.patch('/package-images/:id', withDB(async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, packageTier, category } = req.body;
+
+    const packageImage = await PackageImage.findById(id);
+    if (!packageImage) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'التصميم غير موجود' }
+      });
+    }
+
+    if (name !== undefined) packageImage.name = name.trim();
+    if (packageTier !== undefined) {
+      packageImage.packageTier = packageTier || undefined;
+      packageImage.category = undefined;
+    }
+    if (category !== undefined) {
+      packageImage.category = category || undefined;
+      packageImage.packageTier = undefined;
+    }
+
+    await packageImage.save();
+
+    return res.json({
+      success: true,
+      message: 'تم تحديث التصميم بنجاح',
+      data: packageImage
+    });
+  } catch (error) {
+    logger.error('Error updating package image:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تحديث التصميم' }
+    });
+  }
+}));
+
+/**
+ * DELETE /api/admin/package-images/:id
+ * Remove a package image (Cloudinary + DB)
+ */
+router.delete('/package-images/:id', withDB(async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user!.id;
+
+    const packageImage = await PackageImage.findById(id);
+    if (!packageImage) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'التصميم غير موجود' }
+      });
+    }
+
+    try {
+      await CloudinaryService.deleteImage(packageImage.image.public_id);
+    } catch (deleteError) {
+      logger.warn('Failed to delete package image from Cloudinary:', deleteError);
+    }
+
+    await packageImage.deleteOne();
+
+    logger.info(`Admin ${adminId} deleted package image ${id}`);
+
+    return res.json({
+      success: true,
+      message: 'تم حذف التصميم بنجاح'
+    });
+  } catch (error) {
+    logger.error('Error deleting package image:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في حذف التصميم' }
+    });
+  }
+}));
 
 export default router;

@@ -8,11 +8,11 @@ import {
   optimisticRemoveFromWishlist 
 } from '@/store/wishlistSlice';
 import { useToast } from '@/hooks/useToast';
-import { invitationDesigns } from '@/constants';
 
 export const useWishlist = () => {
   const dispatch = useAppDispatch();
   const { items: wishlistItems } = useAppSelector((state) => state.wishlist);
+  const designs = useAppSelector((state) => state.packageImages.items);
   const { toast } = useToast();
 
   // Memoized set for O(1) lookup
@@ -28,7 +28,7 @@ export const useWishlist = () => {
 
   // Updated toggleWishlist with packageType support
   const toggleWishlist = useCallback(async (designId: string, packageType?: 'classic' | 'premium' | 'vip') => {
-    const design = invitationDesigns.find(d => d.id === designId);
+    const design = designs.find(d => d.id === designId);
     
     try {
       if (isInWishlist(designId)) {
@@ -67,7 +67,7 @@ export const useWishlist = () => {
         duration: 3000
       });
     }
-  }, [dispatch, isInWishlist, toast]);
+  }, [dispatch, isInWishlist, toast, designs]);
 
   return {
     isInWishlist,

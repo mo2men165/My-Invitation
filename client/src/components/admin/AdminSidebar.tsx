@@ -17,7 +17,8 @@ import {
   X,
   Shield,
   ChevronRight,
-  ShoppingCart
+  ShoppingCart,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -84,6 +85,12 @@ export function AdminSidebar({ children }: AdminSidebarProps) {
       href: '/admin/notifications',
       icon: Bell,
       color: 'text-yellow-400'
+    },
+    {
+      title: 'صور الباقات',
+      href: '/admin/package-images',
+      icon: ImageIcon,
+      color: 'text-pink-400'
     },
   ];
 

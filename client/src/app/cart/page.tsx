@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
 import { useModal } from '@/hooks/useModal';
 import { formatCurrency } from '@/utils/calculations';
-import { invitationDesigns, packageData } from '@/constants';
+import { packageData } from '@/constants';
 import { CartModal } from '@/components/cart/CartModal';
 import ConfirmationModal from '@/components/cart/CartModal/components/ConfirmationModal';
 import { InstantRouteGuard } from '@/components/auth/InstantRouteGuard';
@@ -42,6 +42,7 @@ function CartPageContent() {
   const dispatch = useAppDispatch();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const { items: cartItems, isLoading, error } = useAppSelector((state) => state.cart);
+  const invitationDesigns = useAppSelector((state) => state.packageImages.items);
   const { toast } = useToast();
   
   // Modal states

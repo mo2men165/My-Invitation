@@ -21,9 +21,11 @@ import { CartModal } from '@/components/cart/CartModal';
 
 import { InvitationDesign, PackageData } from '@/types';
 import { getDesignById } from '@/utils/designHelpers';
+import { useAppSelector } from '@/store';
 
 const ComparePage: React.FC = () => {
   const { isAuthenticated } = useAuth();
+  const designs = useAppSelector((state) => state.packageImages.items);
   const { items, isLoading, error, count, isEmpty, refetchCompare } = useCompareData();
   const { items: wishlistItems } = useWishlistData(); // Get wishlist items for status checking
   const { toggleCompare } = useCompare();
@@ -108,7 +110,7 @@ const ComparePage: React.FC = () => {
             {/* Package Cards Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {compareItemsWithPackages.map((item) => {
-                const design = getDesignById(item.designId);
+                const design = getDesignById(item.designId, designs);
                 if (!design) return null;
 
                 return (

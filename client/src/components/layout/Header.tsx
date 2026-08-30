@@ -9,6 +9,7 @@ import { logout } from '@/store/authSlice';
 import { fetchCart } from '@/store/cartSlice';
 import { fetchWishlist } from '@/store/wishlistSlice';
 import { fetchCompareList } from '@/store/compareSlice';
+import { fetchPackageImages } from '@/store/packageImagesSlice';
 import { usePathname } from 'next/navigation';
 import { navLinks } from '@/constants';
 
@@ -16,11 +17,12 @@ export function Header() {
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, isInitialized } = useAuth();
   const dispatch = useAppDispatch();
-  
+
   // Get Redux state for cart, wishlist, compare
   const { items: cartItems, count: cartCount } = useAppSelector((state) => state.cart);
   const { count: wishlistCount } = useAppSelector((state) => state.wishlist);
   const { count: compareCount } = useAppSelector((state) => state.compare);
+  const { isInitialized: packageImagesInitialized } = useAppSelector((state) => state.packageImages);
   
   // Calculate cart total
   const cartTotal = cartItems.reduce((total, item) => total + item.totalPrice, 0);
@@ -38,6 +40,13 @@ export function Header() {
       dispatch(fetchCompareList());
     }
   }, [isAuthenticated, user, dispatch]);
+
+  // Package images are public data (needed for logged-out browsing too)
+  useEffect(() => {
+    if (!packageImagesInitialized) {
+      dispatch(fetchPackageImages());
+    }
+  }, [packageImagesInitialized, dispatch]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {

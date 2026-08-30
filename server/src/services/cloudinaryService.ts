@@ -94,7 +94,7 @@ export class CloudinaryService {
       uploadTransformations.push({ format: targetFormat }); // Force format conversion
 
       // Generate public_id with target format extension
-      const baseFileName = fileName.replace(/\.[^/.]+$/, '');
+      const baseFileName = fileName.replace(/\.[^/.]+$/, '').trim();
       const publicId = `${Date.now()}_${baseFileName}`;
 
       // Create a promise wrapper for the upload
@@ -170,7 +170,7 @@ export class CloudinaryService {
       uploadTransformations.push({ format: targetFormat }); // Force format conversion
 
       // Generate public_id with target format extension
-      const baseFileName = filePath.split('/').pop()?.replace(/\.[^/.]+$/, '') || 'image';
+      const baseFileName = filePath.split('/').pop()?.replace(/\.[^/.]+$/, '').trim() || 'image';
       const publicId = `${Date.now()}_${baseFileName}`;
 
       const result = await cloudinary.uploader.upload(filePath, {

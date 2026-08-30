@@ -8,11 +8,11 @@ import {
   optimisticRemoveFromCompare 
 } from '@/store/compareSlice';
 import { useToast } from '@/hooks/useToast';
-import { invitationDesigns } from '@/constants';
 
 export const useCompare = () => {
   const dispatch = useAppDispatch();
   const { items: compareItems } = useAppSelector((state) => state.compare);
+  const designs = useAppSelector((state) => state.packageImages.items);
   const { toast } = useToast();
 
   const compareSet = useMemo(() => 
@@ -27,7 +27,7 @@ export const useCompare = () => {
 
   // Updated toggleCompare with packageType support
   const toggleCompare = useCallback(async (designId: string, packageType: 'classic' | 'premium' | 'vip' = 'classic') => {
-    const design = invitationDesigns.find(d => d.id === designId);
+    const design = designs.find(d => d.id === designId);
     
     try {
       if (isInCompare(designId)) {
@@ -73,7 +73,7 @@ export const useCompare = () => {
         duration: 3000
       });
     }
-  }, [dispatch, isInCompare, compareItems.length, toast]);
+  }, [dispatch, isInCompare, compareItems.length, toast, designs]);
 
   return {
     isInCompare,

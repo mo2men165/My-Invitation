@@ -7,6 +7,7 @@ import wishlistReducer from './wishlistSlice';
 import compareReducer from './compareSlice';
 import paymentReducer from './paymentSlice';
 import dashboardReducer from './dashboardSlice';
+import packageImagesReducer from './packageImagesSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     compare: compareReducer,
     payment: paymentReducer,
     dashboard: dashboardReducer,
+    packageImages: packageImagesReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

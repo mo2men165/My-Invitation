@@ -6,7 +6,7 @@ import { AdminEventGuests } from '@/components/admin/AdminEventGuests';
 import { Calendar, Search, Check, X, Clock, Eye, CheckCircle, XCircle, MessageSquare, Users, MapPin, Package, ExternalLink, QrCode, CreditCard, Truck, UserCheck, ImageIcon } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
-import { invitationDesigns } from '@/constants/invitationDesigns';
+import { useAppSelector } from '@/store';
 import Image from 'next/image';
 
 interface Event {
@@ -68,6 +68,7 @@ interface Event {
 }
 
 export default function AdminEventsPage() {
+  const invitationDesigns = useAppSelector((state) => state.packageImages.items);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

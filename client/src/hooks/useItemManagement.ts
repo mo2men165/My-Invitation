@@ -3,7 +3,6 @@
 import { useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { useToast } from '@/hooks/useToast';
-import { invitationDesigns } from '@/constants';
 import { addToWishlist, removeFromWishlist } from '@/store/wishlistSlice';
 import { addToCompare, removeFromCompare } from '@/store/compareSlice';
 
@@ -29,6 +28,7 @@ export const useItemManagement = (config: ItemManagementConfig) => {
   const items = state.items || [];
   const isLoading = state.isLoading || false;
   const error = state.error;
+  const designs = useAppSelector((state) => state.packageImages.items);
 
   // Memoized set for O(1) lookup
   const itemSet = useMemo(() => 
@@ -46,7 +46,7 @@ export const useItemManagement = (config: ItemManagementConfig) => {
     designId: string, 
     packageType?: 'classic' | 'premium' | 'vip'
   ) => {
-    const design = invitationDesigns.find(d => d.id === designId);
+    const design = designs.find(d => d.id === designId);
     
     try {
       if (isInList(designId)) {
@@ -97,7 +97,7 @@ export const useItemManagement = (config: ItemManagementConfig) => {
         duration: 3000
       });
     }
-  }, [dispatch, isInList, items.length, toast, config]);
+  }, [dispatch, isInList, items.length, toast, config, designs]);
 
   return {
     isInList,

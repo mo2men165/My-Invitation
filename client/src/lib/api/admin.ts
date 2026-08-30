@@ -108,6 +108,16 @@ interface AdminNotification {
   createdAt: string;
 }
 
+interface PackageImage {
+  _id: string;
+  name: string;
+  image: CloudinaryImage;
+  packageTier?: 'classic' | 'premium' | 'vip';
+  category?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface PaginatedResponse<T> {
   data: T[];
   pagination: {
@@ -520,6 +530,71 @@ export const adminAPI = {
     }
     
     return result.data;
+  },
+
+  // Package Images
+  async getPackageImages(filters: { packageTier?: string; category?: string } = {}): Promise<PackageImage[]> {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) query.append(key, value);
+    });
+
+    const response = await fetch(`${API_URL}/api/admin/package-images?${query}`, {
+      headers: getAuthHeaders()
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في جلب صور الباقات');
+    }
+
+    return result.data;
+  },
+
+  async createPackageImage(formData: FormData): Promise<PackageImage> {
+    const response = await fetch(`${API_URL}/api/admin/package-images`, {
+      method: 'POST',
+      headers: getAuthHeaders(false), // Don't include Content-Type, let browser set it with boundary
+      body: formData
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في إضافة التصميم');
+    }
+
+    return result.data;
+  },
+
+  async updatePackageImage(id: string, data: { name?: string; packageTier?: string; category?: string }): Promise<PackageImage> {
+    const response = await fetch(`${API_URL}/api/admin/package-images/${id}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في تحديث التصميم');
+    }
+
+    return result.data;
+  },
+
+  async deletePackageImage(id: string): Promise<void> {
+    const response = await fetch(`${API_URL}/api/admin/package-images/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في حذف التصميم');
+    }
   },
 
   async removeCartItemPriceModification(userId: string, cartItemId: string): Promise<any> {

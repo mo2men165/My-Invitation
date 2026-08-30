@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { ShoppingCart, DollarSign, Percent, X, Edit2, RotateCcw, Save, AlertCircle, Loader2, Tag } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { formatCurrency } from '@/utils/calculations';
-import { invitationDesigns, packageData } from '@/constants';
+import { packageData } from '@/constants';
+import { useAppSelector } from '@/store';
 
 interface AdminUserCartProps {
   userId: string;
@@ -37,6 +38,7 @@ interface CartItem {
 }
 
 export function AdminUserCart({ userId, userName, userEmail, onClose }: AdminUserCartProps) {
+  const invitationDesigns = useAppSelector((state) => state.packageImages.items);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -5,6 +5,7 @@ import { InvitationDesign } from '@/types';
 import { WishlistItem } from '@/lib/api/wishlist';
 import { CompareItem } from '@/lib/api/compare';
 import { getDesignById } from '@/utils/designHelpers';
+import { useAppSelector } from '@/store';
 
 interface WishlistGridProps {
   items: WishlistItem[];
@@ -25,12 +26,13 @@ const WishlistGrid: React.FC<WishlistGridProps> = ({
   onSelectPackage,
   isLoading
 }) => {
+  const designs = useAppSelector((state) => state.packageImages.items);
   const compareDesignIds = new Set(compareItems.map(item => item.designId));
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
       {items.map((item) => {
-        const design = getDesignById(item.designId);
+        const design = getDesignById(item.designId, designs);
         if (!design) return null;
 
         return (

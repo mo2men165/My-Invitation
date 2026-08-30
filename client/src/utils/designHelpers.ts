@@ -1,4 +1,4 @@
-import { invitationDesigns, packageData } from '@/constants';
+import { packageData } from '@/constants';
 import { InvitationDesign, PackageData } from '@/types';
 
 export const isDesignAvailableForPackage = (
@@ -23,13 +23,13 @@ export const matchesCategoryView = (
   category: string
 ): boolean => !design.packageTier && !design.isCustom && design.category === category;
 
-export const getDesignById = (designId: string): InvitationDesign | undefined => {
-  return invitationDesigns.find(design => design.id === designId);
+export const getDesignById = (designId: string, designs: InvitationDesign[]): InvitationDesign | undefined => {
+  return designs.find(design => design.id === designId);
 };
 
-export const getDesignsByIds = (designIds: string[]): InvitationDesign[] => {
+export const getDesignsByIds = (designIds: string[], designs: InvitationDesign[]): InvitationDesign[] => {
   return designIds
-    .map(id => getDesignById(id))
+    .map(id => getDesignById(id, designs))
     .filter((design): design is InvitationDesign => design !== undefined);
 };
 

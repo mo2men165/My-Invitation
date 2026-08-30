@@ -2,7 +2,6 @@
 'use client';
 import { useState } from 'react';
 import { useAppSelector } from '@/store';
-import { invitationDesigns } from '@/constants';
 import { PackageData } from '@/types';
 import {
   matchesCategoryView,
@@ -31,6 +30,7 @@ const categories = [
 
 export function usePackagesLogic(packageType: keyof PackageData): PackageLogicState & PackageLogicActions {
   const { isLoading: cartLoading } = useAppSelector((state) => state.cart);
+  const { items: invitationDesigns, isInitialized: designsInitialized } = useAppSelector((state) => state.packageImages);
 
   // null = package-tier designs (Classic / Premium / VIP folders)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -69,12 +69,12 @@ export function usePackagesLogic(packageType: keyof PackageData): PackageLogicSt
       ).length;
       return acc;
     }, {} as Record<string, number>);
-  }, []);
+  }, [invitationDesigns]);
 
   return {
     selectedCategory,
     filteredDesigns,
-    isLoading: cartLoading,
+    isLoading: cartLoading || !designsInitialized,
     designMode,
     selectCategory,
     getCategoryStats,
