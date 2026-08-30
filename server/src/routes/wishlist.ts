@@ -4,8 +4,7 @@ import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { withDB } from '../utils/routeUtils';
-import { CacheService } from '../services/cacheService';
-import { 
+import {
   wishlistItemSchema, 
   bulkWishlistSchema,
   designIdSchema 
@@ -25,17 +24,6 @@ router.get('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
-    // Try cache first
-    const cachedWishlist = await CacheService.getCachedUserWishlist(userId);
-    if (cachedWishlist) {
-      return res.json({
-        success: true,
-        wishlist: cachedWishlist,
-        source: 'cache'
-      });
-    }
-
-    // Fetch from database
     const user = await User.findById(userId).select('wishlist');
     if (!user) {
       return res.status(404).json({
@@ -44,15 +32,11 @@ router.get('/', withDB(async (req: Request, res: Response) => {
       });
     }
 
-    // Cache the result
-    await CacheService.cacheUserWishlist(userId, user.wishlist);
-
     logger.info(`Wishlist retrieved for user ${userId}, ${user.wishlist.length} items`);
 
     return res.json({
       success: true,
-      wishlist: user.wishlist,
-      source: 'database'
+      wishlist: user.wishlist
     });
 
   } catch (error) {
@@ -124,9 +108,6 @@ router.post('/', withDB(async (req: Request, res: Response) => {
     // Add to wishlist
     user.wishlist.push(newWishlistItem);
     await user.save();
-
-    // Update cache
-    await CacheService.cacheUserWishlist(userId, user.wishlist);
 
     logger.info(`Item added to wishlist for user ${userId}, design: ${designId}, package: ${packageType || 'none'}`);
 
@@ -202,9 +183,6 @@ router.post('/bulk', withDB(async (req: Request, res: Response) => {
     user.wishlist.push(...newWishlistItems);
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserWishlist(userId, user.wishlist);
-
     logger.info(`${newWishlistItems.length} items added to wishlist for user ${userId}`);
 
     return res.status(201).json({
@@ -262,9 +240,6 @@ router.delete('/:designId', withDB(async (req: Request, res: Response) => {
 
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserWishlist(userId, user.wishlist);
-
     logger.info(`Wishlist item removed for user ${userId}, design: ${designId}`);
 
     return res.json({
@@ -303,9 +278,6 @@ router.delete('/', withDB(async (req: Request, res: Response) => {
     user.wishlist = [];
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserWishlist(userId, user.wishlist);
-
     logger.info(`Wishlist cleared for user ${userId}, ${itemCount} items removed`);
 
     return res.json({
@@ -341,18 +313,6 @@ router.get('/check/:designId', withDB(async (req: Request, res: Response) => {
       });
     }
 
-    // Try cache first
-    const cachedWishlist = await CacheService.getCachedUserWishlist(userId);
-    if (cachedWishlist) {
-      const inWishlist = cachedWishlist.some(item => item.designId.toString() === designId);
-      return res.json({
-        success: true,
-        inWishlist,
-        source: 'cache'
-      });
-    }
-
-    // Check database
     const user = await User.findById(userId).select('wishlist');
     if (!user) {
       return res.status(404).json({
@@ -365,8 +325,7 @@ router.get('/check/:designId', withDB(async (req: Request, res: Response) => {
 
     return res.json({
       success: true,
-      inWishlist,
-      source: 'database'
+      inWishlist
     });
 
   } catch (error) {
@@ -386,17 +345,6 @@ router.get('/count', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
-    // Try cache first
-    const cachedWishlist = await CacheService.getCachedUserWishlist(userId);
-    if (cachedWishlist) {
-      return res.json({
-        success: true,
-        count: cachedWishlist.length,
-        source: 'cache'
-      });
-    }
-
-    // Fetch count from database
     const user = await User.findById(userId).select('wishlist');
     if (!user) {
       return res.status(404).json({
@@ -407,8 +355,7 @@ router.get('/count', withDB(async (req: Request, res: Response) => {
 
     return res.json({
       success: true,
-      count: user.wishlist.length,
-      source: 'database'
+      count: user.wishlist.length
     });
 
   } catch (error) {

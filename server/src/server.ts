@@ -6,7 +6,6 @@ dotenv.config();
 
 import app from './app';
 import { connectDatabase } from './config/database';
-import { connectRedis } from './config/redis';
 import { configureCloudinary } from './config/cloudinary';
 import { logger } from './config/logger';
 const PORT = process.env.PORT || 5000;
@@ -16,9 +15,8 @@ const startServer = async () => {
     // Configure Cloudinary
     configureCloudinary();
 
-    // Connect to databases
+    // Connect to database
     await connectDatabase();
-    await connectRedis();
 
     // Only start the server if NOT in Vercel environment
     // Vercel uses api/index.ts as entry point instead

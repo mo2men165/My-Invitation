@@ -4,8 +4,7 @@ import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { withDB } from '../utils/routeUtils';
-import { CacheService } from '../services/cacheService';
-import { 
+import {
   compareItemSchema, 
   bulkCompareSchema,
   designIdSchema 
@@ -25,17 +24,6 @@ router.get('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
-    // Try cache first
-    const cachedCompare = await CacheService.getCachedUserCompare(userId);
-    if (cachedCompare) {
-      return res.json({
-        success: true,
-        compareList: cachedCompare,
-        source: 'cache'
-      });
-    }
-
-    // Fetch from database
     const user = await User.findById(userId).select('compareList');
     if (!user) {
       return res.status(404).json({
@@ -44,15 +32,11 @@ router.get('/', withDB(async (req: Request, res: Response) => {
       });
     }
 
-    // Cache the result
-    await CacheService.cacheUserCompare(userId, user.compareList);
-
     logger.info(`Compare list retrieved for user ${userId}, ${user.compareList.length} items`);
 
     return res.json({
       success: true,
-      compareList: user.compareList,
-      source: 'database'
+      compareList: user.compareList
     });
 
   } catch (error) {
@@ -124,9 +108,6 @@ router.post('/', withDB(async (req: Request, res: Response) => {
     user.compareList.push(newCompareItem);
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserCompare(userId, user.compareList);
-
     logger.info(`Item added to compare list for user ${userId}, design: ${designId}, package: ${packageType}`);
 
     return res.status(201).json({
@@ -193,9 +174,6 @@ router.post('/bulk', withDB(async (req: Request, res: Response) => {
     user.compareList = newCompareItems;
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserCompare(userId, user.compareList);
-
     logger.info(`Compare list replaced for user ${userId}, ${newCompareItems.length} items`);
 
     return res.json({
@@ -252,9 +230,6 @@ router.delete('/:designId', withDB(async (req: Request, res: Response) => {
 
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserCompare(userId, user.compareList);
-
     logger.info(`Compare item removed for user ${userId}, design: ${designId}`);
 
     return res.json({
@@ -293,9 +268,6 @@ router.delete('/', withDB(async (req: Request, res: Response) => {
     user.compareList = [];
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserCompare(userId, user.compareList);
-
     logger.info(`Compare list cleared for user ${userId}, ${itemCount} items removed`);
 
     return res.json({
@@ -331,18 +303,6 @@ router.get('/check/:designId', withDB(async (req: Request, res: Response) => {
       });
     }
 
-    // Try cache first
-    const cachedCompare = await CacheService.getCachedUserCompare(userId);
-    if (cachedCompare) {
-      const inCompare = cachedCompare.some(item => item.designId.toString() === designId);
-      return res.json({
-        success: true,
-        inCompare,
-        source: 'cache'
-      });
-    }
-
-    // Check database
     const user = await User.findById(userId).select('compareList');
     if (!user) {
       return res.status(404).json({
@@ -355,8 +315,7 @@ router.get('/check/:designId', withDB(async (req: Request, res: Response) => {
 
     return res.json({
       success: true,
-      inCompare,
-      source: 'database'
+      inCompare
     });
 
   } catch (error) {
@@ -376,17 +335,6 @@ router.get('/count', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
-    // Try cache first
-    const cachedCompare = await CacheService.getCachedUserCompare(userId);
-    if (cachedCompare) {
-      return res.json({
-        success: true,
-        count: cachedCompare.length,
-        source: 'cache'
-      });
-    }
-
-    // Fetch count from database
     const user = await User.findById(userId).select('compareList');
     if (!user) {
       return res.status(404).json({
@@ -397,8 +345,7 @@ router.get('/count', withDB(async (req: Request, res: Response) => {
 
     return res.json({
       success: true,
-      count: user.compareList.length,
-      source: 'database'
+      count: user.compareList.length
     });
 
   } catch (error) {
@@ -418,18 +365,6 @@ router.get('/full', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
-    // Try cache first
-    const cachedCompare = await CacheService.getCachedUserCompare(userId);
-    if (cachedCompare) {
-      return res.json({
-        success: true,
-        isFull: cachedCompare.length >= 3,
-        count: cachedCompare.length,
-        source: 'cache'
-      });
-    }
-
-    // Check database
     const user = await User.findById(userId).select('compareList');
     if (!user) {
       return res.status(404).json({
@@ -441,8 +376,7 @@ router.get('/full', withDB(async (req: Request, res: Response) => {
     return res.json({
       success: true,
       isFull: user.compareList.length >= 3,
-      count: user.compareList.length,
-      source: 'database'
+      count: user.compareList.length
     });
 
   } catch (error) {

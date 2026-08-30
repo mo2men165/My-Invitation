@@ -2,7 +2,6 @@
 import { User } from '../models/User';
 import { Event } from '../models/Event';
 import { logger } from '../config/logger';
-import { CacheService } from './cacheService';
 import { Types } from 'mongoose';
 import { NotificationService } from './notificationService';
 import { emailService, BillEmailData, EventDetailsEmailData } from './emailService';
@@ -166,18 +165,6 @@ export class PaymentService {
         userId,
         cartLengthAfter: user.cart.length
       });
-
-      // Update cache
-      try {
-        await CacheService.cacheUserCart(userId, user.cart);
-        logger.info('Cache updated successfully for user:', userId);
-      } catch (cacheError: any) {
-        logger.error('Failed to update cache:', {
-          userId,
-          error: cacheError.message
-        });
-        // Don't throw error - cache failure shouldn't stop the process
-      }
 
       // Send emails after successful payment
       try {

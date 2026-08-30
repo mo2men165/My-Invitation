@@ -4,7 +4,6 @@ import { User, ICartItem } from '../models/User';
 import { Event } from '../models/Event';
 import { logger } from '../config/logger';
 import { Types } from 'mongoose';
-import { CacheService } from './cacheService';
 import { NotificationService } from './notificationService';
 import { BillService } from './billService';
 
@@ -296,13 +295,6 @@ export class OrderService {
         const cartItemIdsToRemove = order.selectedCartItems.map(item => item.cartItemId.toString());
         user.cart = user.cart.filter(item => !cartItemIdsToRemove.includes(item._id!.toString()));
         await user.save();
-
-        // Invalidate cart cache to prevent stale data
-        try {
-          await CacheService.invalidateUserCartCache((order.userId as Types.ObjectId).toString());
-        } catch (cacheError: any) {
-          // Don't throw error - cache failure shouldn't stop the process
-        }
 
         logger.info(`Cart items removed for user ${order.userId}:`, {
           removedItemsCount: cartItemIdsToRemove.length,
@@ -636,11 +628,6 @@ export class OrderService {
         user.cart = user.cart.filter(item => !cartItemIdsToRemove.includes(item._id!.toString()));
         await user.save();
 
-        try {
-          await CacheService.invalidateUserCartCache((order.userId as Types.ObjectId).toString());
-        } catch (cacheError: any) {
-          // Cache failure shouldn't stop the process
-        }
       }
 
       logger.info(`✅ TABBY PAYMENT PROCESSED SUCCESSFULLY [${processId}]`, {
@@ -914,11 +901,6 @@ export class OrderService {
         user.cart = user.cart.filter(item => !cartItemIdsToRemove.includes(item._id!.toString()));
         await user.save();
 
-        try {
-          await CacheService.invalidateUserCartCache((order.userId as Types.ObjectId).toString());
-        } catch (cacheError: any) {
-          // Cache failure shouldn't stop the process
-        }
       }
 
       logger.info(`✅ TAMARA PAYMENT PROCESSED SUCCESSFULLY [${processId}]`, {

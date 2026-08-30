@@ -1,9 +1,10 @@
 // server/src/services/passwordResetService.ts
 import { emailService } from './emailService';
 import { authService } from './authService';
-import { getRedisClient } from '../config/redis';
 import { logger } from '../config/logger';
 import { User, IUser } from '../models/User';
+import { PasswordReset } from '../models/PasswordReset';
+import { PasswordResetAttempt } from '../models/PasswordResetAttempt';
 import { Types } from 'mongoose';
 
 interface PasswordResetData {
@@ -32,43 +33,38 @@ class PasswordResetService {
   }
 
   /**
-   * Store reset token data in Redis
+   * Store reset token data in MongoDB (TTL-indexed, auto-expires)
    */
   private async storeResetData(token: string, data: PasswordResetData): Promise<void> {
-    const redisClient = await getRedisClient();
-    const key = `password_reset:${token}`;
-    
-    await redisClient.setEx(key, this.RESET_TOKEN_EXPIRY, JSON.stringify(data));
+    await PasswordReset.create({
+      token,
+      userId: data.userId,
+      email: data.email,
+      expiresAt: new Date(Date.now() + this.RESET_TOKEN_EXPIRY * 1000)
+    });
     logger.info(`Password reset token stored for user: ${data.userId}`);
   }
 
   /**
-   * Get reset data from Redis
+   * Get reset data from MongoDB
    */
   private async getResetData(token: string): Promise<PasswordResetData | null> {
     try {
-      const redisClient = await getRedisClient();
-      const key = `password_reset:${token}`;
-      const data = await redisClient.get(key);
-      
-      if (!data) {
+      const doc = await PasswordReset.findOne({ token });
+      if (!doc) {
         return null;
       }
-      
-      return JSON.parse(data.toString()) as PasswordResetData;
+
+      return {
+        userId: doc.userId.toString(),
+        email: doc.email,
+        expiresAt: doc.expiresAt,
+        used: doc.used
+      };
     } catch (error) {
       logger.error('Error retrieving reset data:', error);
       return null;
     }
-  }
-
-  /**
-   * Delete reset token from Redis
-   */
-  private async deleteResetToken(token: string): Promise<void> {
-    const redisClient = await getRedisClient();
-    const key = `password_reset:${token}`;
-    await redisClient.del(key);
   }
 
   /**
@@ -77,13 +73,12 @@ class PasswordResetService {
    * while preventing the token from being reused for another reset
    */
   private async markTokenAsUsed(token: string, data: PasswordResetData): Promise<void> {
-    const redisClient = await getRedisClient();
-    const key = `password_reset:${token}`;
-    
-    // Update the token data to mark it as used, keep it for 60 seconds to allow redirect
-    const usedData: PasswordResetData = { ...data, used: true };
-    await redisClient.setEx(key, 60, JSON.stringify(usedData)); // 60 seconds should be plenty for redirect
-    
+    // Keep it for 60 seconds (TTL cleanup) to allow redirect verification
+    await PasswordReset.updateOne(
+      { token },
+      { used: true, expiresAt: new Date(Date.now() + 60 * 1000) }
+    );
+
     logger.info(`Password reset token marked as used for user: ${data.userId}`);
   }
 
@@ -91,13 +86,18 @@ class PasswordResetService {
    * Check rate limiting for password reset attempts
    */
   private async checkRateLimit(email: string): Promise<void> {
-    const redisClient = await getRedisClient();
-    const key = `reset_attempts:${email.toLowerCase()}`;
-    
-    const attempts = await redisClient.incr(key);
-    await redisClient.expire(key, this.LOCKOUT_DURATION);
-    
-    if (Number(attempts) > this.MAX_RESET_ATTEMPTS) {
+    const identifier = email.toLowerCase();
+
+    const attempt = await PasswordResetAttempt.findOneAndUpdate(
+      { identifier },
+      {
+        $inc: { count: 1 },
+        $set: { expiresAt: new Date(Date.now() + this.LOCKOUT_DURATION * 1000) }
+      },
+      { upsert: true, new: true }
+    );
+
+    if (attempt.count > this.MAX_RESET_ATTEMPTS) {
       throw new Error('تم تجاوز عدد محاولات إعادة تعيين كلمة المرور. حاول مرة أخرى خلال 30 دقيقة');
     }
   }
@@ -175,7 +175,7 @@ class PasswordResetService {
       // Verify token format
       const decoded = authService.verifyPasswordResetToken(token);
       
-      // Get reset data from Redis
+      // Get reset data
       const resetData = await this.getResetData(token);
       
       if (!resetData) {
@@ -212,8 +212,7 @@ class PasswordResetService {
       await this.markTokenAsUsed(token, resetData);
 
       // Clear rate limit attempts
-      const redisClient = await getRedisClient();
-      await redisClient.del(`reset_attempts:${resetData.email.toLowerCase()}`);
+      await PasswordResetAttempt.deleteOne({ identifier: resetData.email.toLowerCase() });
 
       logger.info(`Password reset completed for user: ${user._id}`);
 
@@ -237,7 +236,7 @@ class PasswordResetService {
       // Verify token format
       const decoded = authService.verifyPasswordResetToken(token);
       
-      // Get reset data from Redis
+      // Get reset data
       const resetData = await this.getResetData(token);
       
       if (!resetData || decoded.id !== resetData.userId) {

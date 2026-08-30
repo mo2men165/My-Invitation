@@ -4,8 +4,7 @@ import { User } from '../models/User';
 import { logger } from '../config/logger';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { withDB } from '../utils/routeUtils';
-import { CacheService } from '../services/cacheService';
-import { 
+import {
   cartItemSchema, 
   updateCartItemSchema, 
   mongoIdSchema 
@@ -25,17 +24,6 @@ router.get('/', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
-    // Try cache first
-    const cachedCart = await CacheService.getCachedUserCart(userId);
-    if (cachedCart) {
-      return res.json({
-        success: true,
-        cart: cachedCart,
-        source: 'cache'
-      });
-    }
-
-    // Fetch from database
     const user = await User.findById(userId).select('cart');
     if (!user) {
       return res.status(404).json({
@@ -44,15 +32,11 @@ router.get('/', withDB(async (req: Request, res: Response) => {
       });
     }
 
-    // Cache the result
-    await CacheService.cacheUserCart(userId, user.cart);
-
     logger.info(`Cart retrieved for user ${userId}, ${user.cart.length} items`);
 
     return res.json({
       success: true,
-      cart: user.cart,
-      source: 'database'
+      cart: user.cart
     });
 
   } catch (error) {
@@ -150,9 +134,6 @@ router.post('/', withDB(async (req: Request, res: Response) => {
     user.cart.push(newCartItem);
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserCart(userId, user.cart);
-
     logger.info(`Item added to cart for user ${userId}, design: ${cartItemData.designId}`);
 
     return res.status(201).json({
@@ -246,9 +227,6 @@ router.patch('/:id', withDB(async (req: Request, res: Response) => {
 
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserCart(userId, user.cart);
-
     logger.info(`Cart item updated for user ${userId}, item: ${id}`);
 
     return res.json({
@@ -305,9 +283,6 @@ router.delete('/:id', withDB(async (req: Request, res: Response) => {
 
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserCart(userId, user.cart);
-
     logger.info(`Cart item removed for user ${userId}, item: ${id}`);
 
     return res.json({
@@ -346,9 +321,6 @@ router.delete('/', withDB(async (req: Request, res: Response) => {
     user.cart = [];
     await user.save();
 
-    // Update cache
-    await CacheService.cacheUserCart(userId, user.cart);
-
     logger.info(`Cart cleared for user ${userId}, ${itemCount} items removed`);
 
     return res.json({
@@ -374,17 +346,6 @@ router.get('/count', withDB(async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
-    // Try cache first
-    const cachedCart = await CacheService.getCachedUserCart(userId);
-    if (cachedCart) {
-      return res.json({
-        success: true,
-        count: cachedCart.length,
-        source: 'cache'
-      });
-    }
-
-    // Fetch count from database
     const user = await User.findById(userId).select('cart');
     if (!user) {
       return res.status(404).json({
@@ -395,8 +356,7 @@ router.get('/count', withDB(async (req: Request, res: Response) => {
 
     return res.json({
       success: true,
-      count: user.cart.length,
-      source: 'database'
+      count: user.cart.length
     });
 
   } catch (error) {
@@ -404,30 +364,6 @@ router.get('/count', withDB(async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { message: 'خطأ في جلب عدد عناصر السلة' }
-    });
-  }
-}));
-
-/**
- * POST /api/cart/invalidate-cache
- * Manually invalidate cart cache for current user
- */
-router.post('/invalidate-cache', withDB(async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.id;
-
-    await CacheService.invalidateUserCartCache(userId);
-
-    return res.json({
-      success: true,
-      message: 'تم مسح ذاكرة التخزين المؤقت للسلة'
-    });
-
-  } catch (error) {
-    logger.error('Error invalidating cart cache:', error);
-    return res.status(500).json({
-      success: false,
-      error: { message: 'خطأ في مسح ذاكرة التخزين المؤقت' }
     });
   }
 }));
@@ -559,9 +495,6 @@ router.patch('/:id/field', withDB(async (req: Request, res: Response) => {
 
     cartItem.updatedAt = new Date();
     await user.save();
-
-    // Update cache
-    await CacheService.cacheUserCart(userId, user.cart);
 
     logger.info(`Cart item field updated for user ${userId}, item: ${id}, field: ${field}`);
 
