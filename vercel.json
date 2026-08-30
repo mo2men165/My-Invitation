@@ -4,7 +4,8 @@
     { "src": "/(.*)", "dest": "/api/index.ts" }
   ],
   "crons": [
-    { "path": "/api/cron/update-event-status", "schedule": "0 2 * * *" }
+    { "path": "/api/cron/update-event-status", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/accompanying-count-defaults", "schedule": "0 4 * * *" }
   ],
   "env": {
     "NODE_ENV": "production"

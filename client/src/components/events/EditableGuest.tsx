@@ -20,6 +20,35 @@ interface EditableGuestProps {
   onCountryChange?: (country: string) => void;
 }
 
+const AccompanyingCountBadge: React.FC<{ guest: Guest }> = ({ guest }) => {
+  if (guest.rsvpStatus !== 'accepted' || guest.numberOfAccompanyingGuests <= 1) {
+    return null;
+  }
+
+  if (guest.conversationStage === 'awaiting_accompanying_count') {
+    return (
+      <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
+        بانتظار تأكيد عدد المرافقين
+      </span>
+    );
+  }
+
+  if (guest.confirmedAccompanyingGuests !== undefined) {
+    const isDefaulted = guest.accompanyingCountResponse === 'auto_defaulted_no_reply';
+    return (
+      <span
+        className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded"
+        title={isDefaulted ? 'لم يرد الضيف، تم افتراض العدد الكامل' : ''}
+      >
+        أكّد {guest.confirmedAccompanyingGuests} من {guest.numberOfAccompanyingGuests}
+        {isDefaulted && <span className="opacity-75"> (بدون رد)</span>}
+      </span>
+    );
+  }
+
+  return null;
+};
+
 export const EditableGuest: React.FC<EditableGuestProps> = ({
   guest,
   userRole,
@@ -282,7 +311,9 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
                     )}
                   </span>
                 )}
-                
+
+                <AccompanyingCountBadge guest={guest} />
+
                 {guest.individualInviteImage ? (
                   <>
                     {onSendWhatsappAPI && (
@@ -335,7 +366,9 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
                     )}
                   </span>
                 )}
-                
+
+                <AccompanyingCountBadge guest={guest} />
+
                 {guest.whatsappMessageSent ? (
                   <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
                     <Check className="w-3 h-3" />

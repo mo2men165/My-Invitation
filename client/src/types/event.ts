@@ -21,6 +21,10 @@ export interface Guest {
   rsvpStatus?: 'pending' | 'accepted' | 'declined';
   rsvpResponse?: string;
   rsvpRespondedAt?: string;
+  conversationStage?: 'awaiting_rsvp' | 'awaiting_accompanying_count' | 'completed';
+  confirmedAccompanyingGuests?: number;
+  accompanyingCountConfirmedAt?: string;
+  accompanyingCountResponse?: string;
   addedBy?: {
     type: 'owner' | 'collaborator';
     userId: string;

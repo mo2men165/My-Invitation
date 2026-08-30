@@ -25,6 +25,15 @@ export interface IGuest {
   rsvpStatus?: 'pending' | 'accepted' | 'declined';
   rsvpResponse?: string;
   rsvpRespondedAt?: Date;
+  // Tracks which question the guest's next WhatsApp reply should be interpreted as
+  conversationStage?: 'awaiting_rsvp' | 'awaiting_accompanying_count' | 'completed';
+  // How many of numberOfAccompanyingGuests the guest confirmed they're actually bringing
+  confirmedAccompanyingGuests?: number;
+  accompanyingCountConfirmedAt?: Date;
+  accompanyingCountPromptSentAt?: Date;
+  accompanyingCountResponse?: string;
+  // Track if unused accompanying slots were already refunded (prevents double-refunding)
+  accompanyingCountRefunded?: boolean;
   addedAt: Date;
   updatedAt: Date;
   // Optional field to track who added this guest
@@ -164,6 +173,28 @@ const guestSchema = new Schema<IGuest>({
   },
   rsvpRespondedAt: {
     type: Date
+  },
+  conversationStage: {
+    type: String,
+    enum: ['awaiting_rsvp', 'awaiting_accompanying_count', 'completed'],
+    default: 'awaiting_rsvp'
+  },
+  confirmedAccompanyingGuests: {
+    type: Number,
+    min: 0
+  },
+  accompanyingCountConfirmedAt: {
+    type: Date
+  },
+  accompanyingCountPromptSentAt: {
+    type: Date
+  },
+  accompanyingCountResponse: {
+    type: String
+  },
+  accompanyingCountRefunded: {
+    type: Boolean,
+    default: false
   },
   addedAt: {
     type: Date,

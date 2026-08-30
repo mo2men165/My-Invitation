@@ -288,6 +288,7 @@ export class WhatsappService {
       const guestPhone = message.from;
       const originalMessageId = message.context?.id;
       let messageText = '';
+      let listReplyId: string | undefined;
 
     // Extract text from message
     if (message.text) {
@@ -308,6 +309,13 @@ export class WhatsappService {
         logger.info('WHATSAPP WEBHOOK: Interactive button response', {
           buttonId: message.interactive.button_reply.id,
           buttonTitle: messageText
+        });
+      } else if (message.interactive.type === 'list_reply') {
+        listReplyId = message.interactive.list_reply.id;
+        messageText = message.interactive.list_reply.title;
+        logger.info('WHATSAPP WEBHOOK: Interactive list response', {
+          listReplyId,
+          listReplyTitle: messageText
         });
       }
     } else {
@@ -373,14 +381,19 @@ export class WhatsappService {
         return;
       }
 
-      logger.info('WHATSAPP WEBHOOK: Guest found, processing RSVP', {
+      logger.info('WHATSAPP WEBHOOK: Guest found, processing reply', {
         guestId: guest._id,
         guestName: guest.name,
-        messageText
+        messageText,
+        conversationStage: guest.conversationStage
       });
 
-      // Process RSVP response
-      await this.processRSVPResponse(event, guest, messageText);
+      // Dispatch based on which question this guest is currently expected to answer
+      if (guest.conversationStage === 'awaiting_accompanying_count') {
+        await this.processAccompanyingCountResponse(event, guest, messageText, listReplyId);
+      } else {
+        await this.processRSVPResponse(event, guest, messageText);
+      }
 
     } catch (error: any) {
       logger.error('=== WHATSAPP WEBHOOK: ERROR handling incoming message ===', {
@@ -509,10 +522,20 @@ export class WhatsappService {
           refundedOnDecline
         });
 
-        // If accepted, send confirmation with links
+        // If accepted, ask how many accompanying guests they're bringing (when relevant),
+        // otherwise go straight to the confirmation-with-links message
         if (rsvpStatus === 'accepted') {
-          logger.info('WHATSAPP RSVP: Guest accepted - sending confirmation message...');
-          await this.sendConfirmationWithLinks(event, guest);
+          if (guest.numberOfAccompanyingGuests > 1) {
+            logger.info('WHATSAPP RSVP: Guest accepted - asking for accompanying guest count...');
+            await this.sendAccompanyingCountPrompt(event, guest);
+          } else {
+            logger.info('WHATSAPP RSVP: Guest accepted - sending confirmation message...');
+            await Event.updateOne(
+              { _id: event._id, 'guests._id': guest._id },
+              { $set: { 'guests.$.conversationStage': 'completed' } }
+            );
+            await this.sendConfirmationWithLinks(event, guest);
+          }
         }
       } else {
         logger.warn('WHATSAPP RSVP: Could not determine RSVP status from response');
@@ -657,6 +680,358 @@ export class WhatsappService {
         guestId: guest._id
       });
     }
+  }
+
+  /**
+   * Send an interactive list message asking an accepted guest how many of their
+   * declared accompanying guests they're actually bringing (0..numberOfAccompanyingGuests).
+   * Sent as a free-form session message (no template needed) since it's sent within the
+   * 24-hour window the guest's own "confirm attendance" reply just opened.
+   */
+  private static async sendAccompanyingCountPrompt(event: any, guest: any, isRetry: boolean = false): Promise<void> {
+    try {
+      const maxCount = guest.numberOfAccompanyingGuests;
+      const rows: { id: string; title: string }[] = [];
+
+      // Meta's interactive list caps at 10 rows total; numberOfAccompanyingGuests can be up
+      // to 10, which would need 11 rows (0..10), so collapse the top two into one row.
+      if (maxCount >= 10) {
+        for (let i = 0; i <= 8; i++) {
+          rows.push({ id: `count_${i}`, title: `${i}` });
+        }
+        rows.push({ id: 'count_9_10', title: '9 أو 10' });
+      } else {
+        for (let i = 0; i <= maxCount; i++) {
+          rows.push({ id: `count_${i}`, title: `${i}` });
+        }
+      }
+
+      const bodyText = isRetry
+        ? `لم أفهم ردك، من فضلك اختر عدد المرافقين الذين ستحضرهم من أصل ${maxCount}:`
+        : `تم تأكيد حضورك يا ${guest.name}! كم عدد المرافقين الذين ستحضرهم معك من أصل ${maxCount}؟`;
+
+      const messageData = {
+        messaging_product: 'whatsapp',
+        to: guest.phone.replace(/^\+/, ''),
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          body: { text: bodyText },
+          action: {
+            button: 'اختر العدد',
+            sections: [
+              {
+                title: 'عدد المرافقين',
+                rows
+              }
+            ]
+          }
+        }
+      };
+
+      logger.info('WHATSAPP ACCOMPANYING COUNT: Sending prompt...', {
+        guestId: guest._id,
+        guestName: guest.name,
+        maxCount,
+        isRetry
+      });
+
+      const response = await this.sendMessage(messageData);
+      const sentMessageId = response.messages?.[0]?.id;
+
+      // Overwrite whatsappMessageId so the guest's reply threads to THIS message,
+      // matching the same context-correlation pattern used for the initial invitation.
+      await Event.updateOne(
+        { _id: event._id, 'guests._id': guest._id },
+        {
+          $set: {
+            'guests.$.whatsappMessageId': sentMessageId,
+            'guests.$.conversationStage': 'awaiting_accompanying_count',
+            'guests.$.accompanyingCountPromptSentAt': new Date()
+          }
+        }
+      );
+
+      logger.info('WHATSAPP ACCOMPANYING COUNT: Prompt sent successfully', {
+        guestId: guest._id,
+        messageId: sentMessageId
+      });
+    } catch (error: any) {
+      logger.error('=== WHATSAPP ACCOMPANYING COUNT: ERROR sending prompt ===', {
+        error: error.message,
+        stack: error.stack,
+        eventId: event._id,
+        guestId: guest._id
+      });
+    }
+  }
+
+  /**
+   * Sent when the guest tapped the merged "9 أو 10" row - asks them to type the exact number.
+   */
+  private static async sendAccompanyingCountClarification(event: any, guest: any): Promise<void> {
+    try {
+      const messageData = {
+        messaging_product: 'whatsapp',
+        to: guest.phone.replace(/^\+/, ''),
+        type: 'text',
+        text: {
+          body: 'من فضلك اكتب الرقم بالضبط: 9 أو 10'
+        }
+      };
+
+      const response = await this.sendMessage(messageData);
+      const sentMessageId = response.messages?.[0]?.id;
+
+      await Event.updateOne(
+        { _id: event._id, 'guests._id': guest._id },
+        {
+          $set: {
+            'guests.$.whatsappMessageId': sentMessageId,
+            'guests.$.conversationStage': 'awaiting_accompanying_count',
+            'guests.$.accompanyingCountPromptSentAt': new Date()
+          }
+        }
+      );
+    } catch (error: any) {
+      logger.error('=== WHATSAPP ACCOMPANYING COUNT: ERROR sending clarification ===', {
+        error: error.message,
+        stack: error.stack,
+        eventId: event._id,
+        guestId: guest._id
+      });
+    }
+  }
+
+  /**
+   * Parse a guest's reply to the accompanying-count prompt into a validated count.
+   * Prefers the unambiguous list_reply id; falls back to free text (digits, Arabic-Indic
+   * digits, and common Arabic/English words for "none"/"all") for guests who type instead of tap.
+   */
+  private static parseAccompanyingCountReply(
+    rawText: string,
+    listReplyId: string | undefined,
+    maxCount: number
+  ): { type: 'value'; value: number } | { type: 'ambiguous' } | { type: 'invalid' } {
+    if (listReplyId === 'count_9_10') {
+      return { type: 'ambiguous' };
+    }
+
+    if (listReplyId) {
+      const match = listReplyId.match(/^count_(\d+)$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (!isNaN(n) && n >= 0 && n <= maxCount) {
+          return { type: 'value', value: n };
+        }
+      }
+    }
+
+    if (!rawText) {
+      return { type: 'invalid' };
+    }
+
+    // Normalize Arabic-Indic digits (٠-٩) to Latin digits
+    const arabicIndicDigits = '٠١٢٣٤٥٦٧٨٩';
+    const text = rawText.trim().replace(/[٠-٩]/g, (d) => String(arabicIndicDigits.indexOf(d)));
+    const normalized = text.toLowerCase();
+
+    const noneWords = ['لا احد', 'لا أحد', 'ولا حد', 'ولا أحد', 'صفر', 'لا يوجد', 'none', 'no one'];
+    const allWords = ['الكل', 'كلهم', 'الجميع', 'all', 'everyone'];
+
+    if (noneWords.some(w => normalized.includes(w))) {
+      return { type: 'value', value: 0 };
+    }
+    if (allWords.some(w => normalized.includes(w))) {
+      return { type: 'value', value: maxCount };
+    }
+
+    const digitMatch = text.match(/\d+/);
+    if (digitMatch) {
+      const n = parseInt(digitMatch[0], 10);
+      if (!isNaN(n) && n >= 0 && n <= maxCount) {
+        return { type: 'value', value: n };
+      }
+    }
+
+    return { type: 'invalid' };
+  }
+
+  /**
+   * Process a guest's reply to "how many accompanying guests are you bringing?"
+   * Persists the confirmed count, auto-refunds any unused declared slots (same
+   * refundableSlots pool used for full declines), then sends the final confirmation message.
+   */
+  private static async processAccompanyingCountResponse(
+    event: any,
+    guest: any,
+    messageText: string,
+    listReplyId: string | undefined
+  ): Promise<void> {
+    try {
+      const maxCount = guest.numberOfAccompanyingGuests;
+      const parsed = this.parseAccompanyingCountReply(messageText, listReplyId, maxCount);
+
+      logger.info('WHATSAPP ACCOMPANYING COUNT: Processing response', {
+        guestId: guest._id,
+        guestName: guest.name,
+        messageText,
+        listReplyId,
+        parsedType: parsed.type
+      });
+
+      if (parsed.type === 'ambiguous') {
+        await this.sendAccompanyingCountClarification(event, guest);
+        return;
+      }
+
+      if (parsed.type === 'invalid') {
+        logger.warn('WHATSAPP ACCOMPANYING COUNT: Could not parse reply, re-prompting', {
+          guestId: guest._id,
+          messageText
+        });
+        await this.sendAccompanyingCountPrompt(event, guest, true);
+        return;
+      }
+
+      const confirmedCount = parsed.value;
+      const unusedSlots = maxCount - confirmedCount;
+
+      // Auto-refund unused slots against the same refundableSlots pool used for full declines
+      let accompanyingCountRefunded = false;
+      if (unusedSlots > 0 && (event.packageType === 'premium' || event.packageType === 'vip')) {
+        if (!event.refundableSlots || event.refundableSlots.total === 0) {
+          const percentage = event.packageType === 'premium' ? 0.20 : 0.30;
+          event.refundableSlots = {
+            total: Math.floor(event.details.inviteCount * percentage),
+            used: 0
+          };
+        }
+
+        const availableRefundableSlots = event.refundableSlots.total - event.refundableSlots.used;
+        if (availableRefundableSlots >= unusedSlots) {
+          accompanyingCountRefunded = true;
+          event.refundableSlots.used += unusedSlots;
+        }
+
+        logger.info('WHATSAPP ACCOMPANYING COUNT: Refund evaluation', {
+          guestName: guest.name,
+          declared: maxCount,
+          confirmed: confirmedCount,
+          unusedSlots,
+          accompanyingCountRefunded,
+          refundableSlotsUsed: event.refundableSlots.used,
+          refundableSlotsTotal: event.refundableSlots.total
+        });
+      }
+
+      const updateData: any = {
+        'guests.$.confirmedAccompanyingGuests': confirmedCount,
+        'guests.$.accompanyingCountConfirmedAt': new Date(),
+        'guests.$.accompanyingCountResponse': messageText,
+        'guests.$.conversationStage': 'completed',
+        'guests.$.accompanyingCountRefunded': accompanyingCountRefunded
+      };
+
+      if (accompanyingCountRefunded) {
+        updateData['refundableSlots.used'] = event.refundableSlots.used;
+        if (!event.refundableSlots.total) {
+          updateData['refundableSlots.total'] = event.refundableSlots.total;
+        }
+      }
+
+      const updateResult = await Event.updateOne(
+        { _id: event._id, 'guests._id': guest._id },
+        { $set: updateData }
+      );
+
+      logger.info('WHATSAPP ACCOMPANYING COUNT: Database updated', {
+        matched: updateResult.matchedCount,
+        modified: updateResult.modifiedCount,
+        confirmedCount,
+        accompanyingCountRefunded
+      });
+
+      // Final step of the accept flow: send the maps/invite-image confirmation message
+      await this.sendConfirmationWithLinks(event, guest);
+    } catch (error: any) {
+      logger.error('=== WHATSAPP ACCOMPANYING COUNT: ERROR processing response ===', {
+        error: error.message,
+        stack: error.stack,
+        eventId: event._id,
+        guestId: guest._id
+      });
+    }
+  }
+
+  /**
+   * For guests who accepted but never answered the accompanying-count prompt: after the
+   * 24-hour WhatsApp customer-service window has passed (no further interactive follow-up
+   * is possible without a new approved template), assume they're bringing everyone they were
+   * declared with. Intended to be called on a schedule (see api/cron/accompanying-count-defaults.ts).
+   */
+  static async applyAccompanyingCountDefaults(staleHours: number = 24): Promise<{ processed: number; errors: number }> {
+    const cutoff = new Date(Date.now() - staleHours * 60 * 60 * 1000);
+    let processed = 0;
+    let errors = 0;
+
+    const events = await Event.find({
+      status: { $ne: 'cancelled' },
+      guests: {
+        $elemMatch: {
+          conversationStage: 'awaiting_accompanying_count',
+          accompanyingCountPromptSentAt: { $lte: cutoff }
+        }
+      }
+    });
+
+    for (const event of events) {
+      const staleGuests = event.guests.filter(
+        (g: any) =>
+          g.conversationStage === 'awaiting_accompanying_count' &&
+          g.accompanyingCountPromptSentAt &&
+          g.accompanyingCountPromptSentAt <= cutoff
+      );
+
+      for (const guest of staleGuests) {
+        try {
+          const confirmedCount = guest.numberOfAccompanyingGuests;
+
+          await Event.updateOne(
+            { _id: event._id, 'guests._id': guest._id },
+            {
+              $set: {
+                'guests.$.confirmedAccompanyingGuests': confirmedCount,
+                'guests.$.accompanyingCountConfirmedAt': new Date(),
+                'guests.$.accompanyingCountResponse': 'auto_defaulted_no_reply',
+                'guests.$.conversationStage': 'completed',
+                'guests.$.accompanyingCountRefunded': false
+              }
+            }
+          );
+
+          logger.info('WHATSAPP ACCOMPANYING COUNT: Auto-defaulted stale guest', {
+            eventId: event._id,
+            guestId: guest._id,
+            guestName: guest.name,
+            defaultedCount: confirmedCount
+          });
+
+          await this.sendConfirmationWithLinks(event, guest);
+          processed++;
+        } catch (error: any) {
+          errors++;
+          logger.error('=== WHATSAPP ACCOMPANYING COUNT: ERROR auto-defaulting guest ===', {
+            error: error.message,
+            eventId: event._id,
+            guestId: guest._id
+          });
+        }
+      }
+    }
+
+    logger.info('WHATSAPP ACCOMPANYING COUNT: Auto-default sweep complete', { processed, errors });
+    return { processed, errors };
   }
 
   /**
@@ -953,7 +1328,8 @@ export class WhatsappService {
             'guests.$.whatsappMessageSent': true,
             'guests.$.whatsappSentAt': new Date(),
             'guests.$.whatsappMessageId': sentMessageId,
-            'guests.$.rsvpStatus': 'pending'
+            'guests.$.rsvpStatus': 'pending',
+            'guests.$.conversationStage': 'awaiting_rsvp'
           }
         }
       );
@@ -1142,7 +1518,8 @@ export class WhatsappService {
             'guests.$.whatsappMessageSent': true,
             'guests.$.whatsappSentAt': new Date(),
             'guests.$.whatsappMessageId': sentMessageId,
-            'guests.$.rsvpStatus': 'pending'
+            'guests.$.rsvpStatus': 'pending',
+            'guests.$.conversationStage': 'awaiting_rsvp'
           }
         }
       );

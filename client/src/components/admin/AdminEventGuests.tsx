@@ -32,6 +32,9 @@ interface Guest {
   rsvpStatus?: 'pending' | 'accepted' | 'declined';
   rsvpResponse?: string;
   rsvpRespondedAt?: string;
+  conversationStage?: 'awaiting_rsvp' | 'awaiting_accompanying_count' | 'completed';
+  confirmedAccompanyingGuests?: number;
+  accompanyingCountResponse?: string;
   addedAt: string;
   updatedAt: string;
   individualInviteImage?: {
@@ -86,6 +89,34 @@ interface GuestStats {
 interface AdminEventGuestsProps {
   eventId: string;
   onBack: () => void;
+}
+
+function AccompanyingCountBadge({ guest }: { guest: Guest }) {
+  if (guest.rsvpStatus !== 'accepted' || guest.numberOfAccompanyingGuests <= 1) {
+    return null;
+  }
+
+  if (guest.conversationStage === 'awaiting_accompanying_count') {
+    return (
+      <span className="flex items-center space-x-1 px-2 py-1 bg-yellow-900/20 text-yellow-300 rounded text-xs">
+        <span>بانتظار تأكيد عدد المرافقين</span>
+      </span>
+    );
+  }
+
+  if (guest.confirmedAccompanyingGuests !== undefined) {
+    const isDefaulted = guest.accompanyingCountResponse === 'auto_defaulted_no_reply';
+    return (
+      <span className="flex items-center space-x-1 px-2 py-1 bg-blue-900/20 text-blue-300 rounded text-xs">
+        <span>
+          أكّد {guest.confirmedAccompanyingGuests} من {guest.numberOfAccompanyingGuests}
+          {isDefaulted && ' (بدون رد)'}
+        </span>
+      </span>
+    );
+  }
+
+  return null;
 }
 
 export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
@@ -867,7 +898,9 @@ ${event.invitationText}
                           {guest.rsvpStatus === 'accepted' ? 'قبل الدعوة' : 'اعتذر'}
                         </span>
                       )}
-                      
+
+                      <AccompanyingCountBadge guest={guest} />
+
                       {guest.whatsappMessageSent && (
                         <span className="flex items-center space-x-1  px-2 py-1 bg-green-900/20 text-green-300 rounded text-xs">
                           <CheckCircle className="h-3 w-3" />
@@ -925,7 +958,9 @@ ${event.invitationText}
                           {guest.rsvpStatus === 'accepted' ? 'قبل الدعوة' : 'اعتذر'}
                         </span>
                       )}
-                      
+
+                      <AccompanyingCountBadge guest={guest} />
+
                       {/* Post-Event Attendance Tracking */}
                       <div className="flex items-center space-x-2  bg-gray-800/50 px-3 py-1 rounded-lg border border-gray-700">
                         <span className="text-xs text-gray-400">الحضور الفعلي:</span>
