@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Collaborator } from '@/lib/api/collaboration';
 import { useToast } from '@/hooks/useToast';
+import ConfirmationModal from '@/components/cart/CartModal/components/ConfirmationModal';
 
 interface CollaboratorsListProps {
   collaborators: Collaborator[];
@@ -40,6 +41,7 @@ export const CollaboratorsList: React.FC<CollaboratorsListProps> = ({
   const [editingCollaborator, setEditingCollaborator] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<any>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [collaboratorToRemove, setCollaboratorToRemove] = useState<Collaborator | null>(null);
 
   const handleEditStart = (collaborator: Collaborator) => {
     setEditingCollaborator(collaborator.id);
@@ -75,10 +77,14 @@ export const CollaboratorsList: React.FC<CollaboratorsListProps> = ({
     setEditFormData({});
   };
 
-  const handleRemove = async (collaborator: Collaborator) => {
-    if (!confirm(`هل أنت متأكد من إزالة ${collaborator.name} من المتعاونين؟`)) {
-      return;
-    }
+  const handleRemove = (collaborator: Collaborator) => {
+    setCollaboratorToRemove(collaborator);
+  };
+
+  const handleConfirmRemove = async () => {
+    const collaborator = collaboratorToRemove;
+    setCollaboratorToRemove(null);
+    if (!collaborator) return;
 
     setActionLoading(collaborator.id);
     try {
@@ -404,6 +410,17 @@ export const CollaboratorsList: React.FC<CollaboratorsListProps> = ({
           );
         })}
       </div>
+
+      <ConfirmationModal
+        isOpen={!!collaboratorToRemove}
+        onConfirm={handleConfirmRemove}
+        onCancel={() => setCollaboratorToRemove(null)}
+        title="إزالة متعاون"
+        message={collaboratorToRemove ? `هل أنت متأكد من إزالة ${collaboratorToRemove.name} من المتعاونين؟` : ''}
+        confirmText="نعم، إزالة"
+        cancelText="إلغاء"
+        variant="danger"
+      />
     </div>
   );
 };

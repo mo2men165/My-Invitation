@@ -20,6 +20,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import ImageModal from '@/components/packages/modals/ImageModal';
 import { CartModal } from '@/components/cart/CartModal';
+import ConfirmationModal from '@/components/cart/CartModal/components/ConfirmationModal';
 
 import { InvitationDesign } from '@/types';
 
@@ -96,28 +97,32 @@ const WishlistPage: React.FC = () => {
   }, [items, dispatch, toast, selectedPackageType]);
   
 
-  const handleClearWishlist = useCallback(async () => {
-    if (items.length === 0) return;
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
-    if (window.confirm('هل تريد حقاً مسح جميع عناصر المفضلة؟')) {
-      try {
-        await dispatch(clearWishlist()).unwrap();
-        toast({
-          title: "تم المسح",
-          description: "تم مسح جميع عناصر المفضلة",
-          variant: "wishlist",
-          duration: 3000
-        });
-      } catch (error: any) {
-        toast({
-          title: "خطأ",
-          description: error || "فشل في مسح المفضلة",
-          variant: "destructive",
-          duration: 3000
-        });
-      }
+  const handleClearWishlist = useCallback(() => {
+    if (items.length === 0) return;
+    setShowClearConfirmation(true);
+  }, [items.length]);
+
+  const handleConfirmClearWishlist = useCallback(async () => {
+    setShowClearConfirmation(false);
+    try {
+      await dispatch(clearWishlist()).unwrap();
+      toast({
+        title: "تم المسح",
+        description: "تم مسح جميع عناصر المفضلة",
+        variant: "wishlist",
+        duration: 3000
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error || "فشل في مسح المفضلة",
+        variant: "destructive",
+        duration: 3000
+      });
     }
-  }, [items.length, dispatch, toast]);
+  }, [dispatch, toast]);
 
   // Show loading state for unauthenticated users
   if (!isAuthenticated) {
@@ -186,11 +191,22 @@ const WishlistPage: React.FC = () => {
       />
 
       {/* Cart Modal */}
-      <CartModal 
+      <CartModal
         isOpen={isCartModalOpen}
         onClose={closeModals}
         selectedPackage={selectedPackage}
         selectedDesign={selectedDesign}
+      />
+
+      <ConfirmationModal
+        isOpen={showClearConfirmation}
+        onConfirm={handleConfirmClearWishlist}
+        onCancel={() => setShowClearConfirmation(false)}
+        title="مسح المفضلة"
+        message="هل تريد حقاً مسح جميع عناصر المفضلة؟"
+        confirmText="نعم، مسح الكل"
+        cancelText="إلغاء"
+        variant="danger"
       />
     </div>
   );

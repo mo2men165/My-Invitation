@@ -131,6 +131,9 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
   const [inviteImagePreview, setInviteImagePreview] = useState<string | null>(null);
   const [updatingImage, setUpdatingImage] = useState(false);
   const [showReopenConfirmation, setShowReopenConfirmation] = useState(false);
+  const [guestToDeleteImage, setGuestToDeleteImage] = useState<Guest | null>(null);
+  const [showSendRemindersConfirmation, setShowSendRemindersConfirmation] = useState(false);
+  const [showSendThankYouConfirmation, setShowSendThankYouConfirmation] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -352,20 +355,23 @@ ${event.invitationText}
     }
   };
 
-  const handleDeleteInviteImage = async (guest: Guest) => {
+  const handleDeleteInviteImage = (guest: Guest) => {
     if (!event) return;
+    setGuestToDeleteImage(guest);
+  };
 
-    if (!confirm('هل أنت متأكد من حذف صورة الدعوة الفردية؟')) {
-      return;
-    }
+  const handleConfirmDeleteInviteImage = async () => {
+    const guest = guestToDeleteImage;
+    setGuestToDeleteImage(null);
+    if (!guest) return;
 
     try {
       setUpdatingImage(true);
       await adminAPI.updateGuestInviteImage(eventId, guest._id, null);
-      
+
       // Reload to update UI
       await loadEventGuests();
-      
+
       toast({
         title: "تم الحذف",
         description: "تم حذف صورة الدعوة الفردية بنجاح",
@@ -413,7 +419,69 @@ ${event.invitationText}
     }
   };
 
-  const filteredGuests = showVipOnly 
+  const handleConfirmSendReminders = async () => {
+    setShowSendRemindersConfirmation(false);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/events/${eventId}/send-reminders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        }
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "تم إرسال التذكيرات",
+          description: result.message,
+          variant: "default"
+        });
+      } else {
+        throw new Error(result.error?.message);
+      }
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في إرسال التذكيرات",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleConfirmSendThankYou = async () => {
+    setShowSendThankYouConfirmation(false);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/events/${eventId}/send-thank-you`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        }
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "تم إرسال رسائل الشكر",
+          description: result.message,
+          variant: "default"
+        });
+      } else {
+        throw new Error(result.error?.message);
+      }
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في إرسال رسائل الشكر",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const filteredGuests = showVipOnly
     ? guests.filter(guest => !guest.whatsappMessageSent)
     : guests;
 
@@ -568,37 +636,7 @@ ${event.invitationText}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           {/* Send Reminders Button */}
           <button
-            onClick={async () => {
-              if (confirm(`هل تريد إرسال تذكيرات لجميع الضيوف الذين قبلوا الدعوة؟`)) {
-                try {
-                  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/events/${eventId}/send-reminders`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                    }
-                  });
-
-                  const result = await response.json();
-
-                  if (response.ok) {
-                    toast({
-                      title: "تم إرسال التذكيرات",
-                      description: result.message,
-                      variant: "default"
-                    });
-                  } else {
-                    throw new Error(result.error?.message);
-                  }
-                } catch (error: any) {
-                  toast({
-                    title: "خطأ",
-                    description: error.message || "فشل في إرسال التذكيرات",
-                    variant: "destructive"
-                  });
-                }
-              }
-            }}
+            onClick={() => setShowSendRemindersConfirmation(true)}
             className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
           >
             <Send className="w-4 h-4" />
@@ -608,37 +646,7 @@ ${event.invitationText}
           {/* Send Thank You Messages Button (VIP only) */}
           {event.packageType === 'vip' && (
             <button
-              onClick={async () => {
-                if (confirm(`هل تريد إرسال رسائل شكر لجميع الضيوف الذين حضروا؟`)) {
-                  try {
-                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/events/${eventId}/send-thank-you`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                      }
-                    });
-
-                    const result = await response.json();
-
-                    if (response.ok) {
-                      toast({
-                        title: "تم إرسال رسائل الشكر",
-                        description: result.message,
-                        variant: "default"
-                      });
-                    } else {
-                      throw new Error(result.error?.message);
-                    }
-                  } catch (error: any) {
-                    toast({
-                      title: "خطأ",
-                      description: error.message || "فشل في إرسال رسائل الشكر",
-                      variant: "destructive"
-                    });
-                  }
-                }
-              }}
+              onClick={() => setShowSendThankYouConfirmation(true)}
               className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200"
             >
               <MessageSquare className="w-4 h-4" />
@@ -1045,6 +1053,39 @@ ${event.invitationText}
         title="إعادة فتح قائمة الضيوف"
         message="هل أنت متأكد من إعادة فتح قائمة الضيوف؟ سيتمكن المستخدم من إضافة وتعديل وحذف الضيوف بعد إعادة الفتح."
         confirmText="نعم، إعادة الفتح"
+        cancelText="إلغاء"
+        variant="warning"
+      />
+
+      <ConfirmationModal
+        isOpen={!!guestToDeleteImage}
+        onConfirm={handleConfirmDeleteInviteImage}
+        onCancel={() => setGuestToDeleteImage(null)}
+        title="حذف صورة الدعوة الفردية"
+        message="هل أنت متأكد من حذف صورة الدعوة الفردية؟"
+        confirmText="نعم، حذف"
+        cancelText="إلغاء"
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={showSendRemindersConfirmation}
+        onConfirm={handleConfirmSendReminders}
+        onCancel={() => setShowSendRemindersConfirmation(false)}
+        title="إرسال تذكيرات"
+        message="هل تريد إرسال تذكيرات لجميع الضيوف الذين قبلوا الدعوة؟"
+        confirmText="نعم، إرسال"
+        cancelText="إلغاء"
+        variant="warning"
+      />
+
+      <ConfirmationModal
+        isOpen={showSendThankYouConfirmation}
+        onConfirm={handleConfirmSendThankYou}
+        onCancel={() => setShowSendThankYouConfirmation(false)}
+        title="إرسال رسائل شكر"
+        message="هل تريد إرسال رسائل شكر لجميع الضيوف الذين حضروا؟"
+        confirmText="نعم، إرسال"
         cancelText="إلغاء"
         variant="warning"
       />

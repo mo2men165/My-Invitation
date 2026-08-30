@@ -70,20 +70,20 @@ export function AdminPendingEvents() {
 
   const handleApprove = async (eventId: string) => {
     if (!invitationCardImage) {
-      alert('يرجى رفع صورة بطاقة الدعوة');
+      toast({ title: 'خطأ', description: 'يرجى رفع صورة بطاقة الدعوة', variant: 'destructive' });
       return;
     }
 
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(invitationCardImage.type)) {
-      alert('نوع الملف غير مدعوم. يرجى رفع صورة (JPG, PNG, WebP)');
+      toast({ title: 'خطأ', description: 'نوع الملف غير مدعوم. يرجى رفع صورة (JPG, PNG, WebP)', variant: 'destructive' });
       return;
     }
 
     // Validate file size (10MB)
     if (invitationCardImage.size > 10 * 1024 * 1024) {
-      alert('حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت');
+      toast({ title: 'خطأ', description: 'حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت', variant: 'destructive' });
       return;
     }
 
@@ -103,7 +103,7 @@ export function AdminPendingEvents() {
 
   const handleReject = async (eventId: string) => {
     if (!notes.trim()) {
-      alert('يرجى إدخال سبب الرفض');
+      toast({ title: 'خطأ', description: 'يرجى إدخال سبب الرفض', variant: 'destructive' });
       return;
     }
     
