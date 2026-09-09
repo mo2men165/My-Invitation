@@ -66,6 +66,9 @@ router.get('/summary', withDB(async (req: Request, res: Response) => {
   }
 }));
 
+// ===== TEMPORARILY DISABLED - Paymob flow (bypassed while the Paymob account is unavailable) =====
+// Code kept intact on purpose. To re-enable: remove the `if (false) {` wrapper and its closing brace.
+if (false) {
 /**
  * POST /api/payment/create-paymob-order
  * Create Paymob order and get payment URL
@@ -353,7 +356,87 @@ router.post('/create-paymob-order', withDB(async (req: Request, res: Response) =
     });
   }
 }));
+}
+// ===== END TEMPORARILY DISABLED - Paymob flow =====
 
+/**
+ * POST /api/payment/initiate-manual-payment
+ * TEMPORARY (Paymob bypass): create a pending order for the selected cart items
+ * without contacting any payment gateway. The customer is told support will contact
+ * them within 24 hours; an admin then completes the order from the admin panel,
+ * which is what creates the events.
+ */
+router.post('/initiate-manual-payment', withDB(async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { selectedCartItemIds } = req.body;
+
+    // No specific items selected -> use the whole cart (same behaviour as the Paymob flow)
+    let finalSelectedCartItemIds = selectedCartItemIds;
+    if (!Array.isArray(finalSelectedCartItemIds) || finalSelectedCartItemIds.length === 0) {
+      const allCartSummary = await PaymentService.getCartPaymentSummary(userId);
+      if (!allCartSummary.success || !allCartSummary.summary) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'السلة فارغة أو غير صحيحة' }
+        });
+      }
+      finalSelectedCartItemIds = allCartSummary.summary.items.map(item => item.id);
+    }
+
+    const cartSummary = await PaymentService.getCartPaymentSummary(userId, finalSelectedCartItemIds);
+    if (!cartSummary.success || !cartSummary.summary) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'السلة فارغة أو غير صحيحة' }
+      });
+    }
+
+    const merchantOrderId = `MANUAL_${userId}_${Date.now()}`;
+
+    // paymobOrderId omitted -> OrderService records the order as paymentProvider 'manual'.
+    // createOrder rejects items that are already inside another pending order.
+    const order = await OrderService.createOrder(
+      userId,
+      finalSelectedCartItemIds,
+      undefined,
+      merchantOrderId,
+      cartSummary.summary.totalAmount
+    );
+
+    logger.info('Manual payment order created (Paymob bypass)', {
+      userId,
+      orderId: order._id,
+      merchantOrderId,
+      itemsCount: finalSelectedCartItemIds.length,
+      totalAmount: cartSummary.summary.totalAmount
+    });
+
+    return res.json({
+      success: true,
+      ourOrderId: order._id,
+      merchantOrderId,
+      amount: cartSummary.summary.totalAmount,
+      currency: 'SAR',
+      itemsCount: finalSelectedCartItemIds.length
+    });
+
+  } catch (error: any) {
+    logger.error('Error creating manual payment order:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: error.message || 'خطأ في إنشاء طلب الدفع' }
+    });
+  }
+}));
+
+
+// ===== TEMPORARILY DISABLED - client-driven payment completion =====
+// This endpoint converted the caller's whole cart into events using an amount supplied
+// by the client. It has no callers, and while the Paymob flow is bypassed it would be a
+// way to self-issue events without paying. Order completion now goes through the admin
+// panel only (POST /api/admin/orders/:orderId/complete).
+if (false) {
 /**
  * POST /api/payment/process
  * Process successful payment and convert cart to events
@@ -404,6 +487,8 @@ router.post('/process', withDB(async (req: Request, res: Response) => {
     });
   }
 }));
+}
+// ===== END TEMPORARILY DISABLED - client-driven payment completion =====
 
 /**
  * POST /api/payment/failed
@@ -438,6 +523,9 @@ router.post('/failed', withDB(async (req: Request, res: Response) => {
   }
 }));
 
+// ===== TEMPORARILY DISABLED - Paymob flow (bypassed while the Paymob account is unavailable) =====
+// Code kept intact on purpose. To re-enable: remove the `if (false) {` wrapper and its closing brace.
+if (false) {
 /**
  * GET /api/payment/paymob/config
  * Get Paymob configuration for frontend
@@ -909,6 +997,8 @@ router.post('/paymob/callback', cors(), withDB(async (req: Request, res: Respons
     return res.redirect(errorUrl);
   }
 }));
+}
+// ===== END TEMPORARILY DISABLED - Paymob flow =====
 
 /**
  * GET /api/payment/pending-orders
@@ -1071,6 +1161,9 @@ router.get('/order/:merchantOrderId', withDB(async (req: Request, res: Response)
   }
 }));
 
+// ===== TEMPORARILY DISABLED - Paymob flow (bypassed while the Paymob account is unavailable) =====
+// Code kept intact on purpose. To re-enable: remove the `if (false) {` wrapper and its closing brace.
+if (false) {
 /**
  * GET /api/payment/paymob/status/:transactionId
  * Get payment status from Paymob
@@ -1098,6 +1191,8 @@ router.get('/paymob/status/:transactionId', withDB(async (req: Request, res: Res
     });
   }
 }));
+}
+// ===== END TEMPORARILY DISABLED - Paymob flow =====
 
 // TEMPORARILY DISABLED - Tamara & Tabby payment routes
 if (false) {

@@ -186,7 +186,7 @@ export default function BillDetailsPage() {
                   <div className="space-y-3 sm:space-y-4">
                     <div>
                       <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">طريقة الدفع</p>
-                      <p className="text-white font-medium text-sm sm:text-base">{bill.paymentMethod === 'paymob' ? 'باي موب' : bill.paymentMethod}</p>
+                      <p className="text-white font-medium text-sm sm:text-base">{bill.paymentMethod === 'paymob' ? 'باي موب' : bill.paymentMethod === 'manual' ? 'تحويل يدوي' : bill.paymentMethod}</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-xs sm:text-sm mb-0.5 sm:mb-1">إجمالي المبلغ</p>

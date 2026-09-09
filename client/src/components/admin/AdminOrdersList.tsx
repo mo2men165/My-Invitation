@@ -19,7 +19,7 @@ import { AdminOrderDetailsModal } from './AdminOrderDetailsModal';
 interface Order {
   id: string;
   merchantOrderId: string;
-  paymobOrderId: number;
+  paymobOrderId?: number;
   paymobTransactionId?: string;
   user: {
     id: string;
@@ -384,7 +384,7 @@ export function AdminOrdersList() {
                     <tr key={order.id} className="hover:bg-gray-800/30 transition-colors">
                       <td className="px-6 py-4">
                         <div className="text-sm max-w-[200px]">
-                          <p className="text-white font-medium">#{order.paymobOrderId}</p>
+                          <p className="text-white font-medium">{order.paymobOrderId ? `#${order.paymobOrderId}` : 'دفع يدوي'}</p>
                           <p className="text-gray-400 text-xs break-all">{order.merchantOrderId}</p>
                         </div>
                       </td>

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAppDispatch } from '@/store';
 import { fetchCart } from '@/store/cartSlice';
 import { paymentAPI } from '@/lib/api/payment';
-import { paymobAPI } from '@/lib/api/paymob';
+// TEMPORARILY DISABLED - Paymob flow (bypass). Re-enable with handlePayNow below.
+// import { paymobAPI } from '@/lib/api/paymob';
 import { useToast } from '@/hooks/useToast';
 import { useAuth } from '@/hooks/useAuth';
 import { InstantRouteGuard } from '@/components/auth/InstantRouteGuard';
@@ -22,7 +23,8 @@ import {
   Clock,
   AlertTriangle,
   CheckSquare,
-  Square
+  Square,
+  PhoneCall
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -69,6 +71,8 @@ const PaymentPageContent: React.FC = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(true);
+  // Paymob bypass: shown after the order is registered as pending
+  const [showContactModal, setShowContactModal] = useState(false);
 
   // Load payment summary and pending orders
   useEffect(() => {
@@ -266,6 +270,10 @@ const PaymentPageContent: React.FC = () => {
     return null;
   }
 
+  // ===== TEMPORARILY DISABLED - Paymob flow (bypassed while the Paymob account is unavailable) =====
+  // Code kept intact on purpose. To re-enable: uncomment this handler + the paymobAPI import,
+  // and point the button below back at handlePayNow.
+  /*
   const handlePayNow = async () => {
     const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -427,6 +435,45 @@ const PaymentPageContent: React.FC = () => {
         isProcessingPayment: false,
         timestamp: new Date().toISOString()
       });
+    }
+  };
+  */
+  // ===== END TEMPORARILY DISABLED - Paymob flow =====
+
+  // Paymob bypass: register the selected items as a pending order. No gateway is called -
+  // support contacts the customer, then an admin completes the order (which creates the events).
+  const handleInitiatePayment = async () => {
+    if (!paymentSummary || selectedCartItemIds.length === 0) {
+      toast({
+        title: "خطأ",
+        description: "يرجى تحديد العناصر المراد دفعها",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsProcessingPayment(true);
+
+    try {
+      const result = await paymentAPI.initiateManualPayment(selectedCartItemIds);
+
+      if (!result.success) {
+        throw new Error(result.error?.message || 'فشل في إنشاء طلب الدفع');
+      }
+
+      // The submitted items are now locked in a pending order
+      setPendingCartItemIds(prev => [...prev, ...selectedCartItemIds]);
+      setSelectedCartItemIds([]);
+      setShowContactModal(true);
+    } catch (error: any) {
+      toast({
+        title: "فشل في إنشاء طلب الدفع",
+        description: error.message || "حدث خطأ أثناء إنشاء طلب الدفع",
+        variant: "destructive",
+        duration: 4000
+      });
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -730,14 +777,14 @@ const PaymentPageContent: React.FC = () => {
               </div>
 
               <button
-                onClick={handlePayNow}
+                onClick={handleInitiatePayment}
                 disabled={isProcessingPayment || selectedCartItemIds.length === 0}
                 className="w-full py-4 bg-gradient-to-r from-[#C09B52] to-[#B8935A] text-white font-bold text-lg rounded-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {isProcessingPayment ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    جاري إنشاء طلب الدفع...
+                    جاري إرسال الطلب...
                   </>
                 ) : selectedCartItemIds.length === 0 ? (
                   <>
@@ -747,19 +794,58 @@ const PaymentPageContent: React.FC = () => {
                 ) : (
                   <>
                     <CreditCard className="w-5 h-5" />
-                    ادفع الآن ({selectedCartItemIds.length} مناسبة)
+                    بدء إجراءات الدفع ({selectedCartItemIds.length} مناسبة)
                   </>
                 )}
               </button>
 
               <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
                 <Clock className="w-3 h-3" />
-                <span>سيتم إنشاء المناسبات فور إتمام الدفع</span>
+                <span>سيتواصل معك فريقنا خلال 24 ساعة لإتمام الدفع</span>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Paymob bypass: confirmation that support will reach out */}
+      {showContactModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowContactModal(false)} />
+          <div className="relative bg-gray-900 border border-[#C09B52]/30 rounded-2xl p-6 sm:p-8 max-w-md w-full text-center">
+            <div className="w-16 h-16 bg-[#C09B52]/20 rounded-full flex items-center justify-center mx-auto mb-5">
+              <PhoneCall className="w-8 h-8 text-[#C09B52]" />
+            </div>
+
+            <h3 className="text-2xl font-bold text-white mb-3">
+              تم استلام طلبك بنجاح
+            </h3>
+
+            <p className="text-gray-300 leading-relaxed mb-4">
+              سيتواصل معك أحد أعضاء فريقنا خلال 24 ساعة لإرشادك إلى طريقة إتمام الدفع.
+            </p>
+
+            <p className="text-gray-400 text-sm leading-relaxed mb-6">
+              مناسباتك المحددة الآن في حالة انتظار، ولن يتم إنشاؤها إلا بعد تأكيد الدفع.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setShowContactModal(false)}
+                className="flex-1 py-3 bg-[#C09B52] text-white font-medium rounded-xl hover:bg-[#B8935A] transition-colors"
+              >
+                حسناً
+              </button>
+              <Link
+                href="/dashboard"
+                className="flex-1 py-3 border border-white/20 text-gray-200 font-medium rounded-xl hover:bg-white/5 transition-colors flex items-center justify-center"
+              >
+                لوحة التحكم
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -5,7 +5,7 @@ import { ICartItem } from './User';
 export interface IOrder extends Document {
   userId: Types.ObjectId;
   merchantOrderId: string;         // Our internal order reference
-  paymentProvider: 'paymob' | 'tabby' | 'tamara';  // Payment provider used
+  paymentProvider: 'paymob' | 'tabby' | 'tamara' | 'manual';  // Payment provider used ('manual' = temporary Paymob bypass, offline payment)
   paymobOrderId?: number;          // Paymob's order ID (for paymob payments)
   tabbyPaymentId?: string;         // Tabby's payment ID (for tabby payments)
   tabbySessionId?: string;         // Tabby's session ID
@@ -194,7 +194,7 @@ const orderSchema = new Schema<IOrder>({
   },
   paymentProvider: {
     type: String,
-    enum: ['paymob', 'tabby', 'tamara'],
+    enum: ['paymob', 'tabby', 'tamara', 'manual'],
     required: true,
     default: 'paymob'
   },

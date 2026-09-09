@@ -144,6 +144,35 @@ class PaymentAPI {
     return result;
   }
 
+  /**
+   * TEMPORARY (Paymob bypass): register the selected cart items as a pending order.
+   * No payment gateway is contacted - support contacts the customer within 24 hours,
+   * and an admin completes the order from the admin panel.
+   */
+  async initiateManualPayment(selectedCartItemIds: string[]): Promise<{
+    success: boolean;
+    ourOrderId?: string;
+    merchantOrderId?: string;
+    amount?: number;
+    currency?: string;
+    itemsCount?: number;
+    error?: { message: string };
+  }> {
+    const response = await fetch(`${API_BASE_URL}/api/payment/initiate-manual-payment`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ selectedCartItemIds }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في إنشاء طلب الدفع');
+    }
+
+    return result;
+  }
+
   async getOrderByMerchantId(merchantOrderId: string): Promise<{
     success: boolean;
     order?: any;

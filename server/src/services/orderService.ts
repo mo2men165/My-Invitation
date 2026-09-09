@@ -11,10 +11,12 @@ export class OrderService {
   /**
    * Create a new order with selected cart items
    */
+  // NOTE: paymobOrderId is optional while the Paymob flow is bypassed.
+  // Orders created without one are 'manual' — an admin completes them from the admin panel.
   static async createOrder(
     userId: string,
     selectedCartItemIds: string[],
-    paymobOrderId: number,
+    paymobOrderId: number | undefined,
     merchantOrderId: string,
     totalAmount: number
   ): Promise<IOrder> {
@@ -113,10 +115,11 @@ export class OrderService {
       }
 
       // Create order with cart snapshot
+      const isManual = paymobOrderId === undefined;
       const orderData = {
         userId: new Types.ObjectId(userId),
         merchantOrderId,
-        paymentProvider: 'paymob' as const,
+        paymentProvider: (isManual ? 'manual' : 'paymob') as 'manual' | 'paymob',
         paymobOrderId,
         selectedCartItems: selectedCartItems.map(item => ({
           cartItemId: item._id!,
@@ -124,7 +127,7 @@ export class OrderService {
         })),
         totalAmount,
         status: 'pending' as const,
-        paymentMethod: 'paymob'
+        paymentMethod: isManual ? 'manual' : 'paymob'
       };
 
       logger.info(`📝 CREATING ORDER RECORD [${orderCreationId}]`, {

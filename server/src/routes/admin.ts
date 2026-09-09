@@ -1207,7 +1207,7 @@ router.post('/events/:eventId/send-reminders', withDB(async (req: Request, res: 
     }
 
     // Import WhatsappService
-    const { WhatsappService } = await import('../services/whatsappService.js');
+    const { WhatsappService } = await import('../services/whatsappService');
     const result = await WhatsappService.sendEventReminders(eventIdString);
 
     logger.info(`Admin ${adminId} triggered reminders for event ${eventId}`, result);
@@ -1268,7 +1268,7 @@ router.post('/events/:eventId/send-thank-you', withDB(async (req: Request, res: 
     }
 
     // Import WhatsappService
-    const { WhatsappService } = await import('../services/whatsappService.js');
+    const { WhatsappService } = await import('../services/whatsappService');
     const result = await WhatsappService.sendThankYouMessages(eventIdString);
 
     logger.info(`Admin ${adminId} triggered thank you messages for event ${eventId}`, result);
@@ -1724,7 +1724,7 @@ router.post('/orders/:orderId/complete', withDB(async (req: Request, res: Respon
     }
 
     // Process the order manually using the same logic as webhook
-    const { OrderService } = await import('../services/orderService.js');
+    const { OrderService } = await import('../services/orderService');
     const result = await OrderService.processSuccessfulPayment(
       order.merchantOrderId,
       transactionId || `ADMIN_MANUAL_${Date.now()}`

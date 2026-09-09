@@ -20,7 +20,7 @@ import {
 interface OrderDetails {
   id: string;
   merchantOrderId: string;
-  paymobOrderId: number;
+  paymobOrderId?: number;
   paymobTransactionId?: string;
   user: {
     id: string;
@@ -398,10 +398,12 @@ export function AdminOrderDetailsModal({ orderId, isOpen, onClose }: AdminOrderD
                     معلومات الطلب
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-gray-400 text-sm mb-1">رقم الطلب (Paymob)</p>
-                      <p className="text-white font-medium">#{order.paymobOrderId}</p>
-                    </div>
+                    {order.paymobOrderId && (
+                      <div>
+                        <p className="text-gray-400 text-sm mb-1">رقم الطلب (Paymob)</p>
+                        <p className="text-white font-medium">#{order.paymobOrderId}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-gray-400 text-sm mb-1">رقم الطلب (النظام)</p>
                       <p className="text-white font-medium break-all">{order.merchantOrderId}</p>
@@ -611,7 +613,8 @@ export function AdminOrderDetailsModal({ orderId, isOpen, onClose }: AdminOrderD
           <div className="relative bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-md w-full">
             <h3 className="text-xl font-bold text-white mb-4">تأكيد الطلب</h3>
             <p className="text-gray-300 mb-4">
-              هل أنت متأكد من تأكيد هذا الطلب؟ سيتم إنشاء الأحداث من عناصر الطلب.
+              هل أنت متأكد من تأكيد هذا الطلب؟ سيتم اعتباره مدفوعاً، وإنشاء الأحداث من عناصر الطلب،
+              وحذف تلك العناصر من سلة العميل.
             </p>
             <div className="mb-4">
               <label className="block text-sm text-gray-400 mb-2">رقم المعاملة (اختياري)</label>
@@ -619,7 +622,7 @@ export function AdminOrderDetailsModal({ orderId, isOpen, onClose }: AdminOrderD
                 type="text"
                 value={transactionId}
                 onChange={(e) => setTransactionId(e.target.value)}
-                placeholder="أدخل رقم المعاملة من Paymob"
+                placeholder="رقم التحويل / المرجع (إن وجد)"
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
                 disabled={processing}
               />
