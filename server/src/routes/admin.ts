@@ -14,6 +14,12 @@ import { uploadSingleImage } from '../config/multer';
 import { CloudinaryService } from '../services/cloudinaryService';
 import { registerTabbyWebhook, updateTabbyWebhook } from '../services/tabbyWebhookRegistration';
 import { PackageImage } from '../models/PackageImage';
+// Imported statically, not via await import(): tsc emits CommonJS locally while
+// @vercel/node emits ESM, and a runtime import() is resolved by Node's ESM resolver
+// in both cases - which requires a file extension that only matches one of the two
+// build layouts. A static import is rewritten by each compiler and works in both.
+import { OrderService } from '../services/orderService';
+import { WhatsappService } from '../services/whatsappService';
 
 
 const router = Router();
@@ -1206,8 +1212,6 @@ router.post('/events/:eventId/send-reminders', withDB(async (req: Request, res: 
       });
     }
 
-    // Import WhatsappService
-    const { WhatsappService } = await import('../services/whatsappService');
     const result = await WhatsappService.sendEventReminders(eventIdString);
 
     logger.info(`Admin ${adminId} triggered reminders for event ${eventId}`, result);
@@ -1267,8 +1271,6 @@ router.post('/events/:eventId/send-thank-you', withDB(async (req: Request, res: 
       });
     }
 
-    // Import WhatsappService
-    const { WhatsappService } = await import('../services/whatsappService');
     const result = await WhatsappService.sendThankYouMessages(eventIdString);
 
     logger.info(`Admin ${adminId} triggered thank you messages for event ${eventId}`, result);
@@ -1724,7 +1726,6 @@ router.post('/orders/:orderId/complete', withDB(async (req: Request, res: Respon
     }
 
     // Process the order manually using the same logic as webhook
-    const { OrderService } = await import('../services/orderService');
     const result = await OrderService.processSuccessfulPayment(
       order.merchantOrderId,
       transactionId || `ADMIN_MANUAL_${Date.now()}`
