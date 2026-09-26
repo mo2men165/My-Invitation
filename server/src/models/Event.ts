@@ -105,6 +105,15 @@ export interface IEvent extends Document {
     reopenedBy?: Types.ObjectId;
     reopenCount?: number;
   };
+
+  // Classic packages have no guest list: the team hands the invitation cards to
+  // the customer over WhatsApp and the customer distributes them. Delivery is
+  // therefore tracked once per event instead of per guest.
+  classicInvitationsDelivered?: {
+    isDelivered: boolean;
+    deliveredAt?: Date;
+    deliveredBy?: Types.ObjectId;
+  };
   
   // Collaboration tracking (optional fields)
   collaborators?: {
@@ -442,6 +451,19 @@ const eventSchema: Schema<IEvent> = new Schema({
     type: String,
     default: '',
     trim: true
+  },
+  classicInvitationsDelivered: {
+    isDelivered: {
+      type: Boolean,
+      default: false
+    },
+    deliveredAt: {
+      type: Date
+    },
+    deliveredBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    }
   },
   guestListConfirmed: {
     isConfirmed: {

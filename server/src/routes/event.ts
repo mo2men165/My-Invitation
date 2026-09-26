@@ -62,6 +62,25 @@ function initializeRefundableSlots(event: any): void {
 }
 
 /**
+ * Classic packages have no customer-managed guest list: our team prepares the
+ * invitation cards and hands them to the customer, who distributes them. Guest
+ * data entry was removed from the UI, so the endpoints reject it as well.
+ */
+const CLASSIC_GUESTS_DISABLED_MESSAGE =
+  'الباقة الكلاسيكية لا تتطلب إدخال بيانات الضيوف. سيتم إرسال الدعوات إليك عبر الواتساب';
+
+function rejectIfClassic(event: { packageType: string }, res: Response): boolean {
+  if (event.packageType !== 'classic') {
+    return false;
+  }
+  res.status(400).json({
+    success: false,
+    error: { message: CLASSIC_GUESTS_DISABLED_MESSAGE }
+  });
+  return true;
+}
+
+/**
  * GET /api/events
  * Get user's events with filtering options
  */
@@ -332,6 +351,10 @@ router.post('/:id/guests', withDB(async (req: Request, res: Response) => {
       }
     }
 
+    if (rejectIfClassic(event, res)) {
+      return;
+    }
+
     // Check if guest list is already confirmed (all package types)
     if (event.guestListConfirmed.isConfirmed) {
       return res.status(400).json({
@@ -484,6 +507,10 @@ router.patch('/:id/guests/:guestId', withDB(async (req: Request, res: Response) 
       });
     }
 
+    if (rejectIfClassic(event, res)) {
+      return;
+    }
+
     // Check if collaborator has permission to edit guests
     if (userRole === 'collaborator' && !collaboratorPermissions?.canEditGuests) {
       return res.status(403).json({
@@ -569,6 +596,10 @@ router.post('/:id/guests/confirm', withDB(async (req: Request, res: Response) =>
         success: false,
         error: { message: 'المناسبة غير موجودة' }
       });
+    }
+
+    if (rejectIfClassic(event, res)) {
+      return;
     }
 
     // Check if already confirmed (and not reopened by admin)
@@ -670,6 +701,10 @@ router.delete('/:id/guests/:guestId', withDB(async (req: Request, res: Response)
       });
     }
 
+    if (rejectIfClassic(event, res)) {
+      return;
+    }
+
     // Check if collaborator has permission to delete guests
     if (userRole === 'collaborator' && !collaboratorPermissions?.canDeleteGuests) {
       return res.status(403).json({
@@ -753,6 +788,10 @@ router.post('/:id/guests/:guestId/whatsapp', withDB(async (req: Request, res: Re
         success: false,
         error: { message: 'المناسبة غير موجودة أو ليس لديك صلاحية للوصول إليها' }
       });
+    }
+
+    if (rejectIfClassic(event, res)) {
+      return;
     }
 
     const guest = event.guests.find(g => g._id?.toString() === guestId);

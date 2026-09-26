@@ -447,6 +447,26 @@ export const adminAPI = {
     return result.data;
   },
 
+  // Mark the invitation cards of a classic event as handed to the customer
+  async setClassicInvitationsDelivered(
+    eventId: string,
+    delivered: boolean
+  ): Promise<{ classicInvitationsDelivered: { isDelivered: boolean; deliveredAt?: string } }> {
+    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/classic-invitations-delivered`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ delivered })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في تحديث حالة تسليم الدعوات');
+    }
+
+    return result.data;
+  },
+
   // Mark Guest Attendance (VIP packages only)
   async markGuestAttendance(eventId: string, guestId: string, attended: boolean): Promise<void> {
     const response = await fetch(`${API_URL}/api/admin/events/${eventId}/guests/${guestId}/attendance`, {

@@ -236,6 +236,7 @@ router.get('/events/pending', withDB(async (req: Request, res: Response) => {
         updatedAt: event.updatedAt,
         guests: formattedGuests,
         guestListConfirmed: event.guestListConfirmed,
+        classicInvitationsDelivered: event.classicInvitationsDelivered,
         // Show guest count for VIP packages even if not confirmed
         guestCount: event.guests?.length || 0,
         
@@ -386,6 +387,7 @@ router.get('/events/all', withDB(async (req: Request, res: Response) => {
         updatedAt: event.updatedAt,
         guests: formattedGuests,
         guestListConfirmed: event.guestListConfirmed,
+        classicInvitationsDelivered: event.classicInvitationsDelivered,
         // Show guest count for VIP packages even if not confirmed
         guestCount: event.guests?.length || 0,
         
@@ -834,12 +836,15 @@ router.get('/events/:eventId/guests', withDB(async (req: Request, res: Response)
           invitationText: event.details.invitationText,
           startTime: event.details.startTime,
           endTime: event.details.endTime,
+          inviteCount: event.details.inviteCount,
+          invitationCardUrl: event.invitationCardImage?.secure_url || event.invitationCardImage?.url,
           user: {
             name: `${(event.userId as any).firstName} ${(event.userId as any).lastName}`,
             email: (event.userId as any).email,
             phone: (event.userId as any).phone
           },
           guestListConfirmed: event.guestListConfirmed,
+          classicInvitationsDelivered: event.classicInvitationsDelivered,
           
           // Collaboration information
           hasCollaborators: collaborators.length > 0,
@@ -1115,6 +1120,65 @@ router.post('/events/:eventId/reopen-guest-list', withDB(async (req: Request, re
     return res.status(500).json({
       success: false,
       error: { message: 'خطأ في إعادة فتح قائمة الضيوف' }
+    });
+  }
+}));
+
+/**
+ * POST /api/admin/events/:eventId/classic-invitations-delivered
+ * Mark (or unmark) the invitation cards of a classic event as handed to the
+ * customer. Classic events have no guest list, so delivery is tracked once per
+ * event rather than per guest.
+ */
+router.post('/events/:eventId/classic-invitations-delivered', withDB(async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
+    const adminId = req.user!.id;
+    const delivered = req.body?.delivered !== false;
+
+    const event = await Event.findById(eventIdString);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    if (event.packageType !== 'classic') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'هذا الإجراء متاح للباقة الكلاسيكية فقط' }
+      });
+    }
+
+    event.classicInvitationsDelivered = delivered
+      ? {
+          isDelivered: true,
+          deliveredAt: new Date(),
+          deliveredBy: new Types.ObjectId(adminId)
+        }
+      : { isDelivered: false };
+
+    await event.save();
+
+    logger.info(
+      `Admin ${adminId} marked classic invitations for event ${eventId} as ${delivered ? 'delivered' : 'not delivered'}`
+    );
+
+    return res.json({
+      success: true,
+      message: delivered
+        ? 'تم تسجيل تسليم الدعوات للعميل'
+        : 'تم إلغاء تسجيل تسليم الدعوات',
+      data: { classicInvitationsDelivered: event.classicInvitationsDelivered }
+    });
+
+  } catch (error) {
+    logger.error('Error updating classic invitation delivery status:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تحديث حالة تسليم الدعوات' }
     });
   }
 }));

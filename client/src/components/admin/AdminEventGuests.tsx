@@ -16,7 +16,8 @@ import {
   CheckCircle,
   XCircle,
   UserCheck,
-  AlertCircle
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
@@ -76,6 +77,14 @@ interface EventDetails {
     reopenedBy?: string;
     reopenCount?: number;
   };
+  inviteCount?: number;
+  invitationCardUrl?: string;
+  // Classic packages only: the cards are handed to the customer as a whole,
+  // so delivery is tracked once per event instead of per guest.
+  classicInvitationsDelivered?: {
+    isDelivered: boolean;
+    deliveredAt?: string;
+  };
 }
 
 interface GuestStats {
@@ -134,6 +143,7 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
   const [guestToDeleteImage, setGuestToDeleteImage] = useState<Guest | null>(null);
   const [showSendRemindersConfirmation, setShowSendRemindersConfirmation] = useState(false);
   const [showSendThankYouConfirmation, setShowSendThankYouConfirmation] = useState(false);
+  const [updatingDelivery, setUpdatingDelivery] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -481,6 +491,29 @@ ${event.invitationText}
     }
   };
 
+  const handleToggleClassicDelivery = async (delivered: boolean) => {
+    try {
+      setUpdatingDelivery(true);
+      await adminAPI.setClassicInvitationsDelivered(eventId, delivered);
+      await loadEventGuests();
+      toast({
+        title: delivered ? "تم تسجيل التسليم" : "تم إلغاء التسجيل",
+        description: delivered
+          ? "تم تسجيل تسليم الدعوات للعميل"
+          : "تم إلغاء تسجيل تسليم الدعوات",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في تحديث حالة التسليم",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingDelivery(false);
+    }
+  };
+
   const filteredGuests = showVipOnly
     ? guests.filter(guest => !guest.whatsappMessageSent)
     : guests;
@@ -500,6 +533,12 @@ ${event.invitationText}
       </div>
     );
   }
+
+  const isClassic = event.packageType === 'classic';
+  const isClassicDelivered = !!event.classicInvitationsDelivered?.isDelivered;
+  // Classic events created before guest entry was removed may still carry
+  // guests, so their list stays visible to admins.
+  const hasLegacyClassicGuests = isClassic && guests.length > 0;
 
   return (
     <div className="space-y-6">
@@ -542,7 +581,8 @@ ${event.invitationText}
                 </span>
               </p>
               
-              {/* Guest List Confirmation Status - All Packages */}
+              {/* Guest List Confirmation Status - Packages with a guest list */}
+              {!isClassic && (
               <p><span className="text-gray-400">حالة قائمة الضيوف:</span> 
                 <span className={`ml-2 px-2 py-1 rounded text-xs ${
                   event.guestListConfirmed?.isConfirmed 
@@ -555,13 +595,124 @@ ${event.invitationText}
                   }
                 </span>
               </p>
+              )}
             </div>
           </div>
         </div>
       </div>
 
+      {/* Classic Package - Invitation delivery to the customer.
+          Classic events have no guest list: the cards are handed to the
+          customer over WhatsApp and the customer distributes them. */}
+      {isClassic && (
+        <div className="bg-gray-900/60 border border-gray-700 rounded-xl p-6 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white">تسليم الدعوات للعميل</h3>
+            <p className="text-sm text-gray-400 mt-1">
+              الباقة الكلاسيكية لا تحتوي على قائمة ضيوف. يتم إرسال بطاقات الدعوة إلى العميل
+              عبر الواتساب، ويقوم هو بتوزيعها على ضيوفه.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
+              <div className="text-xs text-gray-400 mb-2">واتساب العميل</div>
+              <div className="text-white text-sm mb-3">{event.user.name}</div>
+              <a
+                href={`https://wa.me/${event.user.phone.replace(/^\+/, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs transition-colors"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span dir="ltr">+{event.user.phone.replace(/^\+/, '')}</span>
+              </a>
+            </div>
+
+            <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
+              <div className="text-xs text-gray-400 mb-2">بطاقة الدعوة</div>
+              {event.invitationCardUrl ? (
+                <a
+                  href={event.invitationCardUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs transition-colors"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>فتح البطاقة</span>
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-2 text-yellow-300 text-xs">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>لم يتم رفع بطاقة الدعوة بعد</span>
+                </span>
+              )}
+            </div>
+
+            <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
+              <div className="text-xs text-gray-400 mb-2">عدد الدعوات في الباقة</div>
+              <div className="text-2xl font-bold text-white">{event.inviteCount ?? 0}</div>
+            </div>
+          </div>
+
+          <div
+            className={`rounded-lg p-4 border ${
+              isClassicDelivered
+                ? 'bg-green-900/20 border-green-700/30'
+                : 'bg-yellow-900/20 border-yellow-700/30'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                {isClassicDelivered ? (
+                  <CheckCircle className="h-5 w-5 text-green-400" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-yellow-400" />
+                )}
+                <div>
+                  <h4 className={`font-medium ${isClassicDelivered ? 'text-green-400' : 'text-yellow-400'}`}>
+                    {isClassicDelivered ? 'تم تسليم الدعوات للعميل' : 'لم يتم تسليم الدعوات بعد'}
+                  </h4>
+                  <p className={`text-sm mt-1 ${isClassicDelivered ? 'text-green-100' : 'text-yellow-100'}`}>
+                    {isClassicDelivered
+                      ? event.classicInvitationsDelivered?.deliveredAt
+                        ? `تم التسليم في ${new Date(event.classicInvitationsDelivered.deliveredAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })}`
+                        : 'تم تسجيل التسليم'
+                      : 'أرسل بطاقات الدعوة إلى العميل عبر الواتساب ثم سجّل التسليم هنا'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleToggleClassicDelivery(!isClassicDelivered)}
+                disabled={updatingDelivery || (!isClassicDelivered && !event.invitationCardUrl)}
+                title={
+                  !isClassicDelivered && !event.invitationCardUrl
+                    ? 'يجب رفع بطاقة الدعوة أولاً'
+                    : undefined
+                }
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isClassicDelivered
+                    ? 'bg-gray-700 hover:bg-gray-600'
+                    : 'bg-[#C09B52] hover:bg-[#A0884A]'
+                }`}
+              >
+                {updatingDelivery ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isClassicDelivered ? (
+                  <XCircle className="h-4 w-4" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                <span>{isClassicDelivered ? 'إلغاء تسجيل التسليم' : 'تسجيل تسليم الدعوات'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Guest Stats */}
-      {guestStats && (
+      {guestStats && (!isClassic || hasLegacyClassicGuests) && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-4 text-center">
@@ -657,7 +808,7 @@ ${event.invitationText}
       )}
 
       {/* Guest List Status Warning/Actions */}
-      {!event.guestListConfirmed?.isConfirmed ? (
+      {!isClassic && (!event.guestListConfirmed?.isConfirmed ? (
         <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-xl p-4 mb-6">
           <div className="flex items-center gap-3">
             <XCircle className="w-5 h-5 text-yellow-400" />
@@ -667,7 +818,6 @@ ${event.invitationText}
                 المستخدم لم يؤكد قائمة الضيوف النهائية بعد. 
                 {event.packageType === 'vip' && ' لا يمكن إرسال الدعوات حتى يتم التأكيد.'}
                 {event.packageType === 'premium' && ' بعد التأكيد يمكنك إضافة الروابط الفردية.'}
-                {event.packageType === 'classic' && ' بعد التأكيد يمكنك إرسال الدعوات للمستخدم.'}
               </p>
             </div>
           </div>
@@ -698,9 +848,10 @@ ${event.invitationText}
             </button>
           </div>
         </div>
-      )}
+      ))}
 
       {/* Guests List */}
+      {(!isClassic || hasLegacyClassicGuests) && (
       <div className="bg-gray-900/60 border border-gray-700 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-700">
           <h3 className="text-lg font-semibold text-white">قائمة الضيوف</h3>
@@ -710,6 +861,11 @@ ${event.invitationText}
               : `${filteredGuests.length} من أصل ${guests.length} ضيف`
             }
           </p>
+          {hasLegacyClassicGuests && (
+            <p className="text-xs text-yellow-300 mt-1">
+              ضيوف مُدخلون قبل إلغاء إدخال بيانات الضيوف في الباقة الكلاسيكية
+            </p>
+          )}
         </div>
         
         <div className="divide-y divide-gray-700">
@@ -1044,6 +1200,7 @@ ${event.invitationText}
           </div>
         )}
       </div>
+      )}
 
       {/* Reopen Guest List Confirmation Modal */}
       <ConfirmationModal

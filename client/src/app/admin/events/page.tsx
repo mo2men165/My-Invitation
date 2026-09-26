@@ -62,6 +62,12 @@ interface Event {
     confirmedAt?: string;
     confirmedBy?: string;
   };
+  // Classic packages only: delivery of the cards to the customer is tracked
+  // per event, since these events have no guest list.
+  classicInvitationsDelivered?: {
+    isDelivered: boolean;
+    deliveredAt?: string;
+  };
   guestCount?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -502,16 +508,29 @@ export default function AdminEventsPage() {
                               {event.eventDetails.packageType}
                             </div>
                             {event.approvalStatus === 'approved' && (
-                              <div className={`text-xs px-1.5 py-0.5 rounded ${
-                                event.guestListConfirmed?.isConfirmed 
-                                  ? 'bg-green-900/30 text-green-400' 
-                                  : 'bg-yellow-900/30 text-yellow-400'
-                              }`}>
-                                {event.guestListConfirmed?.isConfirmed 
-                                  ? `✓ ${event.guestCount || 0} ضيف` 
-                                  : `${event.guestCount || 0} ضيف`
-                                }
-                              </div>
+                              event.eventDetails.packageType === 'classic' ? (
+                                <div className={`text-xs px-1.5 py-0.5 rounded ${
+                                  event.classicInvitationsDelivered?.isDelivered
+                                    ? 'bg-green-900/30 text-green-400'
+                                    : 'bg-yellow-900/30 text-yellow-400'
+                                }`}>
+                                  {event.classicInvitationsDelivered?.isDelivered
+                                    ? '✓ تم تسليم الدعوات'
+                                    : 'بانتظار تسليم الدعوات'
+                                  }
+                                </div>
+                              ) : (
+                                <div className={`text-xs px-1.5 py-0.5 rounded ${
+                                  event.guestListConfirmed?.isConfirmed 
+                                    ? 'bg-green-900/30 text-green-400' 
+                                    : 'bg-yellow-900/30 text-yellow-400'
+                                }`}>
+                                  {event.guestListConfirmed?.isConfirmed 
+                                    ? `✓ ${event.guestCount || 0} ضيف` 
+                                    : `${event.guestCount || 0} ضيف`
+                                  }
+                                </div>
+                              )
                             )}
                           </div>
                         </div>
@@ -561,19 +580,27 @@ export default function AdminEventsPage() {
                             <Eye className="w-4 h-4" />
                           </button>
                           
-                          {/* Guest Management Button - All Packages */}
+                          {/* Guest Management Button - All Packages.
+                              Classic events have no guest list, so the button
+                              tracks delivery of the cards to the customer. */}
                           {event.approvalStatus === 'approved' && (
                             <button
                               onClick={() => handleViewGuests(event.id)}
                               className={`p-2.5 text-white rounded-lg transition-colors duration-200 ${
-                                event.guestListConfirmed?.isConfirmed 
+                                (event.eventDetails.packageType === 'classic'
+                                  ? event.classicInvitationsDelivered?.isDelivered
+                                  : event.guestListConfirmed?.isConfirmed)
                                   ? 'bg-green-600 hover:bg-green-700' 
                                   : 'bg-yellow-600 hover:bg-yellow-700'
                               }`}
                               title={
-                                event.guestListConfirmed?.isConfirmed 
-                                  ? `إدارة الضيوف (${event.guestCount || 0} ضيف مؤكد - ${event.eventDetails.packageType})` 
-                                  : `إدارة الضيوف (${event.guestCount || 0} ضيف في انتظار التأكيد - ${event.eventDetails.packageType})`
+                                event.eventDetails.packageType === 'classic'
+                                  ? (event.classicInvitationsDelivered?.isDelivered
+                                      ? 'تسليم الدعوات (تم التسليم للعميل)'
+                                      : 'تسليم الدعوات (بانتظار التسليم للعميل)')
+                                  : event.guestListConfirmed?.isConfirmed 
+                                    ? `إدارة الضيوف (${event.guestCount || 0} ضيف مؤكد - ${event.eventDetails.packageType})` 
+                                    : `إدارة الضيوف (${event.guestCount || 0} ضيف في انتظار التأكيد - ${event.eventDetails.packageType})`
                               }
                             >
                               <Users className="w-4 h-4" />
