@@ -407,7 +407,11 @@ export const MyEventsPage: React.FC = () => {
                     <div className="flex items-center gap-2 text-gray-300 text-sm">
                       <Users className="w-4 h-4 text-[#C09B52]" />
                       {isOwner ? (
-                        `${totalGuests} من ${event.details.inviteCount} ضيف`
+                        // Classic events have no user-managed guest list, so only
+                        // the number of invitations in the package is shown.
+                        event.packageType === 'classic'
+                          ? `${event.details.inviteCount} دعوة`
+                          : `${totalGuests} من ${event.details.inviteCount} ضيف`
                       ) : (
                         `${event.usedInvites || 0} من ${event.allocatedInvites || 0} دعوة مخصصة`
                       )}
@@ -436,9 +440,11 @@ export const MyEventsPage: React.FC = () => {
                           <div className="text-[#C09B52] font-bold">
                             {event.totalPrice.toLocaleString('ar-SA')} ر.س
                           </div>
-                          <div className="text-xs text-gray-400">
-                            {event.guests.length} ضيف مضاف
-                          </div>
+                          {event.packageType !== 'classic' && (
+                            <div className="text-xs text-gray-400">
+                              {event.guests.length} ضيف مضاف
+                            </div>
+                          )}
                         </>
                       ) : (
                         <>

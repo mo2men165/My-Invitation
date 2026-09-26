@@ -23,6 +23,7 @@ interface EventDetailsProps {
       invitationText: string;
     };
     totalPrice?: number; // Make optional since it's filtered for collaborators
+    packageType: 'classic' | 'premium' | 'vip';
     adminNotes?: string;
     invitationCardUrl?: string;
     qrCodeReaderUrl?: string;
@@ -95,7 +96,11 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               <div>
                 <div className="text-white font-medium">عدد الدعوات</div>
                 <div className="text-gray-300 text-sm">
-                  {guestStats?.totalInvited || 0} من {totalInvitesForView} دعوة
+                  {/* Classic events have no user-managed guest list, so the
+                      invited/total progress is not meaningful there. */}
+                  {event.packageType === 'classic'
+                    ? `${totalInvitesForView} دعوة`
+                    : `${guestStats?.totalInvited || 0} من ${totalInvitesForView} دعوة`}
                 </div>
               </div>
             </div>

@@ -48,6 +48,7 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
   formatEventDate
 }) => {
   const ApprovalIcon = approvalStatusDetails.icon;
+  const isClassic = event.packageType === 'classic';
 
   return (
     <div className="space-y-6">
@@ -55,6 +56,14 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
       <div className="bg-gradient-to-br from-[#C09B52]/10 via-[#C09B52]/5 to-transparent rounded-2xl border border-[#C09B52]/20 p-4 sm:p-6">
         <h3 className="text-base sm:text-lg font-bold text-white mb-4">إحصائيات المناسبة</h3>
         
+        {/* Classic events have no user-managed guest list, so guest counters
+            would always read zero. Only the package size is relevant. */}
+        {isClassic ? (
+          <div className="flex justify-between items-center">
+            <span className="text-gray-300">عدد الدعوات</span>
+            <span className="text-[#C09B52] font-semibold">{totalInvitesForView}</span>
+          </div>
+        ) : (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <span className="text-gray-300">إجمالي الضيوف</span>
@@ -76,6 +85,7 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
             <span className="text-[#C09B52] font-semibold">{guestStats?.remainingInvites || 0}</span>
           </div>
         </div>
+        )}
         
         {/* Refundable Slots Info - Only for Premium and VIP */}
         {(event.packageType === 'premium' || event.packageType === 'vip') && event.refundableSlots && event.refundableSlots.total > 0 && (
@@ -101,6 +111,7 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
         )}
         
         {/* Progress Bar */}
+        {!isClassic && (
         <div className="mt-4">
           <div className="flex justify-between text-sm text-gray-400 mb-2">
             <span>التقدم</span>
@@ -115,6 +126,7 @@ export const EventSidebar: React.FC<EventSidebarProps> = ({
             />
           </div>
         </div>
+        )}
       </div>
 
       {/* Approval Status Info */}
