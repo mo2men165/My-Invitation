@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users2, AlertCircle, CheckSquare, Loader2, Send } from 'lucide-react';
+import { Users2, AlertCircle, CheckSquare, Loader2, Send, MessageCircle, ShieldCheck } from 'lucide-react';
 import { Guest } from '@/types/event';
 import { GuestForm } from './GuestForm';
 import { GuestList } from './GuestList';
@@ -65,6 +65,63 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
   remainingInvites
 }) => {
   const isVipConfirmed = event.packageType === 'vip' && event.guestListConfirmed.isConfirmed;
+
+  // Classic package: guests are handled entirely by our team, so there is no
+  // guest data entry here. We only explain how the invitations will arrive.
+  if (event.packageType === 'classic') {
+    return (
+      <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
+          <h3 className="text-base sm:text-lg font-bold text-white">الدعوات</h3>
+          <div className="text-xs sm:text-sm text-gray-400">
+            {event.details?.inviteCount || 0} دعوة
+          </div>
+        </div>
+
+        <div className="rounded-xl p-4 sm:p-5 bg-gradient-to-r from-[#C09B52]/15 to-[#C09B52]/5 border border-[#C09B52]/30">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#C09B52]/20 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5 text-[#C09B52]" />
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-bold text-[#C09B52]">فريقنا يتولى تجهيز دعواتك</h4>
+              <p className="text-sm text-gray-200 leading-relaxed">
+                في الباقة الكلاسيكية لا حاجة لإدخال بيانات ضيوفك. سيقوم فريقنا بتجهيز بطاقات
+                الدعوة الخاصة بمناسبتك وإرسالها إليك عبر الواتساب على رقمك المسجل، لتتمكن من
+                توزيعها على ضيوفك بالطريقة التي تناسبك.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl p-4 bg-white/[0.03] border border-white/10">
+            <div className="flex items-center gap-2 text-white font-medium text-sm mb-1">
+              <MessageCircle className="w-4 h-4 text-green-400" />
+              وصول الدعوات
+            </div>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              ترسل جميع الدعوات إليك عبر الواتساب بعد اكتمال تجهيز بطاقة الدعوة.
+            </p>
+          </div>
+
+          <div className="rounded-xl p-4 bg-white/[0.03] border border-white/10">
+            <div className="flex items-center gap-2 text-white font-medium text-sm mb-1">
+              <Users2 className="w-4 h-4 text-[#C09B52]" />
+              عدد الدعوات
+            </div>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              تحتوي باقتك على {event.details?.inviteCount || 0} دعوة يمكنك توزيعها على ضيوفك.
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs text-gray-500 leading-relaxed">
+          لأي استفسار أو طلب خاص بخصوص دعواتك، يسعد فريق الدعم بمساعدتك في أي وقت.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gradient-to-br from-white/[0.02] to-white/[0.05] rounded-2xl border border-white/10 p-4 sm:p-6">
@@ -147,7 +204,6 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
             <div>
               <h4 className="font-medium text-green-400">تم تأكيد قائمة الضيوف</h4>
               <p className="text-sm text-green-100">
-                {event.packageType === 'classic' && 'سنقوم بإرسال الدعوات إليك عبر الواتساب قريباً'}
                 {event.packageType === 'premium' && 'بعد إضافة الروابط الفردية يمكنك إرسال الدعوات'}
                 {event.packageType === 'vip' && 'فريقنا سيتولى إرسال الدعوات للضيوف قريباً'}
                 {event.guestListConfirmed.confirmedAt && 
@@ -163,12 +219,10 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
             <AlertCircle className="w-5 h-5 text-yellow-400" />
             <div>
               <h4 className="font-medium text-yellow-400">
-                {event.packageType === 'classic' && 'باقة كلاسيك'}
                 {event.packageType === 'premium' && 'باقة بريميوم'}
                 {event.packageType === 'vip' && 'باقة VIP'}
               </h4>
               <p className="text-sm text-yellow-100">
-                {event.packageType === 'classic' && 'أضف جميع ضيوفك ثم قم بتأكيد القائمة. سنقوم بإرسال الدعوات إليك عبر الواتساب'}
                 {event.packageType === 'premium' && 'أضف جميع ضيوفك وقم بتأكيد القائمة. بعدها سيتم إضافة الروابط الفردية لكل ضيف ويمكنك إرسال الدعوات'}
                 {event.packageType === 'vip' && 'أضف جميع ضيوفك ثم قم بتأكيد القائمة. فريقنا سيتولى إرسال الدعوات للضيوف نيابة عنك'}
               </p>
@@ -212,7 +266,6 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
               <div className="flex-1">
                 <h4 className="text-yellow-400 font-medium mb-1">تأكيد القائمة النهائية</h4>
                 <p className="text-yellow-100 text-sm mb-2">
-                  {event.packageType === 'classic' && 'بعد التأكيد، سنقوم بإرسال الدعوات إليك عبر الواتساب'}
                   {event.packageType === 'premium' && 'بعد التأكيد، سيتم إضافة الروابط الفردية لكل ضيف'}
                   {event.packageType === 'vip' && 'بعد التأكيد، سيقوم فريقنا بإرسال الدعوات لجميع الضيوف'}
                 </p>
