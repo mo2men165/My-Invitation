@@ -22,6 +22,8 @@ import {
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
 import ConfirmationModal from '@/components/cart/CartModal/components/ConfirmationModal';
+import { GuestInviteCards } from './GuestInviteCards';
+import { getMissingCardCount, hasAllCards } from '@/utils/guestCards';
 
 interface Guest {
   _id: string;
@@ -48,6 +50,14 @@ interface Guest {
     bytes: number;
     created_at: string;
   };
+  // One entry card per person on the invitation (index 0 is the guest)
+  individualInviteImages?: Array<{
+    public_id?: string;
+    secure_url?: string;
+    url?: string;
+  }>;
+  cardsRequired?: number;
+  cardsUploaded?: number;
   actuallyAttended?: boolean;
   attendanceMarkedAt?: string;
   attendanceMarkedBy?: string;
@@ -108,7 +118,7 @@ function AccompanyingCountBadge({ guest }: { guest: Guest }) {
   if (guest.conversationStage === 'awaiting_accompanying_count') {
     return (
       <span className="flex items-center space-x-1 px-2 py-1 bg-yellow-900/20 text-yellow-300 rounded text-xs">
-        <span>بانتظار تأكيد عدد المرافقين</span>
+        <span>بانتظار تأكيد عدد الحاضرين</span>
       </span>
     );
   }
@@ -135,12 +145,7 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
   const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState<string | null>(null);
   const [showVipOnly, setShowVipOnly] = useState(false);
-  const [editingImageForGuest, setEditingImageForGuest] = useState<string | null>(null);
-  const [inviteImageFile, setInviteImageFile] = useState<File | null>(null);
-  const [inviteImagePreview, setInviteImagePreview] = useState<string | null>(null);
-  const [updatingImage, setUpdatingImage] = useState(false);
   const [showReopenConfirmation, setShowReopenConfirmation] = useState(false);
-  const [guestToDeleteImage, setGuestToDeleteImage] = useState<Guest | null>(null);
   const [showSendRemindersConfirmation, setShowSendRemindersConfirmation] = useState(false);
   const [showSendThankYouConfirmation, setShowSendThankYouConfirmation] = useState(false);
   const [updatingDelivery, setUpdatingDelivery] = useState(false);
@@ -305,112 +310,6 @@ ${event.invitationText}
     } finally {
       setSendingMessage(null);
     }
-  };
-
-  const handleUpdateInviteImage = async (guest: Guest) => {
-    if (!event) return;
-
-    if (!inviteImageFile) {
-      toast({
-        title: "خطأ",
-        description: "يرجى اختيار صورة",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(inviteImageFile.type)) {
-      toast({
-        title: "خطأ",
-        description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate file size (10MB)
-    if (inviteImageFile.size > 10 * 1024 * 1024) {
-      toast({
-        title: "خطأ",
-        description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setUpdatingImage(true);
-      await adminAPI.updateGuestInviteImage(eventId, guest._id, inviteImageFile);
-      
-      // Reload to update UI
-      await loadEventGuests();
-      
-      // Reset editing state
-      setEditingImageForGuest(null);
-      setInviteImageFile(null);
-      setInviteImagePreview(null);
-      
-      toast({
-        title: "تم التحديث",
-        description: "تم تحديث صورة الدعوة الفردية بنجاح",
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "خطأ في تحديث الصورة",
-        description: error.message || "حدث خطأ غير متوقع",
-        variant: "destructive"
-      });
-    } finally {
-      setUpdatingImage(false);
-    }
-  };
-
-  const handleDeleteInviteImage = (guest: Guest) => {
-    if (!event) return;
-    setGuestToDeleteImage(guest);
-  };
-
-  const handleConfirmDeleteInviteImage = async () => {
-    const guest = guestToDeleteImage;
-    setGuestToDeleteImage(null);
-    if (!guest) return;
-
-    try {
-      setUpdatingImage(true);
-      await adminAPI.updateGuestInviteImage(eventId, guest._id, null);
-
-      // Reload to update UI
-      await loadEventGuests();
-
-      toast({
-        title: "تم الحذف",
-        description: "تم حذف صورة الدعوة الفردية بنجاح",
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "خطأ في حذف الصورة",
-        description: error.message || "حدث خطأ غير متوقع",
-        variant: "destructive"
-      });
-    } finally {
-      setUpdatingImage(false);
-    }
-  };
-
-  const handleStartEditingImage = (guest: Guest) => {
-    setEditingImageForGuest(guest._id);
-    setInviteImageFile(null);
-    setInviteImagePreview(null);
-  };
-
-  const handleCancelEditingImage = () => {
-    setEditingImageForGuest(null);
-    setInviteImageFile(null);
-    setInviteImagePreview(null);
   };
 
   const handleConfirmReopenGuestList = async () => {
@@ -812,7 +711,8 @@ ${event.invitationText}
               be run again safely to pick up whoever is left. */}
           {(() => {
             const unsentGuests = guests.filter(g => !g.whatsappMessageSent);
-            const guestsWithoutLinks = unsentGuests.filter(g => !g.individualInviteImage);
+            const guestsWithoutLinks = unsentGuests.filter(g => !hasAllCards(g));
+            const missingCards = guestsWithoutLinks.reduce((sum, g) => sum + getMissingCardCount(g), 0);
             const sendingInvitations = bulkSending === 'invitations';
 
             if (unsentGuests.length === 0) {
@@ -829,7 +729,7 @@ ${event.invitationText}
                 <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-4 flex items-center gap-3">
                   <AlertCircle className="w-5 h-5 text-yellow-400" />
                   <p className="text-yellow-100 text-sm">
-                    يجب إضافة صور الدعوات الفردية لجميع الضيوف ({guestsWithoutLinks.length} ضيف في انتظار الصورة) قبل إرسال الدعوات
+                    يجب إضافة بطاقة دخول لكل شخص ({guestsWithoutLinks.length} ضيف — {missingCards} بطاقة ناقصة) قبل إرسال الدعوات
                   </p>
                 </div>
               );
@@ -977,7 +877,7 @@ ${event.invitationText}
                       <h4 className="text-white font-medium">{guest.name}</h4>
                       <span className="text-gray-400 text-sm">+{guest.phone}</span>
                       <span className="text-gray-500 text-sm">
-                        ({guest.numberOfAccompanyingGuests} مرافق)
+                        ({guest.numberOfAccompanyingGuests} {guest.numberOfAccompanyingGuests === 1 ? 'شخص' : 'أشخاص'})
                       </span>
                     </div>
                     <div className="flex items-center space-x-2  mt-1">
@@ -993,140 +893,13 @@ ${event.invitationText}
                     </div>
                   </div>
 
-                  {/* Individual Invite Link Section (Premium & VIP only) */}
+                  {/* Entry cards, one per person on the invitation (Premium & VIP only) */}
                   {(event.packageType === 'premium' || event.packageType === 'vip') && (
-                    <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-600">
-                      {editingImageForGuest === guest._id ? (
-                        <div className="space-y-3">
-                          <label className="text-xs text-gray-400 block">صورة الدعوة الفردية</label>
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/jpg,image/png"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
-                              if (file) {
-                                // Validate file type
-                                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-                                if (!allowedTypes.includes(file.type)) {
-                                  toast({
-                                    title: "خطأ",
-                                    description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
-                                    variant: "destructive"
-                                  });
-                                  e.target.value = ''; // Clear the input
-                                  setInviteImageFile(null);
-                                  setInviteImagePreview(null);
-                                  return;
-                                }
-                                
-                                // Validate file size (10MB)
-                                if (file.size > 10 * 1024 * 1024) {
-                                  toast({
-                                    title: "خطأ",
-                                    description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
-                                    variant: "destructive"
-                                  });
-                                  e.target.value = ''; // Clear the input
-                                  setInviteImageFile(null);
-                                  setInviteImagePreview(null);
-                                  return;
-                                }
-                                
-                                setInviteImageFile(file);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setInviteImagePreview(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              } else {
-                                setInviteImageFile(null);
-                                setInviteImagePreview(null);
-                              }
-                            }}
-                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            الصيغ المدعومة: JPEG, PNG فقط (الحد الأقصى: 10 ميجابايت)
-                          </p>
-                          {inviteImagePreview && (
-                            <div className="mt-2">
-                              <p className="text-xs text-gray-400 mb-2">معاينة الصورة:</p>
-                              <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-700">
-                                <img
-                                  src={inviteImagePreview}
-                                  alt="Preview"
-                                  className="w-full h-auto max-h-32 object-contain"
-                                />
-                              </div>
-                            </div>
-                          )}
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => handleUpdateInviteImage(guest)}
-                              disabled={updatingImage || !inviteImageFile}
-                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                            >
-                              {updatingImage ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Check className="h-4 w-4" />
-                              )}
-                            </button>
-                            <button
-                              onClick={handleCancelEditingImage}
-                              disabled={updatingImage}
-                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">صورة الدعوة الفردية</span>
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => handleStartEditingImage(guest)}
-                                className="px-3 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600 transition-colors"
-                              >
-                                {guest.individualInviteImage ? 'تعديل' : 'إضافة'}
-                              </button>
-                              {guest.individualInviteImage && (
-                                <button
-                                  onClick={() => handleDeleteInviteImage(guest)}
-                                  disabled={updatingImage}
-                                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors disabled:opacity-50"
-                                >
-                                  حذف
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          {guest.individualInviteImage ? (
-                            <div className="mt-2">
-                              <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-700">
-                                <img
-                                  src={guest.individualInviteImage.secure_url || guest.individualInviteImage.url}
-                                  alt="Invite Card"
-                                  className="w-full h-auto max-h-32 object-contain"
-                                />
-                              </div>
-                              <a
-                                href={guest.individualInviteImage.secure_url || guest.individualInviteImage.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-400 hover:text-blue-300 mt-2 inline-block"
-                              >
-                                فتح الصورة
-                              </a>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-500">لم يتم تعيين صورة</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <GuestInviteCards
+                      eventId={eventId}
+                      guest={guest}
+                      onChanged={loadEventGuests}
+                    />
                   )}
                 </div>
                 
@@ -1311,17 +1084,6 @@ ${event.invitationText}
         confirmText="نعم، إعادة الفتح"
         cancelText="إلغاء"
         variant="warning"
-      />
-
-      <ConfirmationModal
-        isOpen={!!guestToDeleteImage}
-        onConfirm={handleConfirmDeleteInviteImage}
-        onCancel={() => setGuestToDeleteImage(null)}
-        title="حذف صورة الدعوة الفردية"
-        message="هل أنت متأكد من حذف صورة الدعوة الفردية؟"
-        confirmText="نعم، حذف"
-        cancelText="إلغاء"
-        variant="danger"
       />
 
       <ConfirmationModal

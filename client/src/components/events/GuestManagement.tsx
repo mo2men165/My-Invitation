@@ -1,6 +1,7 @@
 import React from 'react';
 import { Users2, AlertCircle, CheckSquare, Loader2, Send, MessageCircle, ShieldCheck } from 'lucide-react';
 import { Guest } from '@/types/event';
+import { getMissingCardCount, hasAllCards } from '@/utils/guestCards';
 import { GuestForm } from './GuestForm';
 import { GuestList } from './GuestList';
 
@@ -139,9 +140,10 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
       {event.packageType === 'premium' && guests.length > 0 && (
         event.guestListConfirmed.isConfirmed ? (
         <div className="mb-6">
-          {/* Check if all guests have individual invite links */}
+          {/* Every person on an invitation needs an entry card before sending */}
           {(() => {
-            const guestsWithoutLinks = guests.filter(g => !g.individualInviteImage);
+            const guestsWithoutLinks = guests.filter(g => !hasAllCards(g));
+            const missingCards = guestsWithoutLinks.reduce((sum, g) => sum + getMissingCardCount(g), 0);
             const canSendBulk = guestsWithoutLinks.length === 0;
             
             return canSendBulk ? (
@@ -174,9 +176,9 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
                 <div className="flex items-center gap-3">
                   <AlertCircle className="w-5 h-5 text-yellow-400" />
                   <div className="flex-1">
-                    <h4 className="text-yellow-400 font-medium text-sm">في انتظار الروابط الفردية</h4>
+                    <h4 className="text-yellow-400 font-medium text-sm">في انتظار بطاقات الدخول</h4>
                     <p className="text-yellow-100 text-xs mt-1">
-                      يجب إضافة روابط فردية لجميع الضيوف ({guestsWithoutLinks.length} ضيف في انتظار الرابط) قبل إرسال الدعوات
+                      يجب إضافة بطاقة دخول لكل شخص ({guestsWithoutLinks.length} ضيف — {missingCards} بطاقة ناقصة) قبل إرسال الدعوات
                     </p>
                   </div>
                 </div>

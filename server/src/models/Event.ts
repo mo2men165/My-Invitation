@@ -43,8 +43,14 @@ export interface IGuest {
     collaboratorName?: string;
     collaboratorEmail?: string;
   };
-  // Individual invite image for premium and VIP packages (optional)
+  // Individual invite image for premium and VIP packages (optional).
+  // Kept in sync with individualInviteImages[0] - the guest's own card - so
+  // existing guests and older readers keep working.
   individualInviteImage?: ICloudinaryImage;
+  // One entry card per person on this invitation: index 0 is the guest, 1..n-1
+  // are the accompanying guests. numberOfAccompanyingGuests is the total number
+  // of people, so that many cards are needed.
+  individualInviteImages?: ICloudinaryImage[];
   // Post-event attendance tracking (VIP only)
   actuallyAttended?: boolean;
   attendanceMarkedAt?: Date;
@@ -230,7 +236,8 @@ const guestSchema = new Schema<IGuest>({
       type: String
     }
   },
-  // Individual invite image for premium and VIP packages (optional)
+  // Individual invite image for premium and VIP packages (optional).
+  // Mirrors individualInviteImages[0], the guest's own card.
   individualInviteImage: {
     public_id: { type: String, required: false },
     secure_url: { type: String, required: false },
@@ -240,6 +247,20 @@ const guestSchema = new Schema<IGuest>({
     height: { type: Number, required: false },
     bytes: { type: Number, required: false },
     created_at: { type: String, required: false }
+  },
+  // One entry card per person on this invitation (index 0 is the guest).
+  individualInviteImages: {
+    type: [{
+      public_id: { type: String, required: false },
+      secure_url: { type: String, required: false },
+      url: { type: String, required: false },
+      format: { type: String, required: false },
+      width: { type: Number, required: false },
+      height: { type: Number, required: false },
+      bytes: { type: Number, required: false },
+      created_at: { type: String, required: false }
+    }],
+    default: undefined
   },
   // Post-event attendance tracking (VIP only)
   actuallyAttended: {

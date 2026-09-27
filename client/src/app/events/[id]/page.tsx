@@ -14,6 +14,7 @@ import {
   getCountryFromPhone 
 } from '@/utils/eventUtils';
 import { validatePhoneNumber, ALLOWED_COUNTRY_CODES, isCountryAllowed, getDisallowedCountryError } from '@/utils/phoneValidation';
+import { getMissingCardCount, hasAllCards } from '@/utils/guestCards';
 import { Loader2, Package } from 'lucide-react';
 import Link from 'next/link';
 
@@ -337,16 +338,18 @@ ${event.details.invitationText}
       unsentGuestIds: unsentGuests.map(g => g._id)
     });
 
-    // Check if all guests have individual images
-    const guestsWithoutLinks = unsentGuests.filter(g => !g.individualInviteImage);
+    // Every person on an invitation needs an entry card before sending
+    const guestsWithoutLinks = unsentGuests.filter(g => !hasAllCards(g));
     if (guestsWithoutLinks.length > 0) {
-      console.error('USER FRONTEND BULK: Some guests missing individual links', {
+      const missingCards = guestsWithoutLinks.reduce((sum, g) => sum + getMissingCardCount(g), 0);
+      console.error('USER FRONTEND BULK: Some guests missing entry cards', {
         count: guestsWithoutLinks.length,
+        missingCards,
         guestNames: guestsWithoutLinks.map(g => g.name)
       });
       toast({
         title: "خطأ",
-        description: `${guestsWithoutLinks.length} ضيف لا يملكون روابط فردية بعد`,
+        description: `${guestsWithoutLinks.length} ضيف بحاجة إلى بطاقات دخول (${missingCards} بطاقة ناقصة)`,
         variant: "destructive"
       });
       return;

@@ -28,7 +28,7 @@ const AccompanyingCountBadge: React.FC<{ guest: Guest }> = ({ guest }) => {
   if (guest.conversationStage === 'awaiting_accompanying_count') {
     return (
       <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
-        بانتظار تأكيد عدد المرافقين
+        بانتظار تأكيد عدد الحاضرين
       </span>
     );
   }

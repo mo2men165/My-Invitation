@@ -3,7 +3,7 @@ import axios from 'axios';
 import { logger } from '../config/logger';
 import { Event } from '../models/Event';
 import { Types } from 'mongoose';
-import { v4 as uuidv4 } from 'uuid';
+import { getCardUrl, getCardsToSend, getGuestCards, getInvitationSize } from '../utils/guestCards';
 
 // Type for bulk job message types
 export type BulkMessageType = 'invitation' | 'reminder' | 'thank-you';
@@ -565,8 +565,27 @@ export class WhatsappService {
   }
 
   /**
-   * Send confirmation message with invitation card and location links
-   * Template: invitation_message - sent after guest accepts RSVP
+   * Google Maps link for an event, however its location was captured.
+   */
+  private static buildMapsLink(event: any): string {
+    return event.details.locationCoordinates
+      ? `https://maps.google.com/?q=${event.details.locationCoordinates.lat},${event.details.locationCoordinates.lng}`
+      : event.details.googleMapsUrl || `https://maps.google.com/?q=${encodeURIComponent(event.details.eventLocation)}`;
+  }
+
+  /**
+   * Send the entry cards and the venue location after a guest confirms.
+   *
+   * These go out as free-form session messages, inside the 24-hour window the
+   * guest's own reply just opened. That matters for two reasons: an invitation
+   * covers several people and so needs a card each, which a single template
+   * (one media header) cannot carry; and a template combining an image header
+   * with a URL button renders the card as the button's link preview, so tapping
+   * the card opened Google Maps instead of the card. As separate messages, an
+   * image behaves like an image and the venue is a native map pin.
+   *
+   * sendConfirmationTemplate remains the fallback for when the window has
+   * closed, which is the case for guests the stale-reply cron defaults.
    */
   private static async sendConfirmationWithLinks(event: any, guest: any): Promise<void> {
     try {
@@ -576,44 +595,134 @@ export class WhatsappService {
         guestName: guest.name
       });
 
-      // Generate Google Maps link
-      const mapsLink = event.details.locationCoordinates 
-        ? `https://maps.google.com/?q=${event.details.locationCoordinates.lat},${event.details.locationCoordinates.lng}`
-        : event.details.googleMapsUrl || `https://maps.google.com/?q=${encodeURIComponent(event.details.eventLocation)}`;
+      const invitationSize = getInvitationSize(guest);
+      const confirmedCount = guest.confirmedAccompanyingGuests ?? invitationSize;
+      const cards = getCardsToSend(guest, confirmedCount).filter(card => !!getCardUrl(card));
 
-      logger.info('WHATSAPP CONFIRMATION: Maps link generated', { mapsLink });
-
-      // Use individual invite image for confirmation message
-      const individualImageUrl = guest.individualInviteImage?.secure_url || guest.individualInviteImage?.url || '';
-      
-      // Validate image URL - template requires IMAGE header
-      if (!individualImageUrl || !individualImageUrl.startsWith('http')) {
-        logger.error('WHATSAPP CONFIRMATION: Invalid individual invite image URL', {
+      if (cards.length === 0) {
+        logger.error('WHATSAPP CONFIRMATION: No usable entry cards for this guest', {
           eventId: event._id,
           guestId: guest._id,
-          imageUrl: individualImageUrl,
-          hasIndividualImage: !!guest.individualInviteImage,
-          hasSecureUrl: !!guest.individualInviteImage?.secure_url,
-          hasUrl: !!guest.individualInviteImage?.url
+          invitationSize,
+          confirmedCount
+        });
+        throw new Error('No entry cards uploaded for this guest');
+      }
+
+      if (cards.length < confirmedCount) {
+        logger.warn('WHATSAPP CONFIRMATION: Fewer cards on file than confirmed attendees', {
+          eventId: event._id,
+          guestId: guest._id,
+          confirmedCount,
+          cardsAvailable: cards.length
+        });
+      }
+
+      const eventDate = new Date(event.details.eventDate);
+      const formattedDate = eventDate.toLocaleDateString('ar-SA', {
+        calendar: 'gregory',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      const eventName = event.details.eventName || 'المناسبة';
+      const phone = guest.phone.replace(/^\+/, '');
+
+      // One card per attending person, each as its own image so it can be
+      // opened, saved and forwarded on its own.
+      for (let i = 0; i < cards.length; i++) {
+        const caption = i === 0
+          ? `بطاقة دخول ${guest.name}\n${eventName}\n${formattedDate}`
+          : `بطاقة دخول مرافق ${i} — ${guest.name}\n${eventName}\n${formattedDate}`;
+
+        await this.sendMessage({
+          messaging_product: 'whatsapp',
+          to: phone,
+          type: 'image',
+          image: {
+            link: getCardUrl(cards[i]),
+            caption
+          }
+        });
+
+        if (i < cards.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, this.BULK_MESSAGE_DELAY_MS));
+        }
+      }
+
+      // The venue as a map pin when we have coordinates: it opens in the guest's
+      // own maps app and cannot steal taps from the cards above.
+      const locationName = event.details.displayName || event.details.eventLocation;
+      if (event.details.locationCoordinates) {
+        await this.sendLocation(phone, event.details.locationCoordinates, locationName);
+      } else {
+        await this.sendMessage({
+          messaging_product: 'whatsapp',
+          to: phone,
+          type: 'text',
+          text: {
+            preview_url: true,
+            body: `موقع المناسبة: ${locationName}\n${this.buildMapsLink(event)}`
+          }
+        });
+      }
+
+      logger.info('=== WHATSAPP CONFIRMATION: Confirmation sent successfully ===', {
+        eventId: event._id,
+        guestName: guest.name,
+        guestPhone: guest.phone,
+        cardsSent: cards.length,
+        confirmedCount
+      });
+
+    } catch (error: any) {
+      const errorCode = error.response?.data?.error?.code;
+
+      logger.error('=== WHATSAPP CONFIRMATION: ERROR sending confirmation ===', {
+        error: error.message,
+        errorCode,
+        eventId: event._id,
+        guestId: guest._id
+      });
+
+      // 131047 / 470: outside the 24-hour customer service window, where only
+      // templates may be sent. The stale-reply cron lands here by definition.
+      if (errorCode === 131047 || errorCode === 470) {
+        logger.info('WHATSAPP CONFIRMATION: Session window closed, falling back to template', {
+          eventId: event._id,
+          guestId: guest._id
+        });
+        await this.sendConfirmationTemplate(event, guest);
+      }
+    }
+  }
+
+  /**
+   * Fallback confirmation: the approved invitation_message template, used when a
+   * free-form send is refused because the session window has closed. Carries the
+   * guest's own card only, since a template header holds a single image.
+   */
+  private static async sendConfirmationTemplate(event: any, guest: any): Promise<void> {
+    try {
+      const mapsLink = this.buildMapsLink(event);
+      const validImageUrl = getCardUrl(getGuestCards(guest)[0]);
+
+      if (!validImageUrl) {
+        logger.error('WHATSAPP CONFIRMATION TEMPLATE: Invalid individual invite image URL', {
+          eventId: event._id,
+          guestId: guest._id
         });
         throw new Error('Individual invite image URL is invalid or not accessible');
       }
 
-      // Ensure URL is HTTPS (WhatsApp requires HTTPS for images)
-      const validImageUrl = individualImageUrl.startsWith('https://') 
-        ? individualImageUrl 
-        : individualImageUrl.replace(/^http:\/\//, 'https://');
-
-      logger.info('WHATSAPP CONFIRMATION: Individual invite image validated', {
-        originalUrl: individualImageUrl,
-        validUrl: validImageUrl
+      const eventDate = new Date(event.details.eventDate);
+      const formattedDate = eventDate.toLocaleDateString('ar-SA', {
+        calendar: 'gregory',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       });
 
-      // Format event date
-      const eventDate = new Date(event.details.eventDate);
-      const formattedDate = eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'long', day: 'numeric' });
-
-      // Send template message with event details and location
       const messageData = {
         messaging_product: 'whatsapp',
         to: guest.phone.replace(/^\+/, ''),
@@ -671,24 +780,15 @@ export class WhatsappService {
         }
       };
 
-      logger.info('WHATSAPP CONFIRMATION: Sending confirmation message...', {
-        template: 'invitation_message',
-        to: guest.phone.replace(/^\+/, '')
-      });
-
       await this.sendMessage(messageData);
 
-      logger.info('=== WHATSAPP CONFIRMATION: Confirmation sent successfully ===', {
+      logger.info('=== WHATSAPP CONFIRMATION TEMPLATE: Sent successfully ===', {
         eventId: event._id,
-        guestName: guest.name,
-        guestPhone: guest.phone,
-        individualImageUrl
+        guestName: guest.name
       });
-
     } catch (error: any) {
-      logger.error('=== WHATSAPP CONFIRMATION: ERROR sending confirmation ===', {
+      logger.error('=== WHATSAPP CONFIRMATION TEMPLATE: ERROR ===', {
         error: error.message,
-        stack: error.stack,
         eventId: event._id,
         guestId: guest._id
       });
@@ -696,32 +796,26 @@ export class WhatsappService {
   }
 
   /**
-   * Send an interactive list message asking an accepted guest how many of their
-   * declared accompanying guests they're actually bringing (0..numberOfAccompanyingGuests).
+   * Send an interactive list message asking an accepted guest how many people are
+   * actually coming on their invitation (1..numberOfAccompanyingGuests, which is
+   * the total the invitation covers, the guest included).
    * Sent as a free-form session message (no template needed) since it's sent within the
    * 24-hour window the guest's own "confirm attendance" reply just opened.
    */
   private static async sendAccompanyingCountPrompt(event: any, guest: any, isRetry: boolean = false): Promise<void> {
     try {
-      const maxCount = guest.numberOfAccompanyingGuests;
+      const maxCount = getInvitationSize(guest);
       const rows: { id: string; title: string }[] = [];
 
-      // Meta's interactive list caps at 10 rows total; numberOfAccompanyingGuests can be up
-      // to 10, which would need 11 rows (0..10), so collapse the top two into one row.
-      if (maxCount >= 10) {
-        for (let i = 0; i <= 8; i++) {
-          rows.push({ id: `count_${i}`, title: `${i}` });
-        }
-        rows.push({ id: 'count_9_10', title: '9 أو 10' });
-      } else {
-        for (let i = 0; i <= maxCount; i++) {
-          rows.push({ id: `count_${i}`, title: `${i}` });
-        }
+      // The guest themself always attends, so the range starts at 1. An
+      // invitation covers at most 10 people, which fits Meta's 10-row cap.
+      for (let i = 1; i <= maxCount; i++) {
+        rows.push({ id: `count_${i}`, title: `${i}` });
       }
 
       const bodyText = isRetry
-        ? `لم أفهم ردك، من فضلك اختر عدد المرافقين الذين ستحضرهم من أصل ${maxCount}:`
-        : `تم تأكيد حضورك يا ${guest.name}! كم عدد المرافقين الذين ستحضرهم معك من أصل ${maxCount}؟`;
+        ? `لم أفهم ردك، من فضلك اختر عدد الأشخاص الذين سيحضرون من أصل ${maxCount}:`
+        : `تم تأكيد حضورك يا ${guest.name}! كم عدد الأشخاص الذين سيحضرون من أصل ${maxCount} (بما فيهم أنت)؟`;
 
       const messageData = {
         messaging_product: 'whatsapp',
@@ -734,7 +828,7 @@ export class WhatsappService {
             button: 'اختر العدد',
             sections: [
               {
-                title: 'عدد المرافقين',
+                title: 'عدد الأشخاص',
                 rows
               }
             ]
@@ -780,43 +874,6 @@ export class WhatsappService {
   }
 
   /**
-   * Sent when the guest tapped the merged "9 أو 10" row - asks them to type the exact number.
-   */
-  private static async sendAccompanyingCountClarification(event: any, guest: any): Promise<void> {
-    try {
-      const messageData = {
-        messaging_product: 'whatsapp',
-        to: guest.phone.replace(/^\+/, ''),
-        type: 'text',
-        text: {
-          body: 'من فضلك اكتب الرقم بالضبط: 9 أو 10'
-        }
-      };
-
-      const response = await this.sendMessage(messageData);
-      const sentMessageId = response.messages?.[0]?.id;
-
-      await Event.updateOne(
-        { _id: event._id, 'guests._id': guest._id },
-        {
-          $set: {
-            'guests.$.whatsappMessageId': sentMessageId,
-            'guests.$.conversationStage': 'awaiting_accompanying_count',
-            'guests.$.accompanyingCountPromptSentAt': new Date()
-          }
-        }
-      );
-    } catch (error: any) {
-      logger.error('=== WHATSAPP ACCOMPANYING COUNT: ERROR sending clarification ===', {
-        error: error.message,
-        stack: error.stack,
-        eventId: event._id,
-        guestId: guest._id
-      });
-    }
-  }
-
-  /**
    * Parse a guest's reply to the accompanying-count prompt into a validated count.
    * Prefers the unambiguous list_reply id; falls back to free text (digits, Arabic-Indic
    * digits, and common Arabic/English words for "none"/"all") for guests who type instead of tap.
@@ -825,16 +882,12 @@ export class WhatsappService {
     rawText: string,
     listReplyId: string | undefined,
     maxCount: number
-  ): { type: 'value'; value: number } | { type: 'ambiguous' } | { type: 'invalid' } {
-    if (listReplyId === 'count_9_10') {
-      return { type: 'ambiguous' };
-    }
-
+  ): { type: 'value'; value: number } | { type: 'invalid' } {
     if (listReplyId) {
       const match = listReplyId.match(/^count_(\d+)$/);
       if (match) {
         const n = parseInt(match[1], 10);
-        if (!isNaN(n) && n >= 0 && n <= maxCount) {
+        if (!isNaN(n) && n >= 1 && n <= maxCount) {
           return { type: 'value', value: n };
         }
       }
@@ -849,11 +902,12 @@ export class WhatsappService {
     const text = rawText.trim().replace(/[٠-٩]/g, (d) => String(arabicIndicDigits.indexOf(d)));
     const normalized = text.toLowerCase();
 
-    const noneWords = ['لا احد', 'لا أحد', 'ولا حد', 'ولا أحد', 'صفر', 'لا يوجد', 'none', 'no one'];
+    // "nobody else" still means the guest themself is coming: one person.
+    const aloneWords = ['لا احد', 'لا أحد', 'ولا حد', 'ولا أحد', 'لا يوجد', 'بمفردي', 'وحدي', 'none', 'no one', 'alone'];
     const allWords = ['الكل', 'كلهم', 'الجميع', 'all', 'everyone'];
 
-    if (noneWords.some(w => normalized.includes(w))) {
-      return { type: 'value', value: 0 };
+    if (aloneWords.some(w => normalized.includes(w))) {
+      return { type: 'value', value: 1 };
     }
     if (allWords.some(w => normalized.includes(w))) {
       return { type: 'value', value: maxCount };
@@ -862,7 +916,7 @@ export class WhatsappService {
     const digitMatch = text.match(/\d+/);
     if (digitMatch) {
       const n = parseInt(digitMatch[0], 10);
-      if (!isNaN(n) && n >= 0 && n <= maxCount) {
+      if (!isNaN(n) && n >= 1 && n <= maxCount) {
         return { type: 'value', value: n };
       }
     }
@@ -882,7 +936,7 @@ export class WhatsappService {
     listReplyId: string | undefined
   ): Promise<void> {
     try {
-      const maxCount = guest.numberOfAccompanyingGuests;
+      const maxCount = getInvitationSize(guest);
       const parsed = this.parseAccompanyingCountReply(messageText, listReplyId, maxCount);
 
       logger.info('WHATSAPP ACCOMPANYING COUNT: Processing response', {
@@ -892,11 +946,6 @@ export class WhatsappService {
         listReplyId,
         parsedType: parsed.type
       });
-
-      if (parsed.type === 'ambiguous') {
-        await this.sendAccompanyingCountClarification(event, guest);
-        return;
-      }
 
       if (parsed.type === 'invalid') {
         logger.warn('WHATSAPP ACCOMPANYING COUNT: Could not parse reply, re-prompting', {

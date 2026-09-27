@@ -32,6 +32,10 @@ export interface Guest {
     collaboratorEmail?: string;
   };
   individualInviteImage?: CloudinaryImage;
+  // One entry card per person on the invitation: index 0 is the guest, the rest
+  // are the accompanying guests. Older guests only have individualInviteImage,
+  // which is read as index 0.
+  individualInviteImages?: CloudinaryImage[];
   actuallyAttended?: boolean;
   attendanceMarkedAt?: string;
   attendanceMarkedBy?: string;

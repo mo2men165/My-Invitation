@@ -500,13 +500,20 @@ export const adminAPI = {
   },
 
   // Update Guest Individual Invite Image (premium and VIP only)
-  async updateGuestInviteImage(eventId: string, guestId: string, individualInviteImage: File | null): Promise<void> {
+  // Set or remove one of a guest's entry cards. Slot 0 is the guest's own card,
+  // slots 1..n-1 belong to the accompanying guests on the same invitation.
+  async updateGuestInviteImage(
+    eventId: string,
+    guestId: string,
+    individualInviteImage: File | null,
+    slot = 0
+  ): Promise<void> {
     const formData = new FormData();
     if (individualInviteImage) {
       formData.append('image', individualInviteImage);
     }
 
-    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/guests/${guestId}/invite-image`, {
+    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/guests/${guestId}/invite-image/${slot}`, {
       method: 'PUT',
       headers: getAuthHeaders(false), // Don't include Content-Type, let browser set it with boundary
       body: formData

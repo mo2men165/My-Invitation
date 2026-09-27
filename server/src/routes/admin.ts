@@ -20,6 +20,7 @@ import { PackageImage } from '../models/PackageImage';
 // build layouts. A static import is rewritten by each compiler and works in both.
 import { OrderService } from '../services/orderService';
 import { WhatsappService } from '../services/whatsappService';
+import { getGuestCards, getInvitationSize, getMissingCardCount, hasAllCards } from '../utils/guestCards';
 
 
 const router = Router();
@@ -792,6 +793,9 @@ router.get('/events/:eventId/guests', withDB(async (req: Request, res: Response)
     // Format guests with added by information
     const formattedGuests = guestsToShow.map(guest => ({
       ...guest,
+      // A guest's invitation needs one entry card per person it covers.
+      cardsRequired: getInvitationSize(guest),
+      cardsUploaded: getGuestCards(guest).length,
       addedByInfo: guest.addedBy ? {
         type: guest.addedBy.type,
         isOwner: guest.addedBy.type === 'owner',
@@ -934,12 +938,23 @@ router.post('/events/:eventId/guests/:guestId/whatsapp', withDB(async (req: Requ
 }));
 
 /**
- * PUT /api/admin/events/:eventId/guests/:guestId/invite-image
- * Update individual invite image for a guest (premium and VIP packages only)
+ * PUT /api/admin/events/:eventId/guests/:guestId/invite-image[/:slot]
+ * Set or remove one of a guest's entry cards (premium and VIP packages only).
+ *
+ * A guest's invitation covers numberOfAccompanyingGuests people, so it needs
+ * that many cards: slot 0 is the guest's own card and slots 1..n-1 belong to the
+ * accompanying guests. Omitting the slot targets slot 0, which is what the
+ * single-card version of this endpoint used to do.
  */
-router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, withDB(async (req: Request, res: Response) => {
+router.put(
+  [
+    '/events/:eventId/guests/:guestId/invite-image',
+    '/events/:eventId/guests/:guestId/invite-image/:slot'
+  ],
+  uploadSingleImage,
+  withDB(async (req: Request, res: Response) => {
   try {
-    const { eventId, guestId } = req.params;
+    const { eventId, guestId, slot } = req.params;
     const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
     const adminId = req.user!.id;
     const file = req.file;
@@ -968,29 +983,68 @@ router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, w
       });
     }
 
-    // If no file provided, delete the existing image
-    if (!file) {
-      // Delete old image if it exists
-      if (guest.individualInviteImage?.public_id) {
-        try {
-          await CloudinaryService.deleteImage(guest.individualInviteImage.public_id);
-        } catch (deleteError) {
-          logger.warn('Failed to delete old guest invite image:', deleteError);
-        }
+    const slotIndex = Number(Array.isArray(slot) ? slot[0] : slot ?? 0);
+    const invitationSize = getInvitationSize(guest);
+
+    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= invitationSize) {
+      return res.status(400).json({
+        success: false,
+        error: { message: `رقم البطاقة غير صحيح. هذه الدعوة تحتاج ${invitationSize} بطاقة` }
+      });
+    }
+
+    // Start from whatever is on file, including the older single-image shape.
+    const cards = getGuestCards(guest);
+    const replacedCard = cards[slotIndex];
+
+    // Cards are stored densely - slot n is the nth card - so a slot can only be
+    // filled once the ones before it are, and removing one shifts the rest down.
+    if (req.file && slotIndex > cards.length) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'يجب إضافة البطاقات بالترتيب' }
+      });
+    }
+
+    const persist = async () => {
+      // Trailing empty slots are dropped so a card count always reflects reality.
+      while (cards.length > 0 && !cards[cards.length - 1]) {
+        cards.pop();
       }
-      
-      // Remove the image field
-      delete guest.individualInviteImage;
+
+      guest.individualInviteImages = cards.length > 0 ? cards : undefined;
+      // Keep the legacy single field pointing at the guest's own card.
+      guest.individualInviteImage = cards[0];
       guest.updatedAt = new Date();
-      // Mark the guests array as modified so Mongoose saves the change
       event.markModified('guests');
       await event.save();
+    };
 
-      logger.info(`Admin ${adminId} removed invite image for guest ${guestId} in event ${eventId}`);
+    const removeReplacedImage = async () => {
+      if (!replacedCard?.public_id) {
+        return;
+      }
+      try {
+        await CloudinaryService.deleteImage(replacedCard.public_id);
+      } catch (deleteError) {
+        logger.warn('Failed to delete old guest invite image:', deleteError);
+        // Don't fail the request if deletion fails
+      }
+    };
+
+    // If no file provided, delete the card in this slot
+    if (!file) {
+      await removeReplacedImage();
+
+      // Slots after this one shift down, so the remaining cards stay contiguous.
+      cards.splice(slotIndex, 1);
+      await persist();
+
+      logger.info(`Admin ${adminId} removed invite card ${slotIndex} for guest ${guestId} in event ${eventId}`);
 
       return res.json({
         success: true,
-        message: 'تم حذف صورة الدعوة الفردية بنجاح',
+        message: 'تم حذف صورة الدعوة بنجاح',
         data: { guest }
       });
     }
@@ -1015,7 +1069,7 @@ router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, w
         }
       );
 
-      const individualInviteImage = {
+      const uploadedCard = {
         public_id: uploadResult.public_id,
         secure_url: uploadResult.secure_url,
         url: uploadResult.url,
@@ -1026,26 +1080,16 @@ router.put('/events/:eventId/guests/:guestId/invite-image', uploadSingleImage, w
         created_at: uploadResult.created_at
       };
 
-      // Delete old image if it exists
-      if (guest.individualInviteImage?.public_id) {
-        try {
-          await CloudinaryService.deleteImage(guest.individualInviteImage.public_id);
-        } catch (deleteError) {
-          logger.warn('Failed to delete old guest invite image:', deleteError);
-          // Don't fail the request if deletion fails
-        }
-      }
+      await removeReplacedImage();
 
-      // Update the individual invite image
-      guest.individualInviteImage = individualInviteImage;
-      guest.updatedAt = new Date();
-      await event.save();
+      cards[slotIndex] = uploadedCard;
+      await persist();
 
-      logger.info(`Admin ${adminId} updated invite image for guest ${guestId} in event ${eventId}`);
+      logger.info(`Admin ${adminId} updated invite card ${slotIndex} for guest ${guestId} in event ${eventId}`);
 
       return res.json({
         success: true,
-        message: 'تم تحديث صورة الدعوة الفردية بنجاح',
+        message: 'تم تحديث صورة الدعوة بنجاح',
         data: { guest }
       });
     } catch (uploadError: any) {
@@ -1289,6 +1333,21 @@ router.post('/events/:eventId/send-invitations', withDB(async (req: Request, res
     const recipientIds: string[] = Array.isArray(guestIds) && guestIds.length > 0
       ? guestIds
       : event.guests.filter(g => !g.whatsappMessageSent).map(g => g._id!.toString());
+
+    // Every person on an invitation needs a card before it can go out.
+    const guestsMissingCards = event.guests.filter(
+      g => recipientIds.includes(g._id!.toString()) && !hasAllCards(g)
+    );
+
+    if (guestsMissingCards.length > 0) {
+      const missingTotal = guestsMissingCards.reduce((sum, g) => sum + getMissingCardCount(g), 0);
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: `${guestsMissingCards.length} ضيف بحاجة إلى صور دعوات (${missingTotal} بطاقة ناقصة) قبل الإرسال`
+        }
+      });
+    }
 
     if (recipientIds.length === 0) {
       return res.json({
