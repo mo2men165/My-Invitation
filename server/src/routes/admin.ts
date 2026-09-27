@@ -1251,6 +1251,77 @@ router.put('/events/:eventId/guests/:guestId/attendance', withDB(async (req: Req
 }));
 
 /**
+ * POST /api/admin/events/:eventId/send-invitations
+ * Send invitations to guests of a premium/VIP event, one chunk per request.
+ * The caller repeats the request with the returned remainingGuestIds until the
+ * list is empty; guests already marked as sent are skipped when no explicit
+ * guestIds are given.
+ */
+router.post('/events/:eventId/send-invitations', withDB(async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
+    const adminId = req.user!.id;
+    const { guestIds, limit } = req.body ?? {};
+
+    const event = await Event.findById(eventIdString);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    if (event.packageType !== 'premium' && event.packageType !== 'vip') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'إرسال الدعوات عبر الواتساب متاح فقط لباقات Premium و VIP' }
+      });
+    }
+
+    if (!event.guestListConfirmed?.isConfirmed) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'لم يتم تأكيد قائمة الضيوف بعد' }
+      });
+    }
+
+    const recipientIds: string[] = Array.isArray(guestIds) && guestIds.length > 0
+      ? guestIds
+      : event.guests.filter(g => !g.whatsappMessageSent).map(g => g._id!.toString());
+
+    if (recipientIds.length === 0) {
+      return res.json({
+        success: true,
+        message: 'تم إرسال الدعوات لجميع الضيوف مسبقاً',
+        data: { success: true, sent: 0, failed: 0, results: [], remainingGuestIds: [] }
+      });
+    }
+
+    const result = await WhatsappService.sendBulkInvitations(eventIdString, recipientIds, limit);
+
+    logger.info(`Admin ${adminId} sent invitations chunk for event ${eventId}`, {
+      sent: result.sent,
+      failed: result.failed,
+      remaining: result.remainingGuestIds.length
+    });
+
+    return res.json({
+      success: true,
+      message: `تم إرسال ${result.sent} دعوة`,
+      data: result
+    });
+
+  } catch (error) {
+    logger.error('Error sending invitations:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في إرسال الدعوات' }
+    });
+  }
+}));
+
+/**
  * POST /api/admin/events/:eventId/send-reminders
  * Send reminder messages to all confirmed guests (Premium: 3 days, VIP: 5 days)
  */
@@ -1276,27 +1347,20 @@ router.post('/events/:eventId/send-reminders', withDB(async (req: Request, res: 
       });
     }
 
-    const result = await WhatsappService.sendEventReminders(eventIdString);
+    const { guestIds, limit } = req.body ?? {};
+    const result = await WhatsappService.sendEventReminders(eventIdString, guestIds, limit);
 
-    logger.info(`Admin ${adminId} triggered reminders for event ${eventId}`, result);
+    logger.info(`Admin ${adminId} sent reminders chunk for event ${eventId}`, {
+      sent: result.sent,
+      failed: result.failed,
+      remaining: result.remainingGuestIds.length
+    });
 
-    // Check if result is a queued job response
-    if ('jobId' in result) {
-      return res.json({
-        success: true,
-        message: `تم جدولة المهمة بنجاح. سيتم إرسال تذكيرات لـ ${result.guestCount} ضيف.`,
-        data: {
-          jobId: result.jobId,
-          guestCount: result.guestCount,
-          status: 'queued'
-        }
-      });
-    }
-
-    // Fallback for empty guest list case
     return res.json({
       success: true,
-      message: 'لا يوجد ضيوف مؤكدين لإرسال التذكيرات لهم',
+      message: result.sent > 0
+        ? `تم إرسال ${result.sent} تذكير`
+        : 'لا يوجد ضيوف مؤكدين لإرسال التذكيرات لهم',
       data: result
     });
 
@@ -1335,27 +1399,20 @@ router.post('/events/:eventId/send-thank-you', withDB(async (req: Request, res: 
       });
     }
 
-    const result = await WhatsappService.sendThankYouMessages(eventIdString);
+    const { guestIds, limit } = req.body ?? {};
+    const result = await WhatsappService.sendThankYouMessages(eventIdString, guestIds, limit);
 
-    logger.info(`Admin ${adminId} triggered thank you messages for event ${eventId}`, result);
+    logger.info(`Admin ${adminId} sent thank you chunk for event ${eventId}`, {
+      sent: result.sent,
+      failed: result.failed,
+      remaining: result.remainingGuestIds.length
+    });
 
-    // Check if result is a queued job response
-    if ('jobId' in result) {
-      return res.json({
-        success: true,
-        message: `تم جدولة المهمة بنجاح. سيتم إرسال رسائل شكر لـ ${result.guestCount} ضيف.`,
-        data: {
-          jobId: result.jobId,
-          guestCount: result.guestCount,
-          status: 'queued'
-        }
-      });
-    }
-
-    // Fallback for empty guest list case
     return res.json({
       success: true,
-      message: 'لا يوجد ضيوف حضروا لإرسال رسائل الشكر لهم',
+      message: result.sent > 0
+        ? `تم إرسال ${result.sent} رسالة شكر`
+        : 'لا يوجد ضيوف حضروا لإرسال رسائل الشكر لهم',
       data: result
     });
 

@@ -144,6 +144,9 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
   const [showSendRemindersConfirmation, setShowSendRemindersConfirmation] = useState(false);
   const [showSendThankYouConfirmation, setShowSendThankYouConfirmation] = useState(false);
   const [updatingDelivery, setUpdatingDelivery] = useState(false);
+  const [bulkSending, setBulkSending] = useState<null | 'invitations' | 'reminders' | 'thank-you'>(null);
+  const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
+  const [showSendInvitationsConfirmation, setShowSendInvitationsConfirmation] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -429,66 +432,86 @@ ${event.invitationText}
     }
   };
 
-  const handleConfirmSendReminders = async () => {
-    setShowSendRemindersConfirmation(false);
+  /**
+   * Bulk sends run a chunk per request, so the summary only arrives once every
+   * chunk is done. Progress is surfaced on the button while it runs.
+   */
+  const runBulkSend = async (
+    kind: 'invitations' | 'reminders' | 'thank-you',
+    send: (onProgress: (p: { sent: number; total: number }) => void) => Promise<{
+      sent: number;
+      failed: number;
+      total: number;
+      failures: Array<{ guestId: string; error?: string }>;
+    }>,
+    labels: { done: string; partial: string; failed: string; unit: string }
+  ) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/events/${eventId}/send-reminders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
+      setBulkSending(kind);
+      setBulkProgress({ sent: 0, total: 0 });
 
-      const result = await response.json();
+      const summary = await send(p => setBulkProgress({ sent: p.sent, total: p.total }));
 
-      if (response.ok) {
+      if (summary.total === 0) {
         toast({
-          title: "تم إرسال التذكيرات",
-          description: result.message,
+          title: "لا يوجد ضيوف",
+          description: `لا يوجد ضيوف مؤهلين لإرسال ${labels.unit}`,
+          variant: "default"
+        });
+      } else if (summary.failed === 0) {
+        toast({
+          title: labels.done,
+          description: `تم إرسال ${summary.sent} ${labels.unit}`,
           variant: "default"
         });
       } else {
-        throw new Error(result.error?.message);
+        toast({
+          title: summary.sent > 0 ? labels.partial : labels.failed,
+          description: `تم إرسال ${summary.sent} من ${summary.total}. فشل ${summary.failed}: ${
+            summary.failures[0]?.error || 'خطأ غير معروف'
+          }`,
+          variant: summary.sent > 0 ? "default" : "destructive"
+        });
       }
+
+      await loadEventGuests();
     } catch (error: any) {
       toast({
         title: "خطأ",
-        description: error.message || "فشل في إرسال التذكيرات",
+        description: error.message || `فشل في إرسال ${labels.unit}`,
         variant: "destructive"
       });
+    } finally {
+      setBulkSending(null);
+      setBulkProgress(null);
     }
+  };
+
+  const handleConfirmSendInvitations = async () => {
+    setShowSendInvitationsConfirmation(false);
+    await runBulkSend(
+      'invitations',
+      onProgress => adminAPI.sendEventInvitations(eventId, onProgress),
+      { done: "تم إرسال الدعوات", partial: "تم إرسال بعض الدعوات", failed: "فشل إرسال الدعوات", unit: "دعوة" }
+    );
+  };
+
+  const handleConfirmSendReminders = async () => {
+    setShowSendRemindersConfirmation(false);
+    await runBulkSend(
+      'reminders',
+      onProgress => adminAPI.sendEventReminders(eventId, onProgress),
+      { done: "تم إرسال التذكيرات", partial: "تم إرسال بعض التذكيرات", failed: "فشل إرسال التذكيرات", unit: "تذكير" }
+    );
   };
 
   const handleConfirmSendThankYou = async () => {
     setShowSendThankYouConfirmation(false);
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/events/${eventId}/send-thank-you`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        toast({
-          title: "تم إرسال رسائل الشكر",
-          description: result.message,
-          variant: "default"
-        });
-      } else {
-        throw new Error(result.error?.message);
-      }
-    } catch (error: any) {
-      toast({
-        title: "خطأ",
-        description: error.message || "فشل في إرسال رسائل الشكر",
-        variant: "destructive"
-      });
-    }
+    await runBulkSend(
+      'thank-you',
+      onProgress => adminAPI.sendThankYouMessages(eventId, onProgress),
+      { done: "تم إرسال رسائل الشكر", partial: "تم إرسال بعض الرسائل", failed: "فشل إرسال رسائل الشكر", unit: "رسالة شكر" }
+    );
   };
 
   const handleToggleClassicDelivery = async (delivered: boolean) => {
@@ -784,26 +807,102 @@ ${event.invitationText}
 
       {/* Premium/VIP Bulk Actions */}
       {(event.packageType === 'premium' || event.packageType === 'vip') && event.guestListConfirmed?.isConfirmed && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {/* Send Reminders Button */}
-          <button
-            onClick={() => setShowSendRemindersConfirmation(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
-          >
-            <Send className="w-4 h-4" />
-            إرسال تذكيرات للضيوف
-          </button>
+        <div className="space-y-4 mb-6">
+          {/* Send All Invitations. Guests already sent are skipped, so this can
+              be run again safely to pick up whoever is left. */}
+          {(() => {
+            const unsentGuests = guests.filter(g => !g.whatsappMessageSent);
+            const guestsWithoutLinks = unsentGuests.filter(g => !g.individualInviteImage);
+            const sendingInvitations = bulkSending === 'invitations';
 
-          {/* Send Thank You Messages Button (VIP only) */}
-          {event.packageType === 'vip' && (
+            if (unsentGuests.length === 0) {
+              return (
+                <div className="bg-green-900/20 border border-green-700/30 rounded-lg p-4 flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                  <p className="text-green-100 text-sm">تم إرسال الدعوات لجميع الضيوف</p>
+                </div>
+              );
+            }
+
+            if (guestsWithoutLinks.length > 0) {
+              return (
+                <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-4 flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-400" />
+                  <p className="text-yellow-100 text-sm">
+                    يجب إضافة صور الدعوات الفردية لجميع الضيوف ({guestsWithoutLinks.length} ضيف في انتظار الصورة) قبل إرسال الدعوات
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <button
+                onClick={() => setShowSendInvitationsConfirmation(true)}
+                disabled={!!bulkSending}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200"
+              >
+                {sendingInvitations ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {bulkProgress && bulkProgress.total > 0
+                      ? `جاري الإرسال... ${bulkProgress.sent} من ${bulkProgress.total}`
+                      : 'جاري الإرسال...'}
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    إرسال جميع الدعوات عبر الواتساب ({unsentGuests.length} دعوة)
+                  </>
+                )}
+              </button>
+            );
+          })()}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Send Reminders Button */}
             <button
-              onClick={() => setShowSendThankYouConfirmation(true)}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200"
+              onClick={() => setShowSendRemindersConfirmation(true)}
+              disabled={!!bulkSending}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200"
             >
-              <MessageSquare className="w-4 h-4" />
-              إرسال رسائل شكر
+              {bulkSending === 'reminders' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {bulkProgress && bulkProgress.total > 0
+                    ? `جاري الإرسال... ${bulkProgress.sent} من ${bulkProgress.total}`
+                    : 'جاري الإرسال...'}
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  إرسال تذكيرات للضيوف
+                </>
+              )}
             </button>
-          )}
+
+            {/* Send Thank You Messages Button (VIP only) */}
+            {event.packageType === 'vip' && (
+              <button
+                onClick={() => setShowSendThankYouConfirmation(true)}
+                disabled={!!bulkSending}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200"
+              >
+                {bulkSending === 'thank-you' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {bulkProgress && bulkProgress.total > 0
+                      ? `جاري الإرسال... ${bulkProgress.sent} من ${bulkProgress.total}`
+                      : 'جاري الإرسال...'}
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-4 h-4" />
+                    إرسال رسائل شكر
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -1223,6 +1322,17 @@ ${event.invitationText}
         confirmText="نعم، حذف"
         cancelText="إلغاء"
         variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={showSendInvitationsConfirmation}
+        onConfirm={handleConfirmSendInvitations}
+        onCancel={() => setShowSendInvitationsConfirmation(false)}
+        title="إرسال جميع الدعوات"
+        message="هل تريد إرسال الدعوات عبر الواتساب لجميع الضيوف الذين لم تُرسل لهم دعوات بعد؟"
+        confirmText="نعم، إرسال"
+        cancelText="إلغاء"
+        variant="warning"
       />
 
       <ConfirmationModal

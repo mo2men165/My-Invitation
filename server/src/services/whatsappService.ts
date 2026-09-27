@@ -8,16 +8,29 @@ import { v4 as uuidv4 } from 'uuid';
 // Type for bulk job message types
 export type BulkMessageType = 'invitation' | 'reminder' | 'thank-you';
 
-// Interface for queued job response
-export interface QueuedJobResponse {
+// Result of processing one chunk of a bulk job. remainingGuestIds is what the
+// caller passes back to send the next chunk; an empty array means it is done.
+export interface BulkChunkResult {
   success: boolean;
-  jobId: string;
-  message: string;
-  guestCount: number;
+  sent: number;
+  failed: number;
+  results: Array<{
+    guestId: string;
+    success: boolean;
+    error?: string;
+    messageId?: string;
+  }>;
+  remainingGuestIds: string[];
 }
 
 export class WhatsappService {
   private static readonly WHATSAPP_API_URL = 'https://graph.facebook.com/v18.0';
+
+  // How many guests one bulk request handles. Kept small so a chunk finishes
+  // well inside the serverless function timeout; the caller loops for the rest.
+  private static readonly DEFAULT_BULK_CHUNK_SIZE = 10;
+  private static readonly MAX_BULK_CHUNK_SIZE = 25;
+  private static readonly BULK_MESSAGE_DELAY_MS = 250;
   
   // Lazy getters for environment variables - ensures they're read at runtime, not module load
   private static get PHONE_NUMBER_ID(): string | undefined {
@@ -1563,91 +1576,115 @@ export class WhatsappService {
   }
 
   /**
-   * Queue a bulk WhatsApp job for background processing
+   * Send one chunk of a bulk WhatsApp job, in this request.
+   *
+   * Bulk sending used to be handed to a Vercel background function over an
+   * un-awaited HTTP call to the deployment's own URL. That call never arrived:
+   * the path is rewritten to the Express app, which has no such route, and a
+   * serverless instance may be frozen before an un-awaited request is even
+   * dispatched. Sending now happens in-process, a chunk per request, so the
+   * caller keeps control (and can report progress) while each request stays
+   * well inside the function timeout.
    */
-  private static queueBulkJob(
+  static async processBulkChunk(
     eventId: string,
     guestIds: string[],
-    messageType: BulkMessageType
-  ): QueuedJobResponse {
-    const jobId = uuidv4();
-    
-    logger.info('=== WHATSAPP QUEUE: Job queued for background processing ===', {
-      jobId,
+    messageType: BulkMessageType,
+    limit: number = this.DEFAULT_BULK_CHUNK_SIZE
+  ): Promise<BulkChunkResult> {
+    const chunkSize = Math.max(1, Math.min(limit, this.MAX_BULK_CHUNK_SIZE));
+    const chunk = guestIds.slice(0, chunkSize);
+    const remainingGuestIds = guestIds.slice(chunk.length);
+
+    logger.info('=== WHATSAPP BULK CHUNK: Starting ===', {
       eventId,
       messageType,
-      guestCount: guestIds.length,
+      chunkSize: chunk.length,
+      remaining: remainingGuestIds.length,
       timestamp: new Date().toISOString()
     });
 
-    // Trigger background function (fire and forget)
-    this.triggerBackgroundJob(jobId, eventId, guestIds, messageType);
+    const results: BulkChunkResult['results'] = [];
+    let sent = 0;
+    let failed = 0;
+
+    for (let i = 0; i < chunk.length; i++) {
+      const guestId = chunk[i];
+
+      try {
+        let result: { success: boolean; data?: any; error?: string };
+
+        switch (messageType) {
+          case 'invitation':
+            result = await this.sendInvitation(eventId, guestId);
+            break;
+          case 'reminder':
+            result = await this.sendReminderMessage(eventId, guestId);
+            break;
+          case 'thank-you':
+            result = await this.sendThankYouMessage(eventId, guestId);
+            break;
+          default:
+            result = { success: false, error: `Unknown message type: ${messageType}` };
+        }
+
+        if (result.success) {
+          sent++;
+          results.push({ guestId, success: true, messageId: result.data?.messageId });
+        } else {
+          failed++;
+          logger.error('WHATSAPP BULK CHUNK: Guest failed', { eventId, guestId, error: result.error });
+          results.push({ guestId, success: false, error: result.error });
+        }
+      } catch (error: any) {
+        failed++;
+        logger.error('WHATSAPP BULK CHUNK: Guest threw', {
+          eventId,
+          guestId,
+          error: error.message
+        });
+        results.push({ guestId, success: false, error: error.message });
+      }
+
+      // Space the messages out slightly to stay friendly with the WhatsApp API
+      // rate limits, without making a chunk take long enough to time out.
+      if (i < chunk.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, this.BULK_MESSAGE_DELAY_MS));
+      }
+    }
+
+    logger.info('=== WHATSAPP BULK CHUNK: Complete ===', {
+      eventId,
+      messageType,
+      sent,
+      failed,
+      remaining: remainingGuestIds.length
+    });
 
     return {
-      success: true,
-      jobId,
-      message: `Job queued successfully. ${guestIds.length} guests will be processed in background.`,
-      guestCount: guestIds.length
+      success: failed === 0,
+      sent,
+      failed,
+      results,
+      remainingGuestIds
     };
   }
 
   /**
-   * Trigger the background function to process WhatsApp messages
-   * This is a fire-and-forget operation
+   * Send one chunk of bulk invitations. The caller repeats the request with the
+   * returned remainingGuestIds until nothing is left.
    */
-  private static async triggerBackgroundJob(
-    jobId: string,
+  static async sendBulkInvitations(
     eventId: string,
     guestIds: string[],
-    messageType: BulkMessageType
-  ): Promise<void> {
-    try {
-      // Determine base URL
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.SERVER_URL || 'http://localhost:5000';
-
-      const url = `${baseUrl}/api/background/whatsapp`;
-
-      logger.info('Triggering background job', {
-        jobId,
-        url,
-        eventId,
-        guestCount: guestIds.length
-      });
-
-      // Fire and forget - don't await
-      axios.post(url, {
-        eventId,
-        guestIds,
-        messageType
-      }).catch(error => {
-        logger.error('Failed to trigger background job', {
-          jobId,
-          error: error.message,
-          eventId
-        });
-      });
-
-    } catch (error) {
-      logger.error('Error in triggerBackgroundJob', {
-        jobId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  }
-
-  /**
-   * Send bulk invitations - queues job for background processing
-   */
-  static async sendBulkInvitations(eventId: string, guestIds: string[]): Promise<QueuedJobResponse> {
-    logger.info('=== WHATSAPP BULK INVITATIONS: Queueing job ===', {
+    limit?: number
+  ): Promise<BulkChunkResult> {
+    logger.info('=== WHATSAPP BULK INVITATIONS: Processing chunk ===', {
       eventId,
-      guestCount: guestIds.length,
-      guestIds
+      guestCount: guestIds.length
     });
 
-    return this.queueBulkJob(eventId, guestIds, 'invitation');
+    return this.processBulkChunk(eventId, guestIds, 'invitation', limit ?? this.DEFAULT_BULK_CHUNK_SIZE);
   }
 
   /**
@@ -2046,16 +2083,20 @@ export class WhatsappService {
    * Premium: 3 days before event
    * VIP: 5 days before event
    */
-  static async sendEventReminders(eventId: string): Promise<QueuedJobResponse | { success: boolean; sent: number; failed: number; results: any[] }> {
+  static async sendEventReminders(
+    eventId: string,
+    guestIds?: string[],
+    limit?: number
+  ): Promise<BulkChunkResult> {
     try {
       const event = await Event.findById(eventId);
       if (!event) {
-        return { success: false, sent: 0, failed: 0, results: [] };
+        return { success: false, sent: 0, failed: 0, results: [], remainingGuestIds: [] };
       }
 
       // Only for Premium and VIP packages
       if (event.packageType !== 'premium' && event.packageType !== 'vip') {
-        return { success: false, sent: 0, failed: 0, results: [] };
+        return { success: false, sent: 0, failed: 0, results: [], remainingGuestIds: [] };
       }
 
       // Get guests who accepted RSVP
@@ -2063,66 +2104,70 @@ export class WhatsappService {
         g.rsvpStatus === 'accepted' && g.whatsappMessageSent
       );
 
-      if (confirmedGuests.length === 0) {
+      if (confirmedGuests.length === 0 && !guestIds?.length) {
         logger.info('WHATSAPP REMINDERS: No confirmed guests to send reminders to', {
           eventId
         });
-        return { success: true, sent: 0, failed: 0, results: [] };
+        return { success: true, sent: 0, failed: 0, results: [], remainingGuestIds: [] };
       }
 
-      const guestIds = confirmedGuests.map(g => g._id!.toString());
+      const recipientIds = guestIds ?? confirmedGuests.map(g => g._id!.toString());
 
-      logger.info('=== WHATSAPP REMINDERS: Queueing job ===', {
+      logger.info('=== WHATSAPP REMINDERS: Processing chunk ===', {
         eventId,
         packageType: event.packageType,
-        guestCount: guestIds.length
+        guestCount: recipientIds.length
       });
 
-      return this.queueBulkJob(eventId, guestIds, 'reminder');
+      return this.processBulkChunk(eventId, recipientIds, 'reminder', limit ?? this.DEFAULT_BULK_CHUNK_SIZE);
 
     } catch (error: any) {
-      logger.error('Error queueing event reminders:', error);
-      return { success: false, sent: 0, failed: 0, results: [] };
+      logger.error('Error sending event reminders:', error);
+      return { success: false, sent: 0, failed: 0, results: [], remainingGuestIds: [] };
     }
   }
 
   /**
    * Send thank you messages to all attended guests (VIP only) - queues job for background processing
    */
-  static async sendThankYouMessages(eventId: string): Promise<QueuedJobResponse | { success: boolean; sent: number; failed: number; results: any[] }> {
+  static async sendThankYouMessages(
+    eventId: string,
+    guestIds?: string[],
+    limit?: number
+  ): Promise<BulkChunkResult> {
     try {
       const event = await Event.findById(eventId);
       if (!event) {
-        return { success: false, sent: 0, failed: 0, results: [] };
+        return { success: false, sent: 0, failed: 0, results: [], remainingGuestIds: [] };
       }
 
       // Only for VIP packages
       if (event.packageType !== 'vip') {
-        return { success: false, sent: 0, failed: 0, results: [] };
+        return { success: false, sent: 0, failed: 0, results: [], remainingGuestIds: [] };
       }
 
       // Get guests who actually attended
       const attendedGuests = event.guests.filter(g => g.actuallyAttended === true);
 
-      if (attendedGuests.length === 0) {
+      if (attendedGuests.length === 0 && !guestIds?.length) {
         logger.info('WHATSAPP THANK YOU: No attended guests to send thank you messages to', {
           eventId
         });
-        return { success: true, sent: 0, failed: 0, results: [] };
+        return { success: true, sent: 0, failed: 0, results: [], remainingGuestIds: [] };
       }
 
-      const guestIds = attendedGuests.map(g => g._id!.toString());
+      const recipientIds = guestIds ?? attendedGuests.map(g => g._id!.toString());
 
-      logger.info('=== WHATSAPP THANK YOU: Queueing job ===', {
+      logger.info('=== WHATSAPP THANK YOU: Processing chunk ===', {
         eventId,
-        guestCount: guestIds.length
+        guestCount: recipientIds.length
       });
 
-      return this.queueBulkJob(eventId, guestIds, 'thank-you');
+      return this.processBulkChunk(eventId, recipientIds, 'thank-you', limit ?? this.DEFAULT_BULK_CHUNK_SIZE);
 
     } catch (error: any) {
-      logger.error('Error queueing thank you messages:', error);
-      return { success: false, sent: 0, failed: 0, results: [] };
+      logger.error('Error sending thank you messages:', error);
+      return { success: false, sent: 0, failed: 0, results: [], remainingGuestIds: [] };
     }
   }
 }

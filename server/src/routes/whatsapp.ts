@@ -4,8 +4,36 @@ import { logger } from '../config/logger';
 import { WhatsappService } from '../services/whatsappService';
 import { checkJwt, extractUser, requireActiveUser } from '../middleware/auth';
 import { withDB } from '../utils/routeUtils';
+import { Event } from '../models/Event';
+import { Types } from 'mongoose';
 
 const router = Router();
+
+/**
+ * These send endpoints take an eventId from the request body, so they have to
+ * check that the caller is entitled to that event: its owner, one of its
+ * collaborators, or an admin.
+ */
+async function canSendForEvent(eventId: string, user: { id: string; role: string }): Promise<boolean> {
+  if (user.role === 'admin') {
+    return true;
+  }
+
+  if (!Types.ObjectId.isValid(eventId)) {
+    return false;
+  }
+
+  const event = await Event.findOne({
+    _id: new Types.ObjectId(eventId),
+    $or: [
+      { userId: new Types.ObjectId(user.id) },
+      { 'collaborators.userId': new Types.ObjectId(user.id) }
+    ]
+  }).select('_id');
+
+  return !!event;
+}
+
 
 // Apply authentication middleware to protected routes
 // Webhook routes need to be public for Meta to send notifications
@@ -145,6 +173,14 @@ router.post('/send-invitation', withDB(async (req: Request, res: Response) => {
       });
     }
 
+    if (!(await canSendForEvent(eventId, req.user!))) {
+      logger.warn('ROUTE: Caller not entitled to this event', { eventId, userId: req.user!.id });
+      return res.status(403).json({
+        success: false,
+        error: { message: 'ليس لديك صلاحية لإرسال الدعوات لهذه المناسبة' }
+      });
+    }
+
     logger.info('ROUTE: Calling WhatsappService.sendInvitation...');
     const result = await WhatsappService.sendInvitation(eventId, guestId);
 
@@ -190,7 +226,7 @@ router.post('/send-invitation', withDB(async (req: Request, res: Response) => {
  */
 router.post('/send-bulk-invitations', withDB(async (req: Request, res: Response) => {
   try {
-    const { eventId, guestIds } = req.body;
+    const { eventId, guestIds, limit } = req.body;
 
     if (!eventId || !Array.isArray(guestIds) || guestIds.length === 0) {
       return res.status(400).json({
@@ -199,11 +235,19 @@ router.post('/send-bulk-invitations', withDB(async (req: Request, res: Response)
       });
     }
 
-    const result = await WhatsappService.sendBulkInvitations(eventId, guestIds);
+    if (!(await canSendForEvent(eventId, req.user!))) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'ليس لديك صلاحية لإرسال الدعوات لهذه المناسبة' }
+      });
+    }
+
+    // One chunk is sent per request; the caller repeats with remainingGuestIds.
+    const result = await WhatsappService.sendBulkInvitations(eventId, guestIds, limit);
 
     return res.json({
       success: true,
-      message: `Processing ${guestIds.length} invitations`,
+      message: `Sent ${result.sent} of ${guestIds.length} invitations`,
       data: result
     });
   } catch (error: any) {
@@ -221,7 +265,7 @@ router.post('/send-bulk-invitations', withDB(async (req: Request, res: Response)
  */
 router.post('/send-event-reminders', withDB(async (req: Request, res: Response) => {
   try {
-    const { eventId } = req.body;
+    const { eventId, guestIds, limit } = req.body;
 
     if (!eventId) {
       return res.status(400).json({
@@ -230,25 +274,18 @@ router.post('/send-event-reminders', withDB(async (req: Request, res: Response) 
       });
     }
 
-    const result = await WhatsappService.sendEventReminders(eventId);
-
-    // Check if result is a queued job response
-    if ('jobId' in result) {
-      return res.json({
-        success: true,
-        message: `Job queued successfully. ${result.guestCount} guests will receive reminders.`,
-        data: {
-          jobId: result.jobId,
-          guestCount: result.guestCount,
-          status: 'queued'
-        }
+    if (!(await canSendForEvent(eventId, req.user!))) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'ليس لديك صلاحية لإرسال التذكيرات لهذه المناسبة' }
       });
     }
 
-    // Fallback for empty guest list case
+    const result = await WhatsappService.sendEventReminders(eventId, guestIds, limit);
+
     return res.json({
       success: true,
-      message: 'No confirmed guests to send reminders to',
+      message: `Sent ${result.sent} reminders`,
       data: result
     });
   } catch (error: any) {
@@ -266,7 +303,7 @@ router.post('/send-event-reminders', withDB(async (req: Request, res: Response) 
  */
 router.post('/send-thank-you-messages', withDB(async (req: Request, res: Response) => {
   try {
-    const { eventId } = req.body;
+    const { eventId, guestIds, limit } = req.body;
 
     if (!eventId) {
       return res.status(400).json({
@@ -275,25 +312,18 @@ router.post('/send-thank-you-messages', withDB(async (req: Request, res: Respons
       });
     }
 
-    const result = await WhatsappService.sendThankYouMessages(eventId);
-
-    // Check if result is a queued job response
-    if ('jobId' in result) {
-      return res.json({
-        success: true,
-        message: `Job queued successfully. ${result.guestCount} guests will receive thank you messages.`,
-        data: {
-          jobId: result.jobId,
-          guestCount: result.guestCount,
-          status: 'queued'
-        }
+    if (!(await canSendForEvent(eventId, req.user!))) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'ليس لديك صلاحية لإرسال رسائل الشكر لهذه المناسبة' }
       });
     }
 
-    // Fallback for empty guest list case
+    const result = await WhatsappService.sendThankYouMessages(eventId, guestIds, limit);
+
     return res.json({
       success: true,
-      message: 'No attended guests to send thank you messages to',
+      message: `Sent ${result.sent} thank you messages`,
       data: result
     });
   } catch (error: any) {

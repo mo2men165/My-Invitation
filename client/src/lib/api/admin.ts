@@ -139,6 +139,87 @@ const getAuthHeaders = (includeContentType = true) => {
   return headers;
 };
 
+/**
+ * One chunk of a bulk WhatsApp send, as the server returns it.
+ */
+export interface AdminBulkChunkResult {
+  success: boolean;
+  sent: number;
+  failed: number;
+  results: Array<{ guestId: string; success: boolean; error?: string; messageId?: string }>;
+  remainingGuestIds: string[];
+}
+
+export interface AdminBulkProgress {
+  sent: number;
+  failed: number;
+  total: number;
+}
+
+export interface AdminBulkSummary {
+  sent: number;
+  failed: number;
+  total: number;
+  failures: Array<{ guestId: string; error?: string }>;
+}
+
+/**
+ * Drive a bulk WhatsApp endpoint to completion. The server sends a handful of
+ * messages per request and returns whoever is left, so we keep calling with the
+ * remainder. The first call omits guestIds and lets the server pick the
+ * recipients. Guests are marked as sent as they go, so an interrupted run can
+ * simply be started again.
+ */
+const runAdminBulkSend = async (
+  path: string,
+  errorMessage: string,
+  onProgress?: (progress: AdminBulkProgress) => void
+): Promise<AdminBulkSummary> => {
+  const failures: AdminBulkSummary['failures'] = [];
+  let sent = 0;
+  let failed = 0;
+  let total = 0;
+  let remaining: string[] | undefined;
+  let firstChunk = true;
+
+  while (firstChunk || (remaining && remaining.length > 0)) {
+    const response = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(remaining ? { guestIds: remaining } : {})
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || errorMessage);
+    }
+
+    const chunk = result.data as AdminBulkChunkResult;
+    sent += chunk.sent;
+    failed += chunk.failed;
+    failures.push(
+      ...chunk.results.filter(r => !r.success).map(r => ({ guestId: r.guestId, error: r.error }))
+    );
+
+    if (firstChunk) {
+      total = chunk.sent + chunk.failed + chunk.remainingGuestIds.length;
+    }
+
+    onProgress?.({ sent, failed, total });
+
+    // Stop if the server stopped making progress, so this cannot spin forever.
+    if (!firstChunk && remaining && chunk.remainingGuestIds.length >= remaining.length) {
+      break;
+    }
+
+    remaining = chunk.remainingGuestIds;
+    firstChunk = false;
+  }
+
+  return { sent, failed, total, failures };
+};
+
 export const adminAPI = {
   // Dashboard Stats
   async getDashboardStats(): Promise<DashboardStats> {
@@ -445,6 +526,42 @@ export const adminAPI = {
     }
     
     return result.data;
+  },
+
+  // Send WhatsApp invitations to a premium/VIP event's guests (chunked)
+  async sendEventInvitations(
+    eventId: string,
+    onProgress?: (progress: AdminBulkProgress) => void
+  ): Promise<AdminBulkSummary> {
+    return runAdminBulkSend(
+      `/api/admin/events/${eventId}/send-invitations`,
+      'فشل في إرسال الدعوات',
+      onProgress
+    );
+  },
+
+  // Send reminder messages to guests who accepted (chunked)
+  async sendEventReminders(
+    eventId: string,
+    onProgress?: (progress: AdminBulkProgress) => void
+  ): Promise<AdminBulkSummary> {
+    return runAdminBulkSend(
+      `/api/admin/events/${eventId}/send-reminders`,
+      'فشل في إرسال التذكيرات',
+      onProgress
+    );
+  },
+
+  // Send thank you messages to guests who attended (VIP, chunked)
+  async sendThankYouMessages(
+    eventId: string,
+    onProgress?: (progress: AdminBulkProgress) => void
+  ): Promise<AdminBulkSummary> {
+    return runAdminBulkSend(
+      `/api/admin/events/${eventId}/send-thank-you`,
+      'فشل في إرسال رسائل الشكر',
+      onProgress
+    );
   },
 
   // Mark the invitation cards of a classic event as handed to the customer

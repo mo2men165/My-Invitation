@@ -36,6 +36,7 @@ interface GuestManagementProps {
   onConfirmGuestList: () => Promise<void>;
   sendingWhatsapp?: string | null;
   sendingBulkWhatsapp?: boolean;
+  bulkProgress?: { sent: number; total: number } | null;
   getCountryFromPhone: (phone: string) => string;
   onCountryChange?: (country: string) => void;
   remainingInvites: number;
@@ -60,6 +61,7 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
   onConfirmGuestList,
   sendingWhatsapp,
   sendingBulkWhatsapp,
+  bulkProgress,
   getCountryFromPhone,
   onCountryChange,
   remainingInvites
@@ -132,7 +134,8 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
         </div>
       </div>
 
-      {/* WhatsApp Bulk Send Button for Premium packages */}
+      {/* WhatsApp Bulk Send Button - Premium only. VIP customers do not send
+          their own invitations: our team sends them from the admin panel. */}
       {event.packageType === 'premium' && guests.length > 0 && (
         event.guestListConfirmed.isConfirmed ? (
         <div className="mb-6">
@@ -151,7 +154,9 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
                   {sendingBulkWhatsapp ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      جاري الإرسال...
+                      {bulkProgress
+                        ? `جاري الإرسال... ${bulkProgress.sent} من ${bulkProgress.total}`
+                        : 'جاري الإرسال...'}
                     </>
                   ) : (
                     <>

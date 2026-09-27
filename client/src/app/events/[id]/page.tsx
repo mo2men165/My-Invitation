@@ -46,6 +46,7 @@ const EventDetailPage: React.FC = () => {
   const [phoneError, setPhoneError] = useState(false);
   const [sendingWhatsapp, setSendingWhatsapp] = useState<string | null>(null);
   const [sendingBulkWhatsapp, setSendingBulkWhatsapp] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
   
   // New guest form
   const [newGuest, setNewGuest] = useState<Guest>({
@@ -363,29 +364,40 @@ ${event.details.invitationText}
 
     try {
       setSendingBulkWhatsapp(true);
-      
+      setBulkProgress({ sent: 0, total: unsentGuests.length });
+
       const guestIds = unsentGuests.map(guest => guest._id!);
       console.log('USER FRONTEND BULK: Sending bulk invitations...', {
         guestIds,
         count: guestIds.length
       });
 
-      const result = await whatsappAPI.sendBulkInvitations(eventId, guestIds);
-      console.log('USER FRONTEND BULK: Bulk send result', result);
-      
-      if (result.success) {
-        console.log('USER FRONTEND BULK: Bulk send successful');
+      // Sending happens a chunk per request; progress comes back as it goes.
+      const summary = await whatsappAPI.sendBulkInvitations(eventId, guestIds, progress => {
+        setBulkProgress({ sent: progress.sent, total: progress.total });
+      });
+      console.log('USER FRONTEND BULK: Bulk send summary', summary);
+
+      if (summary.failed === 0) {
         toast({
-          title: "تم بدء إرسال الدعوات",
-          description: `يتم إرسال ${unsentGuests.length} دعوة عبر الواتساب`,
+          title: "تم إرسال الدعوات",
+          description: `تم إرسال ${summary.sent} دعوة عبر الواتساب`,
           variant: "default"
         });
-        
-        // Reload to update UI
-        console.log('USER FRONTEND BULK: Reloading event details...');
-        await loadEventDetails();
-        console.log('=== USER FRONTEND BULK: handleSendBulkWhatsapp complete ===');
+      } else {
+        toast({
+          title: summary.sent > 0 ? "تم إرسال بعض الدعوات" : "فشل إرسال الدعوات",
+          description: `تم إرسال ${summary.sent} من ${summary.total} دعوة. فشل ${summary.failed}: ${
+            summary.failures[0]?.error || 'خطأ غير معروف'
+          }`,
+          variant: summary.sent > 0 ? "default" : "destructive"
+        });
       }
+
+      // Reload to update UI
+      console.log('USER FRONTEND BULK: Reloading event details...');
+      await loadEventDetails();
+      console.log('=== USER FRONTEND BULK: handleSendBulkWhatsapp complete ===');
     } catch (error: any) {
       console.error('=== USER FRONTEND BULK: ERROR in handleSendBulkWhatsapp ===', {
         error: error.message,
@@ -398,6 +410,7 @@ ${event.details.invitationText}
       });
     } finally {
       setSendingBulkWhatsapp(false);
+      setBulkProgress(null);
     }
   };
 
@@ -579,6 +592,7 @@ ${event.details.invitationText}
               onConfirmGuestList={handleConfirmGuestList}
               sendingWhatsapp={sendingWhatsapp}
               sendingBulkWhatsapp={sendingBulkWhatsapp}
+              bulkProgress={bulkProgress}
               getCountryFromPhone={getCountryFromPhone}
               onCountryChange={handleCountryChange}
               remainingInvites={guestStats?.remainingInvites || 0}
