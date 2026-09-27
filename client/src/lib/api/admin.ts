@@ -195,7 +195,14 @@ const runAdminBulkSend = async (
       throw new Error(result.error?.message || errorMessage);
     }
 
-    const chunk = result.data as AdminBulkChunkResult;
+    const chunk = result.data;
+
+    // The API and the frontend deploy separately, so an older API may answer
+    // with the previous shape. Say so plainly instead of failing on undefined.
+    if (!chunk || !Array.isArray(chunk.results) || !Array.isArray(chunk.remainingGuestIds)) {
+      throw new Error('الخادم يعمل بإصدار أقدم غير متوافق. يرجى المحاولة بعد قليل');
+    }
+
     sent += chunk.sent;
     failed += chunk.failed;
     failures.push(

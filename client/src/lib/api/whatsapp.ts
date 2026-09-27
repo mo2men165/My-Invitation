@@ -116,7 +116,15 @@ class WhatsappAPI {
       throw new Error(result.error?.message || 'فشل في إرسال الدعوات');
     }
 
-    return result.data as BulkChunkResult;
+    const chunk = result.data;
+
+    // The API and the frontend deploy separately, so an older API may answer
+    // with the previous shape. Say so plainly instead of failing on undefined.
+    if (!chunk || !Array.isArray(chunk.results) || !Array.isArray(chunk.remainingGuestIds)) {
+      throw new Error('الخادم يعمل بإصدار أقدم غير متوافق. يرجى المحاولة بعد قليل');
+    }
+
+    return chunk as BulkChunkResult;
   }
 
   /**
