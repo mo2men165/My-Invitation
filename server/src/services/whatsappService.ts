@@ -31,6 +31,10 @@ export class WhatsappService {
   private static readonly DEFAULT_BULK_CHUNK_SIZE = 10;
   private static readonly MAX_BULK_CHUNK_SIZE = 25;
   private static readonly BULK_MESSAGE_DELAY_MS = 250;
+  // The confirmation is a sequence the guest reads in order (details, cards,
+  // location), and closely spaced messages can arrive shuffled, so these are
+  // spaced more generously than bulk sends.
+  private static readonly CONFIRMATION_MESSAGE_DELAY_MS = 900;
   
   // Lazy getters for environment variables - ensures they're read at runtime, not module load
   private static get PHONE_NUMBER_ID(): string | undefined {
@@ -547,7 +551,7 @@ export class WhatsappService {
               { _id: event._id, 'guests._id': guest._id },
               { $set: { 'guests.$.conversationStage': 'completed' } }
             );
-            await this.sendConfirmationWithLinks(event, guest);
+            await this.sendConfirmationWithLinks(event, guest, getInvitationSize(guest));
           }
         }
       } else {
@@ -584,36 +588,48 @@ export class WhatsappService {
    * the card opened Google Maps instead of the card. As separate messages, an
    * image behaves like an image and the venue is a native map pin.
    *
+   * confirmedCount is passed in by the caller: the count is written straight to
+   * the database with updateOne, so the in-memory guest still carries the value
+   * it was loaded with and cannot be trusted here.
+   *
    * sendConfirmationTemplate remains the fallback for when the window has
    * closed, which is the case for guests the stale-reply cron defaults.
    */
-  private static async sendConfirmationWithLinks(event: any, guest: any): Promise<void> {
+  private static async sendConfirmationWithLinks(
+    event: any,
+    guest: any,
+    confirmedCount?: number
+  ): Promise<void> {
     try {
       logger.info('=== WHATSAPP CONFIRMATION: Preparing confirmation message ===', {
         eventId: event._id,
         guestId: guest._id,
-        guestName: guest.name
+        guestName: guest.name,
+        confirmedCount
       });
 
       const invitationSize = getInvitationSize(guest);
-      const confirmedCount = guest.confirmedAccompanyingGuests ?? invitationSize;
-      const cards = getCardsToSend(guest, confirmedCount).filter(card => !!getCardUrl(card));
+      const attending = Math.max(
+        1,
+        Math.min(confirmedCount ?? guest.confirmedAccompanyingGuests ?? invitationSize, invitationSize)
+      );
+      const cards = getCardsToSend(guest, attending).filter(card => !!getCardUrl(card));
 
       if (cards.length === 0) {
         logger.error('WHATSAPP CONFIRMATION: No usable entry cards for this guest', {
           eventId: event._id,
           guestId: guest._id,
           invitationSize,
-          confirmedCount
+          attending
         });
         throw new Error('No entry cards uploaded for this guest');
       }
 
-      if (cards.length < confirmedCount) {
-        logger.warn('WHATSAPP CONFIRMATION: Fewer cards on file than confirmed attendees', {
+      if (cards.length < attending) {
+        logger.warn('WHATSAPP CONFIRMATION: Fewer cards on file than attending guests', {
           eventId: event._id,
           guestId: guest._id,
-          confirmedCount,
+          attending,
           cardsAvailable: cards.length
         });
       }
@@ -625,15 +641,47 @@ export class WhatsappService {
         month: 'long',
         day: 'numeric'
       });
+      const dayOfWeek = eventDate.toLocaleDateString('ar-SA', { calendar: 'gregory', weekday: 'long' });
       const eventName = event.details.eventName || 'المناسبة';
+      const locationName = event.details.displayName || event.details.eventLocation;
       const phone = guest.phone.replace(/^\+/, '');
+
+      // A warm opening that carries the details, so the cards themselves can
+      // stay short and the guest has everything in one place.
+      const attendingLine = attending > 1
+        ? `\n👥 عدد الحاضرين: ${attending}`
+        : '';
+      const cardsLine = attending > 1
+        ? 'نرسل لكم الآن بطاقة دخول لكل حاضر، ويُرجى إبرازها عند البوابة.'
+        : 'نرسل لكم الآن بطاقة الدخول الخاصة بكم، ويُرجى إبرازها عند البوابة.';
+
+      await this.sendMessage({
+        messaging_product: 'whatsapp',
+        to: phone,
+        type: 'text',
+        text: {
+          preview_url: false,
+          body:
+            `شكراً لك ${guest.name} 🙏\n` +
+            `يسعدنا تأكيد حضوركم في ${eventName}\n\n` +
+            `📅 ${dayOfWeek} ${formattedDate}\n` +
+            `🕒 من ${event.details.startTime} إلى ${event.details.endTime}\n` +
+            `📍 ${locationName}` +
+            `${attendingLine}\n\n` +
+            cardsLine
+        }
+      });
 
       // One card per attending person, each as its own image so it can be
       // opened, saved and forwarded on its own.
       for (let i = 0; i < cards.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, this.CONFIRMATION_MESSAGE_DELAY_MS));
+
+        // The opening message already asks for the cards at the gate, so the
+        // captions only need to say whose card this is.
         const caption = i === 0
-          ? `بطاقة دخول ${guest.name}\n${eventName}\n${formattedDate}`
-          : `بطاقة دخول مرافق ${i} — ${guest.name}\n${eventName}\n${formattedDate}`;
+          ? `🎟️ بطاقة دخول ${guest.name}`
+          : `🎟️ بطاقة دخول المرافق ${i} — ضيف ${guest.name}`;
 
         await this.sendMessage({
           messaging_product: 'whatsapp',
@@ -644,16 +692,26 @@ export class WhatsappService {
             caption
           }
         });
-
-        if (i < cards.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, this.BULK_MESSAGE_DELAY_MS));
-        }
       }
+
+      await new Promise(resolve => setTimeout(resolve, this.CONFIRMATION_MESSAGE_DELAY_MS));
 
       // The venue as a map pin when we have coordinates: it opens in the guest's
       // own maps app and cannot steal taps from the cards above.
-      const locationName = event.details.displayName || event.details.eventLocation;
       if (event.details.locationCoordinates) {
+        await this.sendMessage({
+          messaging_product: 'whatsapp',
+          to: phone,
+          type: 'text',
+          text: {
+            preview_url: false,
+            body:
+              `✨ ننتظر حضوركم الكريم\n` +
+              `📍 وهذا موقع ${eventName} على الخريطة 👇`
+          }
+        });
+
+        await new Promise(resolve => setTimeout(resolve, this.CONFIRMATION_MESSAGE_DELAY_MS));
         await this.sendLocation(phone, event.details.locationCoordinates, locationName);
       } else {
         await this.sendMessage({
@@ -662,7 +720,11 @@ export class WhatsappService {
           type: 'text',
           text: {
             preview_url: true,
-            body: `موقع المناسبة: ${locationName}\n${this.buildMapsLink(event)}`
+            body:
+              `✨ ننتظر حضوركم الكريم\n\n` +
+              `📍 موقع ${eventName}\n` +
+              `${locationName}\n` +
+              this.buildMapsLink(event)
           }
         });
       }
@@ -672,7 +734,7 @@ export class WhatsappService {
         guestName: guest.name,
         guestPhone: guest.phone,
         cardsSent: cards.length,
-        confirmedCount
+        attending
       });
 
     } catch (error: any) {
@@ -1014,8 +1076,10 @@ export class WhatsappService {
         accompanyingCountRefunded
       });
 
-      // Final step of the accept flow: send the maps/invite-image confirmation message
-      await this.sendConfirmationWithLinks(event, guest);
+      // Final step of the accept flow: send the cards and the venue location.
+      // The count goes in explicitly - the updateOne above does not touch the
+      // in-memory guest this call would otherwise read it from.
+      await this.sendConfirmationWithLinks(event, guest, confirmedCount);
     } catch (error: any) {
       logger.error('=== WHATSAPP ACCOMPANYING COUNT: ERROR processing response ===', {
         error: error.message,
@@ -1057,7 +1121,7 @@ export class WhatsappService {
 
       for (const guest of staleGuests) {
         try {
-          const confirmedCount = guest.numberOfAccompanyingGuests;
+          const confirmedCount = getInvitationSize(guest);
 
           await Event.updateOne(
             { _id: event._id, 'guests._id': guest._id },
@@ -1079,7 +1143,7 @@ export class WhatsappService {
             defaultedCount: confirmedCount
           });
 
-          await this.sendConfirmationWithLinks(event, guest);
+          await this.sendConfirmationWithLinks(event, guest, confirmedCount);
           processed++;
         } catch (error: any) {
           errors++;
