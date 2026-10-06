@@ -5,6 +5,7 @@ import { X, Loader2, Upload } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
+import { validateMediaFile, formatBytes, IMAGE_TYPES, MAX_IMAGE_BYTES } from '@/lib/uploadMedia';
 
 interface PackageImageWizardProps {
   onClose: () => void;
@@ -36,6 +37,7 @@ export function PackageImageWizard({ onClose, onCreated }: PackageImageWizardPro
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0] || null;
@@ -45,15 +47,9 @@ export function PackageImageWizard({ onClose, onCreated }: PackageImageWizardPro
       return;
     }
 
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(selected.type)) {
-      toast({ title: 'خطأ', description: 'نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط', variant: 'destructive' });
-      e.target.value = '';
-      return;
-    }
-
-    if (selected.size > 10 * 1024 * 1024) {
-      toast({ title: 'خطأ', description: 'حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت', variant: 'destructive' });
+    const validation = validateMediaFile(selected, { allowVideo: false });
+    if (!validation.valid) {
+      toast({ title: 'خطأ', description: validation.error, variant: 'destructive' });
       e.target.value = '';
       return;
     }
@@ -74,18 +70,17 @@ export function PackageImageWizard({ onClose, onCreated }: PackageImageWizardPro
       return;
     }
 
-    const formData = new FormData();
-    formData.append('image', file);
-    formData.append('name', name.trim());
-    if (tagMode === 'tier') {
-      formData.append('packageTier', tagValue);
-    } else {
-      formData.append('category', tagValue);
-    }
-
     try {
       setSubmitting(true);
-      await adminAPI.createPackageImage(formData);
+      setUploadProgress(0);
+      await adminAPI.createPackageImage(
+        file,
+        {
+          name: name.trim(),
+          ...(tagMode === 'tier' ? { packageTier: tagValue } : { category: tagValue })
+        },
+        setUploadProgress
+      );
       toast({ title: 'تم', description: 'تم إضافة التصميم بنجاح', variant: 'default' });
       onCreated();
       onClose();
@@ -112,11 +107,11 @@ export function PackageImageWizard({ onClose, onCreated }: PackageImageWizardPro
           <label className="text-sm text-gray-400 block mb-2">الصورة</label>
           <input
             type="file"
-            accept="image/jpeg,image/jpg,image/png"
+            accept={IMAGE_TYPES.join(',')}
             onChange={handleFileChange}
             className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
           />
-          <p className="text-xs text-gray-500 mt-1">الصيغ المدعومة: JPEG, PNG فقط (الحد الأقصى: 10 ميجابايت)</p>
+          <p className="text-xs text-gray-500 mt-1">الصيغ المدعومة: JPEG, PNG, WebP (الحد الأقصى: {formatBytes(MAX_IMAGE_BYTES)})</p>
           {preview && (
             <div className="mt-2 border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
               <img src={preview} alt="معاينة" className="w-full h-auto max-h-48 object-contain" />
@@ -169,7 +164,9 @@ export function PackageImageWizard({ onClose, onCreated }: PackageImageWizardPro
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#C09B52] text-white rounded-lg hover:bg-[#A0884A] transition-colors disabled:opacity-50"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            إضافة
+            {submitting && uploadProgress !== null && uploadProgress < 100
+              ? `جاري الرفع... ${uploadProgress}%`
+              : 'إضافة'}
           </button>
           <button
             onClick={onClose}

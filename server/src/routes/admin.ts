@@ -26,7 +26,7 @@ import { z } from 'zod';
 
 // Upload signatures are only ever issued for our own media folders, so a
 // signature cannot be turned into a write anywhere else in the Cloudinary account.
-const ALLOWED_UPLOAD_FOLDERS = /^(events\/[a-f0-9]{24}\/(invitation-cards|guests\/[a-f0-9]{24}\/invites)|package-images)$/;
+const ALLOWED_UPLOAD_FOLDERS = /^(events\/[a-f0-9]{24}\/(invitation-cards|guests\/[a-f0-9]{24}\/invites)|packages)$/;
 
 // What the browser sends back after uploading straight to Cloudinary.
 const uploadedMediaSchema = z.object({
@@ -1224,7 +1224,7 @@ router.put(
 
     // Cards are stored densely - slot n is the nth card - so a slot can only be
     // filled once the ones before it are, and removing one shifts the rest down.
-    if (req.file && slotIndex > cards.length) {
+    if ((req.file || req.body?.media) && slotIndex > cards.length) {
       return res.status(400).json({
         success: false,
         error: { message: 'يجب إضافة البطاقات بالترتيب' }
@@ -1256,6 +1256,31 @@ router.put(
         // Don't fail the request if deletion fails
       }
     };
+
+    // The browser uploads straight to Cloudinary and posts the metadata here,
+    // since a serverless request body is capped at 4.5MB on Vercel.
+    if (req.body?.media) {
+      const parsed = uploadedMediaSchema.safeParse(req.body.media);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'بيانات الملف المرفوع غير صالحة' }
+        });
+      }
+
+      await removeReplacedImage();
+
+      cards[slotIndex] = parsed.data;
+      await persist();
+
+      logger.info(`Admin ${adminId} updated invite card ${slotIndex} for guest ${guestId} in event ${eventId}`);
+
+      return res.json({
+        success: true,
+        message: 'تم تحديث صورة الدعوة بنجاح',
+        data: { guest }
+      });
+    }
 
     // If no file provided, delete the card in this slot
     if (!file) {
@@ -2988,7 +3013,7 @@ router.post('/package-images', uploadSingleImage, withDB(async (req: Request, re
     const file = req.file;
     const { name, packageTier, category } = req.body;
 
-    if (!file) {
+    if (!file && !req.body?.media) {
       return res.status(400).json({
         success: false,
         error: { message: 'الصورة مطلوبة' }
@@ -3011,19 +3036,34 @@ router.post('/package-images', uploadSingleImage, withDB(async (req: Request, re
       });
     }
 
-    const validation = CloudinaryService.validateImageFile(file);
-    if (!validation.valid) {
-      return res.status(400).json({
-        success: false,
-        error: { message: validation.error || 'صورة غير صالحة' }
-      });
-    }
+    // The browser uploads straight to Cloudinary and posts the metadata here,
+    // since a serverless request body is capped at 4.5MB on Vercel.
+    let uploadResult;
 
-    const uploadResult = await CloudinaryService.uploadFile(
-      file.buffer,
-      file.originalname,
-      { folder: 'packages', resource_type: 'image' }
-    );
+    if (req.body?.media) {
+      const parsed = uploadedMediaSchema.safeParse(req.body.media);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'بيانات الملف المرفوع غير صالحة' }
+        });
+      }
+      uploadResult = parsed.data;
+    } else {
+      const validation = CloudinaryService.validateImageFile(file!);
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          error: { message: validation.error || 'صورة غير صالحة' }
+        });
+      }
+
+      uploadResult = await CloudinaryService.uploadFile(
+        file!.buffer,
+        file!.originalname,
+        { folder: 'packages', resource_type: 'image' }
+      );
+    }
 
     const packageImage = await PackageImage.create({
       name: name.trim(),

@@ -534,21 +534,26 @@ export const adminAPI = {
     eventId: string,
     guestId: string,
     individualInviteImage: File | null,
-    slot = 0
+    slot = 0,
+    onUploadProgress?: (percent: number) => void
   ): Promise<void> {
-    const formData = new FormData();
-    if (individualInviteImage) {
-      formData.append('image', individualInviteImage);
-    }
+    // The card goes straight to Cloudinary; passing null removes the slot.
+    const media = individualInviteImage
+      ? await uploadMedia(
+          individualInviteImage,
+          `events/${eventId}/guests/${guestId}/invites`,
+          onUploadProgress
+        )
+      : null;
 
     const response = await fetch(`${API_URL}/api/admin/events/${eventId}/guests/${guestId}/invite-image/${slot}`, {
       method: 'PUT',
-      headers: getAuthHeaders(false), // Don't include Content-Type, let browser set it with boundary
-      body: formData
+      headers: getAuthHeaders(),
+      body: JSON.stringify(media ? { media } : {})
     });
-    
+
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.error?.message || 'فشل في تحديث صورة الدعوة');
     }
@@ -731,11 +736,18 @@ export const adminAPI = {
     return result.data;
   },
 
-  async createPackageImage(formData: FormData): Promise<PackageImage> {
+  // The design goes straight to Cloudinary first; only its metadata reaches us.
+  async createPackageImage(
+    image: File,
+    details: { name: string; packageTier?: string; category?: string },
+    onUploadProgress?: (percent: number) => void
+  ): Promise<PackageImage> {
+    const media = await uploadMedia(image, 'packages', onUploadProgress);
+
     const response = await fetch(`${API_URL}/api/admin/package-images`, {
       method: 'POST',
-      headers: getAuthHeaders(false), // Don't include Content-Type, let browser set it with boundary
-      body: formData
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ media, ...details })
     });
 
     const result = await response.json();

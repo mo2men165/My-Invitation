@@ -41,6 +41,7 @@ export function GuestInviteCards({ eventId, guest, onChanged }: GuestInviteCards
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busySlot, setBusySlot] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const { toast } = useToast();
 
   const invitationSize = Math.max(1, guest.numberOfAccompanyingGuests || 1);
@@ -108,7 +109,8 @@ export function GuestInviteCards({ eventId, guest, onChanged }: GuestInviteCards
 
     try {
       setBusySlot(slot);
-      await adminAPI.updateGuestInviteImage(eventId, guest._id, file, slot);
+      setUploadProgress(0);
+      await adminAPI.updateGuestInviteImage(eventId, guest._id, file, slot, setUploadProgress);
       resetEditing();
       await onChanged();
       toast({ title: "تم التحديث", description: `تم تحديث ${slotLabel(slot)}`, variant: "default" });
@@ -120,6 +122,7 @@ export function GuestInviteCards({ eventId, guest, onChanged }: GuestInviteCards
       });
     } finally {
       setBusySlot(null);
+      setUploadProgress(null);
     }
   };
 
@@ -225,7 +228,14 @@ export function GuestInviteCards({ eventId, guest, onChanged }: GuestInviteCards
                       disabled={isBusy || !file}
                       className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
-                      {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      {isBusy ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {uploadProgress !== null && uploadProgress < 100 ? `${uploadProgress}%` : ''}
+                        </span>
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
                     </button>
                     <button
                       onClick={resetEditing}

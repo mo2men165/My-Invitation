@@ -35,6 +35,16 @@ export class WhatsappService {
   // location), and closely spaced messages can arrive shuffled, so these are
   // spaced more generously than bulk sends.
   private static readonly CONFIRMATION_MESSAGE_DELAY_MS = 900;
+
+  // A template's header type is fixed when Meta approves it, so an image card
+  // and a video card need different templates. Overridable by env so a renamed
+  // or re-approved template does not need a deploy.
+  private static get IMAGE_INVITATION_TEMPLATE(): string {
+    return process.env.WHATSAPP_INVITATION_TEMPLATE || 'initial_invitation';
+  }
+  private static get VIDEO_INVITATION_TEMPLATE(): string {
+    return process.env.WHATSAPP_VIDEO_INVITATION_TEMPLATE || 'initial_invitation_arabic';
+  }
   
   // Lazy getters for environment variables - ensures they're read at runtime, not module load
   private static get PHONE_NUMBER_ID(): string | undefined {
@@ -1239,6 +1249,13 @@ export class WhatsappService {
       });
     }
 
+    // The header carries whichever media the card is. A template's header type
+    // is fixed at approval, so the caller picks the template to match.
+    const isVideoCard = event.invitationCardImage?.resource_type === 'video';
+    const headerParameter = isVideoCard
+      ? { type: 'video', video: { link: validImageUrl } }
+      : { type: 'image', image: { link: validImageUrl } };
+
     const messageData = {
       messaging_product: 'whatsapp',
       to: phoneNumber,
@@ -1249,17 +1266,9 @@ export class WhatsappService {
           code: 'ar'
         },
         components: [
-          // Template requires IMAGE header - always include it
           {
             type: 'header',
-            parameters: [
-              {
-                type: 'image',
-                image: {
-                  link: validImageUrl
-                }
-              }
-            ]
+            parameters: [headerParameter]
           },
           {
             type: 'body',
@@ -1348,22 +1357,8 @@ export class WhatsappService {
         return { success: false, error: 'Event invitation card image not set' };
       }
 
-      // The approved template carries an IMAGE header, so a video card cannot be
-      // sent through it. Say so plainly rather than letting Meta reject the
-      // message with an opaque error.
-      if (event.invitationCardImage?.resource_type === 'video') {
-        logger.error('WHATSAPP: Invitation card is a video, which the template cannot carry', {
-          eventId,
-          guestId,
-          packageType: event.packageType
-        });
-        return {
-          success: false,
-          error: 'بطاقة الدعوة الحالية فيديو، وقالب الواتساب للدعوة الأولى يتطلب صورة. يرجى رفع صورة لبطاقة الدعوة'
-        };
-      }
-
-      logger.info('WHATSAPP: Event invitation card image validated', {
+      logger.info('WHATSAPP: Event invitation card validated', {
+        resourceType: event.invitationCardImage?.resource_type || 'image',
         imageUrl: event.invitationCardImage?.secure_url || event.invitationCardImage?.url
       });
 
@@ -1396,7 +1391,14 @@ export class WhatsappService {
       );
 
       // Build message data using reusable method
-      const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, 'initial_invitation');
+      // Image cards and video cards need different approved templates, since a
+      // template's header type is fixed at approval.
+      const isVideoCard = event.invitationCardImage?.resource_type === 'video';
+      const templateName = isVideoCard
+        ? this.VIDEO_INVITATION_TEMPLATE
+        : this.IMAGE_INVITATION_TEMPLATE;
+
+      const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, templateName);
 
       // Format dates for logging
       const eventDate = new Date(event.details.eventDate);
@@ -1566,18 +1568,18 @@ export class WhatsappService {
         return { success: false, error: 'Event invitation card image not set' };
       }
 
-      // The approved template carries an IMAGE header, so a video card cannot be
-      // sent through it. Say so plainly rather than letting Meta reject the
-      // message with an opaque error.
+      // The utility fallback template carries an IMAGE header, so a video card
+      // cannot go through it. The initial send already had its own video
+      // template, so there is simply no fallback for video.
       if (event.invitationCardImage?.resource_type === 'video') {
-        logger.error('FALLBACK: Invitation card is a video, which the template cannot carry', {
+        logger.warn('FALLBACK: Invitation card is a video; the utility template cannot carry it', {
           eventId,
           guestId,
           packageType: event.packageType
         });
         return {
           success: false,
-          error: 'بطاقة الدعوة الحالية فيديو، وقالب الواتساب للدعوة الأولى يتطلب صورة. يرجى رفع صورة لبطاقة الدعوة'
+          error: 'لا يتوفر قالب احتياطي لبطاقات الفيديو'
         };
       }
 
