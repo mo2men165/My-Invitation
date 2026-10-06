@@ -51,6 +51,21 @@ export interface CloudinaryUploadResult {
   height: number;
   bytes: number;
   created_at: string;
+  // 'image' or 'video' - invitation cards may be either
+  resource_type?: string;
+  // Seconds, videos only
+  duration?: number;
+}
+
+/** What a browser needs to upload straight to Cloudinary. */
+export interface UploadSignature {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
+  resourceType: 'image' | 'video';
+  uploadUrl: string;
 }
 
 export interface UploadOptions {
@@ -208,12 +223,15 @@ export class CloudinaryService {
   /**
    * Delete an image from Cloudinary
    */
-  static async deleteImage(publicId: string): Promise<void> {
+  static async deleteImage(publicId: string, resourceType: string = 'image'): Promise<void> {
     // Ensure Cloudinary is configured (lazy initialization for serverless)
     ensureCloudinaryConfigured();
     
     try {
-      const result = await cloudinary.uploader.destroy(publicId);
+      // destroy() is keyed by resource type: a video is not found under 'image'.
+      const result = await cloudinary.uploader.destroy(publicId, {
+        resource_type: resourceType === 'video' ? 'video' : 'image'
+      });
       
       if (result.result === 'ok') {
         logger.info('Cloudinary image deleted successfully:', { publicId });
@@ -274,6 +292,39 @@ export class CloudinaryService {
   /**
    * Validate if a file is a valid image
    */
+  /**
+   * Sign a browser upload that goes straight to Cloudinary.
+   *
+   * Files cannot be relayed through the API: a serverless request body is
+   * capped at 4.5MB on Vercel, which an invitation video passes immediately. The
+   * browser uploads to Cloudinary with this signature and sends us back only the
+   * resulting metadata. The signature covers exactly the parameters the browser
+   * sends - folder and timestamp - and nothing else, so it cannot be reused to
+   * write anywhere other than this folder.
+   */
+  static generateUploadSignature(
+    folder: string,
+    resourceType: 'image' | 'video' = 'image'
+  ): UploadSignature {
+    ensureCloudinaryConfigured();
+
+    const timestamp = Math.round(Date.now() / 1000);
+    const signature = cloudinary.utils.api_sign_request(
+      { folder, timestamp },
+      process.env.CLOUDINARY_API_SECRET as string
+    );
+
+    return {
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME as string,
+      apiKey: process.env.CLOUDINARY_API_KEY as string,
+      timestamp,
+      signature,
+      folder,
+      resourceType,
+      uploadUrl: `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`
+    };
+  }
+
   static validateImageFile(file: MulterFile): { valid: boolean; error?: string } {
     const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     const maxSize = 10 * 1024 * 1024; // 10MB

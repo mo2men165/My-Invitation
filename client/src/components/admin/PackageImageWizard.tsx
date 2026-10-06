@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, Loader2, Upload } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 interface PackageImageWizardProps {
   onClose: () => void;
@@ -25,6 +26,9 @@ const categoryOptions = [
 ];
 
 export function PackageImageWizard({ onClose, onCreated }: PackageImageWizardProps) {
+  // Without this the page behind the modal takes the scroll instead of the
+  // modal's own taller-than-the-viewport content.
+  useBodyScrollLock(true);
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [tagMode, setTagMode] = useState<TagMode>('tier');
@@ -95,8 +99,8 @@ export function PackageImageWizard({ onClose, onCreated }: PackageImageWizardPro
   const options = tagMode === 'tier' ? tierOptions : categoryOptions;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" dir="rtl">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 space-y-5">
+    <div className="fixed inset-0 bg-black/70 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto" dir="rtl">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 space-y-5 my-auto max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-white">إضافة تصميم جديد</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white">

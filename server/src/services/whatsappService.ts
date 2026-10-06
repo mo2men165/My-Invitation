@@ -1348,6 +1348,21 @@ export class WhatsappService {
         return { success: false, error: 'Event invitation card image not set' };
       }
 
+      // The approved template carries an IMAGE header, so a video card cannot be
+      // sent through it. Say so plainly rather than letting Meta reject the
+      // message with an opaque error.
+      if (event.invitationCardImage?.resource_type === 'video') {
+        logger.error('WHATSAPP: Invitation card is a video, which the template cannot carry', {
+          eventId,
+          guestId,
+          packageType: event.packageType
+        });
+        return {
+          success: false,
+          error: 'بطاقة الدعوة الحالية فيديو، وقالب الواتساب للدعوة الأولى يتطلب صورة. يرجى رفع صورة لبطاقة الدعوة'
+        };
+      }
+
       logger.info('WHATSAPP: Event invitation card image validated', {
         imageUrl: event.invitationCardImage?.secure_url || event.invitationCardImage?.url
       });
@@ -1549,6 +1564,21 @@ export class WhatsappService {
           packageType: event.packageType
         });
         return { success: false, error: 'Event invitation card image not set' };
+      }
+
+      // The approved template carries an IMAGE header, so a video card cannot be
+      // sent through it. Say so plainly rather than letting Meta reject the
+      // message with an opaque error.
+      if (event.invitationCardImage?.resource_type === 'video') {
+        logger.error('FALLBACK: Invitation card is a video, which the template cannot carry', {
+          eventId,
+          guestId,
+          packageType: event.packageType
+        });
+        return {
+          success: false,
+          error: 'بطاقة الدعوة الحالية فيديو، وقالب الواتساب للدعوة الأولى يتطلب صورة. يرجى رفع صورة لبطاقة الدعوة'
+        };
       }
 
       logger.info('FALLBACK: Event invitation card image validated', {

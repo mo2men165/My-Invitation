@@ -3,6 +3,8 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 import { ALLOWED_PHONE_PATTERN } from '../utils/phoneValidation';
 
 // Cloudinary image object interface
+// Invitation cards may be an image or a video, so the stored media records
+// which it is; anything without it predates video support and is an image.
 export interface ICloudinaryImage {
   public_id: string;
   secure_url: string;
@@ -12,6 +14,8 @@ export interface ICloudinaryImage {
   height: number;
   bytes: number;
   created_at: string;
+  resource_type?: string;
+  duration?: number;
 }
 
 export interface IGuest {
@@ -38,7 +42,8 @@ export interface IGuest {
   updatedAt: Date;
   // Optional field to track who added this guest
   addedBy?: {
-    type: 'owner' | 'collaborator';
+    // 'admin' is our own team adding a guest on the customer's behalf
+    type: 'owner' | 'collaborator' | 'admin';
     userId?: Types.ObjectId;
     collaboratorName?: string;
     collaboratorEmail?: string;
@@ -223,7 +228,7 @@ const guestSchema = new Schema<IGuest>({
   addedBy: {
     type: {
       type: String,
-      enum: ['owner', 'collaborator']
+      enum: ['owner', 'collaborator', 'admin']
     },
     userId: {
       type: Schema.Types.ObjectId,
@@ -466,7 +471,10 @@ const eventSchema: Schema<IEvent> = new Schema({
     width: { type: Number, required: false },
     height: { type: Number, required: false },
     bytes: { type: Number, required: false },
-    created_at: { type: String, required: false }
+    created_at: { type: String, required: false },
+    // 'image' or 'video'; absent on cards uploaded before video support
+    resource_type: { type: String, required: false },
+    duration: { type: Number, required: false }
   },
   qrCodeReaderUrl: {
     type: String,

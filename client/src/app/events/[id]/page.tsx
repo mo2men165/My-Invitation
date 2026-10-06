@@ -417,6 +417,29 @@ ${event.details.invitationText}
     }
   };
 
+  const handleReopenGuestList = async () => {
+    try {
+      setConfirmingGuestList(true);
+      const response = await eventsAPI.reopenGuestList(eventId);
+
+      toast({
+        title: "تم إعادة فتح القائمة",
+        description: response.message || "يمكنك الآن إضافة أو تعديل الضيوف",
+        variant: "default"
+      });
+
+      await loadEventDetails();
+    } catch (error: any) {
+      toast({
+        title: "خطأ في إعادة فتح القائمة",
+        description: error.message || "حدث خطأ غير متوقع",
+        variant: "destructive"
+      });
+    } finally {
+      setConfirmingGuestList(false);
+    }
+  };
+
   const handleRemoveGuest = async (guestId: string) => {
     try {
       await eventsAPI.removeGuest(eventId, guestId);
@@ -593,6 +616,7 @@ ${event.details.invitationText}
               onRemoveGuest={handleRemoveGuest}
               onUpdateGuest={handleUpdateGuest}
               onConfirmGuestList={handleConfirmGuestList}
+              onReopenGuestList={handleReopenGuestList}
               sendingWhatsapp={sendingWhatsapp}
               sendingBulkWhatsapp={sendingBulkWhatsapp}
               bulkProgress={bulkProgress}

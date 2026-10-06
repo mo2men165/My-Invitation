@@ -660,6 +660,72 @@ router.post('/:id/guests/confirm', withDB(async (req: Request, res: Response) =>
 }));
 
 /**
+ * POST /api/events/:id/guests/reopen
+ * Let the event owner reopen their own confirmed guest list so they can add or
+ * edit guests again, without having to ask an admin to do it for them.
+ */
+router.post('/:id/guests/reopen', withDB(async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { id } = req.params;
+    const idString = Array.isArray(id) ? id[0] : id;
+
+    const event = await Event.findOne({
+      _id: new Types.ObjectId(idString),
+      userId: new Types.ObjectId(userId)
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    if (rejectIfClassic(event, res)) {
+      return;
+    }
+
+    if (!event.guestListConfirmed.isConfirmed) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'قائمة الضيوف مفتوحة بالفعل' }
+      });
+    }
+
+    const currentReopenCount = event.guestListConfirmed.reopenCount || 0;
+    event.guestListConfirmed = {
+      isConfirmed: false,
+      confirmedAt: event.guestListConfirmed.confirmedAt,
+      confirmedBy: event.guestListConfirmed.confirmedBy,
+      reopenedAt: new Date(),
+      reopenedBy: new Types.ObjectId(userId),
+      reopenCount: currentReopenCount + 1
+    };
+
+    await event.save();
+
+    logger.info(`User ${userId} reopened their guest list for event ${id} (reopen count: ${currentReopenCount + 1})`);
+
+    return res.json({
+      success: true,
+      message: 'تم إعادة فتح قائمة الضيوف. يمكنك الآن إضافة أو تعديل الضيوف',
+      data: {
+        reopenedAt: event.guestListConfirmed.reopenedAt,
+        reopenCount: event.guestListConfirmed.reopenCount
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error reopening guest list:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في إعادة فتح قائمة الضيوف' }
+    });
+  }
+}));
+
+/**
  * DELETE /api/events/:id/guests/:guestId
  * Remove guest from event
  */

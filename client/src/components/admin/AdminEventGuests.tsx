@@ -17,12 +17,14 @@ import {
   XCircle,
   UserCheck,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  UserPlus
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
 import ConfirmationModal from '@/components/cart/CartModal/components/ConfirmationModal';
 import { GuestInviteCards } from './GuestInviteCards';
+import { AddGuestModal } from './AddGuestModal';
 import { getMissingCardCount, hasAllCards } from '@/utils/guestCards';
 
 interface Guest {
@@ -152,6 +154,7 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
   const [bulkSending, setBulkSending] = useState<null | 'invitations' | 'reminders' | 'thank-you'>(null);
   const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
   const [showSendInvitationsConfirmation, setShowSendInvitationsConfirmation] = useState(false);
+  const [showAddGuestModal, setShowAddGuestModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -852,7 +855,8 @@ ${event.invitationText}
       {/* Guests List */}
       {(!isClassic || hasLegacyClassicGuests) && (
       <div className="bg-gray-900/60 border border-gray-700 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-700 flex items-start justify-between gap-4 flex-wrap">
+          <div>
           <h3 className="text-lg font-semibold text-white">قائمة الضيوف</h3>
           <p className="text-sm text-gray-400 mt-1">
             {event.packageType === 'vip' && !event.guestListConfirmed?.isConfirmed 
@@ -864,6 +868,19 @@ ${event.invitationText}
             <p className="text-xs text-yellow-300 mt-1">
               ضيوف مُدخلون قبل إلغاء إدخال بيانات الضيوف في الباقة الكلاسيكية
             </p>
+          )}
+          </div>
+
+          {/* Admins can add guests for premium/VIP customers, including after
+              the customer has confirmed their list. */}
+          {(event.packageType === 'premium' || event.packageType === 'vip') && (
+            <button
+              onClick={() => setShowAddGuestModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#C09B52] hover:bg-[#A0884A] text-white rounded-lg text-sm transition-colors"
+            >
+              <UserPlus className="h-4 w-4" />
+              إضافة ضيف
+            </button>
           )}
         </div>
         
@@ -1085,6 +1102,15 @@ ${event.invitationText}
         cancelText="إلغاء"
         variant="warning"
       />
+
+      {showAddGuestModal && (
+        <AddGuestModal
+          eventId={eventId}
+          remainingInvites={guestStats?.remainingInvites ?? 0}
+          onClose={() => setShowAddGuestModal(false)}
+          onAdded={loadEventGuests}
+        />
+      )}
 
       <ConfirmationModal
         isOpen={showSendInvitationsConfirmation}

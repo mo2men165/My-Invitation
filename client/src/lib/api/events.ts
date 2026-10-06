@@ -272,6 +272,23 @@ class EventsAPI {
 
     return result;
   }
+
+  // Reopen a confirmed guest list, so the owner can edit it again without
+  // having to ask an admin.
+  async reopenGuestList(eventId: string): Promise<EventsApiResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/guests/reopen`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في إعادة فتح قائمة الضيوف');
+    }
+
+    return result;
+  }
 }
 
 export const eventsAPI = new EventsAPI();

@@ -21,6 +21,33 @@ import { PackageImage } from '../models/PackageImage';
 import { OrderService } from '../services/orderService';
 import { WhatsappService } from '../services/whatsappService';
 import { getGuestCards, getInvitationSize, getMissingCardCount, hasAllCards } from '../utils/guestCards';
+import { phoneValidationSchema, normalizePhoneNumber } from '../utils/phoneValidation';
+import { z } from 'zod';
+
+// Upload signatures are only ever issued for our own media folders, so a
+// signature cannot be turned into a write anywhere else in the Cloudinary account.
+const ALLOWED_UPLOAD_FOLDERS = /^(events\/[a-f0-9]{24}\/(invitation-cards|guests\/[a-f0-9]{24}\/invites)|package-images)$/;
+
+// What the browser sends back after uploading straight to Cloudinary.
+const uploadedMediaSchema = z.object({
+  public_id: z.string().min(1),
+  secure_url: z.string().url(),
+  url: z.string().url(),
+  format: z.string().optional().default(''),
+  width: z.number().optional().default(0),
+  height: z.number().optional().default(0),
+  bytes: z.number().optional().default(0),
+  created_at: z.string().optional().default(() => new Date().toISOString()),
+  resource_type: z.enum(['image', 'video']).optional().default('image'),
+  duration: z.number().optional()
+});
+
+// Same shape the customer-facing add-guest endpoint accepts.
+const adminGuestSchema = z.object({
+  name: z.string().min(2).max(100),
+  phone: phoneValidationSchema,
+  numberOfAccompanyingGuests: z.number().int().min(1).max(10)
+});
 
 
 const router = Router();
@@ -503,11 +530,37 @@ router.post('/events/:eventId/approve', uploadSingleImage, withDB(async (req: Re
           error: { message: `فشل رفع الصورة: ${uploadError.message}` }
         });
       }
+    } else if (req.body?.media) {
+      // Large cards and every video are uploaded straight to Cloudinary by the
+      // browser, which posts the resulting metadata here instead of the file.
+      const parsed = uploadedMediaSchema.safeParse(
+        typeof req.body.media === 'string' ? JSON.parse(req.body.media) : req.body.media
+      );
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'بيانات الملف المرفوع غير صالحة' }
+        });
+      }
+
+      invitationCardImage = parsed.data;
+
+      if (event.invitationCardImage?.public_id) {
+        try {
+          await CloudinaryService.deleteImage(
+            event.invitationCardImage.public_id,
+            event.invitationCardImage.resource_type
+          );
+        } catch (deleteError) {
+          logger.warn('Failed to delete old invitation card:', deleteError);
+        }
+      }
     } else {
       // If no image provided, return error (image is now required)
       return res.status(400).json({
         success: false,
-        error: { message: 'يجب رفع صورة بطاقة الدعوة' }
+        error: { message: 'يجب رفع بطاقة الدعوة' }
       });
     }
 
@@ -613,6 +666,42 @@ router.post('/events/:eventId/reject', withDB(async (req: Request, res: Response
 }));
 
 /**
+ * POST /api/admin/uploads/signature
+ * Hand the browser a signed, short-lived permission to upload one file straight
+ * to Cloudinary. Invitation cards can be videos, and a serverless request body
+ * is capped at 4.5MB on Vercel, so large files cannot be relayed through here.
+ */
+router.post('/uploads/signature', withDB(async (req: Request, res: Response) => {
+  try {
+    const { folder, resourceType } = req.body ?? {};
+
+    if (typeof folder !== 'string' || !ALLOWED_UPLOAD_FOLDERS.test(folder)) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'مسار الرفع غير صالح' }
+      });
+    }
+
+    if (resourceType !== 'image' && resourceType !== 'video') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'نوع الملف غير مدعوم' }
+      });
+    }
+
+    const signature = CloudinaryService.generateUploadSignature(folder, resourceType);
+
+    return res.json({ success: true, data: signature });
+  } catch (error) {
+    logger.error('Error generating upload signature:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في تجهيز الرفع' }
+    });
+  }
+}));
+
+/**
  * PUT /api/admin/events/:eventId/image
  * Update event invitation card image (can create if not exists or update if exists)
  */
@@ -628,6 +717,42 @@ router.put('/events/:eventId/image', uploadSingleImage, withDB(async (req: Reque
       return res.status(404).json({
         success: false,
         error: { message: 'الحدث غير موجود' }
+      });
+    }
+
+    // The browser uploads large files, and every video, straight to Cloudinary
+    // and posts the resulting metadata here instead of the file itself.
+    if (!file && req.body?.media) {
+      const parsed = uploadedMediaSchema.safeParse(req.body.media);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'بيانات الملف المرفوع غير صالحة' }
+        });
+      }
+
+      const previousPublicId = event.invitationCardImage?.public_id;
+      const previousResourceType = event.invitationCardImage?.resource_type;
+
+      event.invitationCardImage = parsed.data;
+      await event.save();
+
+      if (previousPublicId && previousPublicId !== parsed.data.public_id) {
+        try {
+          await CloudinaryService.deleteImage(previousPublicId, previousResourceType);
+        } catch (deleteError) {
+          logger.warn('Failed to delete old invitation card:', deleteError);
+        }
+      }
+
+      logger.info(`Event ${eventId} invitation card updated by admin ${adminId}`, {
+        resourceType: parsed.data.resource_type
+      });
+
+      return res.json({
+        success: true,
+        message: 'تم تحديث بطاقة الدعوة بنجاح',
+        data: { invitationCardImage: event.invitationCardImage }
       });
     }
 
@@ -886,6 +1011,106 @@ router.get('/events/:eventId/guests', withDB(async (req: Request, res: Response)
     return res.status(500).json({
       success: false,
       error: { message: 'خطأ في جلب ضيوف المناسبة' }
+    });
+  }
+}));
+
+/**
+ * POST /api/admin/events/:eventId/guests
+ * Add a guest to a premium/VIP event on the customer's behalf. Unlike the
+ * customer-facing endpoint this one also works once the guest list is confirmed,
+ * since an admin adding a guest is a deliberate act rather than an edit the
+ * customer slipped in after locking the list.
+ */
+router.post('/events/:eventId/guests', withDB(async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
+    const adminId = req.user!.id;
+
+    const validationResult = adminGuestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.issues[0];
+      return res.status(400).json({
+        success: false,
+        error: { message: firstError.message }
+      });
+    }
+
+    const guestData = validationResult.data;
+
+    const event = await Event.findById(eventIdString);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'المناسبة غير موجودة' }
+      });
+    }
+
+    if (event.packageType !== 'premium' && event.packageType !== 'vip') {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'إضافة الضيوف متاحة فقط لباقات Premium و VIP' }
+      });
+    }
+
+    const phone = normalizePhoneNumber(guestData.phone);
+
+    if (event.guests.some(guest => guest.phone === phone)) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'هذا الضيف موجود بالفعل' }
+      });
+    }
+
+    // Same capacity rule as the customer-facing endpoint: declined guests whose
+    // slots were refunded do not count against the package.
+    const currentInvited = calculateEffectiveTotalInvited(event.guests);
+    const remaining = event.details.inviteCount - currentInvited;
+
+    if (guestData.numberOfAccompanyingGuests > remaining) {
+      return res.status(400).json({
+        success: false,
+        error: { message: `تجاوز العدد المسموح. المتبقي: ${remaining} دعوة` }
+      });
+    }
+
+    event.guests.push({
+      name: guestData.name,
+      phone,
+      numberOfAccompanyingGuests: guestData.numberOfAccompanyingGuests,
+      whatsappMessageSent: false,
+      addedAt: new Date(),
+      updatedAt: new Date(),
+      addedBy: {
+        type: 'admin',
+        userId: new Types.ObjectId(adminId)
+      }
+    } as any);
+
+    await event.save();
+
+    const addedGuest = event.guests[event.guests.length - 1];
+
+    logger.info(`Admin ${adminId} added guest to event ${eventId}`, {
+      guestName: guestData.name,
+      people: guestData.numberOfAccompanyingGuests
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'تم إضافة الضيف بنجاح',
+      data: {
+        guest: addedGuest,
+        remainingInvites: event.details.inviteCount - calculateEffectiveTotalInvited(event.guests)
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error adding guest as admin:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في إضافة الضيف' }
     });
   }
 }));

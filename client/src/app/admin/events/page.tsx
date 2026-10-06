@@ -5,6 +5,15 @@ import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminEventGuests } from '@/components/admin/AdminEventGuests';
 import { Calendar, Search, Check, X, Clock, Eye, CheckCircle, XCircle, MessageSquare, Users, MapPin, Package, ExternalLink, QrCode, CreditCard, Truck, UserCheck, ImageIcon } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
+import {
+  validateMediaFile,
+  isVideoFile,
+  formatBytes,
+  IMAGE_TYPES,
+  VIDEO_TYPES,
+  MAX_IMAGE_BYTES,
+  MAX_VIDEO_BYTES
+} from '@/lib/uploadMedia';
 import { useToast } from '@/hooks/useToast';
 import { useAppSelector } from '@/store';
 import Image from 'next/image';
@@ -46,6 +55,7 @@ interface Event {
   rejectedAt?: string;
   paymentCompletedAt: string;
   invitationCardImage?: {
+    resource_type?: string;
     public_id: string;
     secure_url: string;
     url: string;
@@ -95,6 +105,7 @@ export default function AdminEventsPage() {
   const [processingApproval, setProcessingApproval] = useState(false);
   const [editingEventImage, setEditingEventImage] = useState(false);
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
   const [uploadingEventImage, setUploadingEventImage] = useState(false);
   const { toast } = useToast();
@@ -175,32 +186,22 @@ export default function AdminEventsPage() {
     try {
       setUploadingEventImage(true);
 
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-      if (!allowedTypes.includes(eventImageFile.type)) {
-        toast({
-          title: "خطأ",
-          description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
-          variant: "destructive"
-        });
+      const validation = validateMediaFile(eventImageFile);
+      if (!validation.valid) {
+        toast({ title: "خطأ", description: validation.error, variant: "destructive" });
         return;
       }
 
-      // Validate file size (10MB)
-      if (eventImageFile.size > 10 * 1024 * 1024) {
-        toast({
-          title: "خطأ",
-          description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
-          variant: "destructive"
-        });
-        return;
-      }
+      // The file goes straight to Cloudinary, so progress is worth showing: a
+      // video can take a while.
+      setUploadProgress(0);
+      await adminAPI.updateEventImage(selectedEvent.id, eventImageFile, setUploadProgress);
 
-      await adminAPI.updateEventImage(selectedEvent.id, eventImageFile);
-      
       toast({
         title: "تم بنجاح",
-        description: "تم تحديث صورة بطاقة الدعوة بنجاح",
+        description: isVideoFile(eventImageFile)
+          ? "تم تحديث فيديو بطاقة الدعوة بنجاح"
+          : "تم تحديث صورة بطاقة الدعوة بنجاح",
         variant: "default"
       });
 
@@ -266,28 +267,20 @@ export default function AdminEventsPage() {
           return;
         }
 
-        // Validate file type
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-        if (!allowedTypes.includes(invitationCardImage.type)) {
-          toast({
-            title: "خطأ",
-            description: "نوع الملف غير مدعوم. يرجى رفع صورة (JPG, PNG, WebP)",
-            variant: "destructive"
-          });
+        const validation = validateMediaFile(invitationCardImage);
+        if (!validation.valid) {
+          toast({ title: "خطأ", description: validation.error, variant: "destructive" });
           return;
         }
 
-        // Validate file size (10MB)
-        if (invitationCardImage.size > 10 * 1024 * 1024) {
-          toast({
-            title: "خطأ",
-            description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        await adminAPI.approveEvent(selectedEvent.id, invitationCardImage, approvalNotes || undefined, qrCodeReaderUrl.trim() || undefined);
+        setUploadProgress(0);
+        await adminAPI.approveEvent(
+          selectedEvent.id,
+          invitationCardImage,
+          approvalNotes || undefined,
+          qrCodeReaderUrl.trim() || undefined,
+          setUploadProgress
+        );
         toast({
           title: "تم بنجاح",
           description: "تم الموافقة على الحدث وإرسال إشعار للمستخدم",
@@ -1030,43 +1023,31 @@ export default function AdminEventsPage() {
                           </label>
                           <input
                             type="file"
-                            accept="image/jpeg,image/jpg,image/png"
+                            accept={[...IMAGE_TYPES, ...VIDEO_TYPES].join(',')}
                             onChange={(e) => {
                               const file = e.target.files?.[0] || null;
                               if (file) {
-                                // Validate file type
-                                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-                                if (!allowedTypes.includes(file.type)) {
-                                  toast({
-                                    title: "خطأ",
-                                    description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
-                                    variant: "destructive"
-                                  });
-                                  e.target.value = ''; // Clear the input
+                                const validation = validateMediaFile(file);
+                                if (!validation.valid) {
+                                  toast({ title: "خطأ", description: validation.error, variant: "destructive" });
+                                  e.target.value = '';
                                   setEventImageFile(null);
                                   setEventImagePreview(null);
                                   return;
                                 }
-                                
-                                // Validate file size (10MB)
-                                if (file.size > 10 * 1024 * 1024) {
-                                  toast({
-                                    title: "خطأ",
-                                    description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
-                                    variant: "destructive"
-                                  });
-                                  e.target.value = ''; // Clear the input
-                                  setEventImageFile(null);
-                                  setEventImagePreview(null);
-                                  return;
-                                }
-                                
+
                                 setEventImageFile(file);
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setEventImagePreview(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
+                                // A data URL of a large video would pin it all in
+                                // memory, so videos preview from a blob URL.
+                                if (isVideoFile(file)) {
+                                  setEventImagePreview(URL.createObjectURL(file));
+                                } else {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setEventImagePreview(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
                               } else {
                                 setEventImageFile(null);
                                 setEventImagePreview(null);
@@ -1075,18 +1056,26 @@ export default function AdminEventsPage() {
                             className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
                           />
                           <p className="text-xs text-gray-500 mt-1">
-                            الصيغ المدعومة: JPEG, PNG فقط (الحد الأقصى: 10 ميجابايت)
+                            الصور: JPEG, PNG, WebP (حتى {formatBytes(MAX_IMAGE_BYTES)}) — الفيديو: MP4, MOV, WebM (حتى {formatBytes(MAX_VIDEO_BYTES)})
                           </p>
                         </div>
                         {eventImagePreview && (
                           <div className="mt-3">
-                            <p className="text-xs text-gray-400 mb-2">معاينة الصورة:</p>
+                            <p className="text-xs text-gray-400 mb-2">معاينة:</p>
                             <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
-                              <img
-                                src={eventImagePreview}
-                                alt="Preview"
-                                className="w-full h-auto max-h-64 object-contain"
-                              />
+                              {eventImageFile && isVideoFile(eventImageFile) ? (
+                                <video
+                                  src={eventImagePreview}
+                                  controls
+                                  className="w-full h-auto max-h-64"
+                                />
+                              ) : (
+                                <img
+                                  src={eventImagePreview}
+                                  alt="Preview"
+                                  className="w-full h-auto max-h-64 object-contain"
+                                />
+                              )}
                             </div>
                             {eventImageFile && (
                               <p className="text-xs text-gray-500 mt-2">
@@ -1097,13 +1086,21 @@ export default function AdminEventsPage() {
                         )}
                         {selectedEvent.invitationCardImage && !eventImagePreview && (
                           <div className="mt-3">
-                            <p className="text-xs text-gray-400 mb-2">الصورة الحالية:</p>
+                            <p className="text-xs text-gray-400 mb-2">البطاقة الحالية:</p>
                             <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
-                              <img
-                                src={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
-                                alt="Current Invitation Card"
-                                className="w-full h-auto max-h-64 object-contain"
-                              />
+                              {selectedEvent.invitationCardImage.resource_type === 'video' ? (
+                                <video
+                                  src={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
+                                  controls
+                                  className="w-full h-auto max-h-64"
+                                />
+                              ) : (
+                                <img
+                                  src={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
+                                  alt="Current Invitation Card"
+                                  className="w-full h-auto max-h-64 object-contain"
+                                />
+                              )}
                             </div>
                           </div>
                         )}
@@ -1116,10 +1113,12 @@ export default function AdminEventsPage() {
                             {uploadingEventImage ? (
                               <div className="flex items-center justify-center">
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                جاري الرفع...
+                                {uploadProgress !== null && uploadProgress < 100
+                                  ? `جاري الرفع... ${uploadProgress}%`
+                                  : 'جاري الحفظ...'}
                               </div>
                             ) : (
-                              'حفظ الصورة'
+                              'حفظ البطاقة'
                             )}
                           </button>
                           <button
@@ -1138,11 +1137,19 @@ export default function AdminEventsPage() {
                     ) : selectedEvent.invitationCardImage ? (
                       <div className="space-y-4">
                         <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
-                          <img
-                            src={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
-                            alt="Invitation Card"
-                            className="w-full h-auto max-h-96 object-contain"
-                          />
+                          {selectedEvent.invitationCardImage.resource_type === 'video' ? (
+                            <video
+                              src={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
+                              controls
+                              className="w-full h-auto max-h-96"
+                            />
+                          ) : (
+                            <img
+                              src={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
+                              alt="Invitation Card"
+                              className="w-full h-auto max-h-96 object-contain"
+                            />
+                          )}
                         </div>
                         <a
                           href={selectedEvent.invitationCardImage.secure_url || selectedEvent.invitationCardImage.url}
@@ -1267,48 +1274,36 @@ export default function AdminEventsPage() {
                 {approvalAction === 'approve' && (
                   <div>
                     <label className="text-sm text-gray-400 mb-2 block">
-                      صورة بطاقة الدعوة *
+                      بطاقة الدعوة (صورة أو فيديو) *
                     </label>
                     <div className="space-y-3">
                       <input
                         type="file"
-                        accept="image/jpeg,image/jpg,image/png"
+                        accept={[...IMAGE_TYPES, ...VIDEO_TYPES].join(',')}
                         onChange={(e) => {
                           const file = e.target.files?.[0] || null;
                           if (file) {
-                            // Validate file type
-                            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-                            if (!allowedTypes.includes(file.type)) {
-                              toast({
-                                title: "خطأ",
-                                description: "نوع الملف غير مدعوم. يرجى رفع صورة بصيغة JPEG أو PNG فقط",
-                                variant: "destructive"
-                              });
-                              e.target.value = ''; // Clear the input
+                            const validation = validateMediaFile(file);
+                            if (!validation.valid) {
+                              toast({ title: "خطأ", description: validation.error, variant: "destructive" });
+                              e.target.value = '';
                               setInvitationCardImage(null);
                               setInvitationCardImagePreview(null);
                               return;
                             }
-                            
-                            // Validate file size (10MB)
-                            if (file.size > 10 * 1024 * 1024) {
-                              toast({
-                                title: "خطأ",
-                                description: "حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت",
-                                variant: "destructive"
-                              });
-                              e.target.value = ''; // Clear the input
-                              setInvitationCardImage(null);
-                              setInvitationCardImagePreview(null);
-                              return;
-                            }
-                            
+
                             setInvitationCardImage(file);
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setInvitationCardImagePreview(reader.result as string);
-                            };
-                            reader.readAsDataURL(file);
+                            // A data URL of a large video would pin it all in
+                            // memory, so videos preview from a blob URL.
+                            if (isVideoFile(file)) {
+                              setInvitationCardImagePreview(URL.createObjectURL(file));
+                            } else {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setInvitationCardImagePreview(reader.result as string);
+                              };
+                              reader.readAsDataURL(file);
+                            }
                           } else {
                             setInvitationCardImage(null);
                             setInvitationCardImagePreview(null);
@@ -1318,17 +1313,25 @@ export default function AdminEventsPage() {
                         required
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        الصيغ المدعومة: JPEG, PNG فقط (الحد الأقصى: 10 ميجابايت)
+                        الصور: JPEG, PNG, WebP (حتى {formatBytes(MAX_IMAGE_BYTES)}) — الفيديو: MP4, MOV, WebM (حتى {formatBytes(MAX_VIDEO_BYTES)})
                       </p>
                       {invitationCardImagePreview && (
                         <div className="mt-3">
-                          <p className="text-xs text-gray-400 mb-2">معاينة الصورة:</p>
+                          <p className="text-xs text-gray-400 mb-2">معاينة:</p>
                           <div className="relative border border-gray-600 rounded-lg overflow-hidden bg-gray-800">
-                            <img
-                              src={invitationCardImagePreview}
-                              alt="Preview"
-                              className="w-full h-auto max-h-64 object-contain"
-                            />
+                            {invitationCardImage && isVideoFile(invitationCardImage) ? (
+                              <video
+                                src={invitationCardImagePreview}
+                                controls
+                                className="w-full h-auto max-h-64"
+                              />
+                            ) : (
+                              <img
+                                src={invitationCardImagePreview}
+                                alt="Preview"
+                                className="w-full h-auto max-h-64 object-contain"
+                              />
+                            )}
                           </div>
                           <p className="text-xs text-gray-500 mt-2">
                             الملف: {invitationCardImage?.name} ({invitationCardImage ? ((invitationCardImage.size / 1024 / 1024).toFixed(2)) : '0.00'} MB)

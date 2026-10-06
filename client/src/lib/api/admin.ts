@@ -1,3 +1,5 @@
+import { uploadMedia } from '@/lib/uploadMedia';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 interface DashboardStats {
@@ -290,21 +292,26 @@ export const adminAPI = {
     };
   },
 
-  // Approve Event
-  async approveEvent(eventId: string, invitationCardImage: File, notes?: string, qrCodeReaderUrl?: string): Promise<void> {
-    const formData = new FormData();
-    formData.append('image', invitationCardImage);
-    if (notes) formData.append('notes', notes);
-    if (qrCodeReaderUrl) formData.append('qrCodeReaderUrl', qrCodeReaderUrl);
+  // Approve Event. The card goes straight to Cloudinary first - it may be a
+  // video, and the API cannot relay a body that size - and only its metadata
+  // reaches us.
+  async approveEvent(
+    eventId: string,
+    invitationCard: File,
+    notes?: string,
+    qrCodeReaderUrl?: string,
+    onUploadProgress?: (percent: number) => void
+  ): Promise<void> {
+    const media = await uploadMedia(invitationCard, `events/${eventId}/invitation-cards`, onUploadProgress);
 
     const response = await fetch(`${API_URL}/api/admin/events/${eventId}/approve`, {
       method: 'POST',
-      headers: getAuthHeaders(false), // Don't include Content-Type, let browser set it with boundary
-      body: formData
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ media, notes, qrCodeReaderUrl })
     });
-    
+
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.error?.message || 'فشل في الموافقة على الحدث');
     }
@@ -325,21 +332,42 @@ export const adminAPI = {
     }
   },
 
-  // Update Event Image
-  async updateEventImage(eventId: string, invitationCardImage: File): Promise<void> {
-    const formData = new FormData();
-    formData.append('image', invitationCardImage);
+  // Replace an event's invitation card (image or video)
+  async updateEventImage(
+    eventId: string,
+    invitationCard: File,
+    onUploadProgress?: (percent: number) => void
+  ): Promise<void> {
+    const media = await uploadMedia(invitationCard, `events/${eventId}/invitation-cards`, onUploadProgress);
 
     const response = await fetch(`${API_URL}/api/admin/events/${eventId}/image`, {
       method: 'PUT',
-      headers: getAuthHeaders(false), // Don't include Content-Type, let browser set it with boundary
-      body: formData
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ media })
     });
-    
+
     const result = await response.json();
-    
+
     if (!response.ok) {
-      throw new Error(result.error?.message || 'فشل في تحديث صورة الحدث');
+      throw new Error(result.error?.message || 'فشل في تحديث بطاقة الدعوة');
+    }
+  },
+
+  // Add a guest to a premium/VIP event on the customer's behalf
+  async addEventGuest(
+    eventId: string,
+    guest: { name: string; phone: string; numberOfAccompanyingGuests: number }
+  ): Promise<void> {
+    const response = await fetch(`${API_URL}/api/admin/events/${eventId}/guests`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(guest)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || 'فشل في إضافة الضيف');
     }
   },
 

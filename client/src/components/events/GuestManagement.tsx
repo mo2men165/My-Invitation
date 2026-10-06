@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users2, AlertCircle, CheckSquare, Loader2, Send, MessageCircle, ShieldCheck } from 'lucide-react';
+import { Users2, AlertCircle, CheckSquare, Loader2, Send, MessageCircle, ShieldCheck, Unlock } from 'lucide-react';
 import { Guest } from '@/types/event';
 import { getMissingCardCount, hasAllCards } from '@/utils/guestCards';
 import { GuestForm } from './GuestForm';
@@ -35,6 +35,7 @@ interface GuestManagementProps {
   onRemoveGuest: (guestId: string) => Promise<void>;
   onUpdateGuest: (guestId: string, updates: Partial<Guest>) => Promise<void>;
   onConfirmGuestList: () => Promise<void>;
+  onReopenGuestList?: () => Promise<void>;
   sendingWhatsapp?: string | null;
   sendingBulkWhatsapp?: boolean;
   bulkProgress?: { sent: number; total: number } | null;
@@ -60,6 +61,7 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
   onRemoveGuest,
   onUpdateGuest,
   onConfirmGuestList,
+  onReopenGuestList,
   sendingWhatsapp,
   sendingBulkWhatsapp,
   bulkProgress,
@@ -219,6 +221,32 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
               </p>
             </div>
           </div>
+
+          {/* The owner can reopen their own list rather than asking an admin */}
+          {userRole === 'owner' && onReopenGuestList && (
+            <div className="mt-4 pt-4 border-t border-green-700/40 flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-xs text-green-100/80">
+                تحتاج لإضافة أو تعديل ضيف؟ يمكنك إعادة فتح القائمة وتأكيدها مرة أخرى
+              </p>
+              <button
+                onClick={onReopenGuestList}
+                disabled={confirmingGuestList}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors duration-200 flex items-center gap-2 whitespace-nowrap"
+              >
+                {confirmingGuestList ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    جاري إعادة الفتح...
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="w-4 h-4" />
+                    إعادة فتح القائمة
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-xl p-4 mb-6 bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-700">
