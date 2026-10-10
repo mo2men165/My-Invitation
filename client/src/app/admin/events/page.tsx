@@ -5,14 +5,18 @@ import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminEventGuests } from '@/components/admin/AdminEventGuests';
 import { Calendar, Search, Check, X, Clock, Eye, CheckCircle, XCircle, MessageSquare, Users, MapPin, Package, ExternalLink, QrCode, CreditCard, Truck, UserCheck, ImageIcon } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
+import { InvitationCardModal } from '@/components/admin/InvitationCardModal';
 import {
   validateMediaFile,
+  validateInvitationCard,
   isVideoFile,
   formatBytes,
+  formatDuration,
   IMAGE_TYPES,
   VIDEO_TYPES,
   MAX_IMAGE_BYTES,
-  MAX_VIDEO_BYTES
+  MAX_VIDEO_BYTES,
+  MAX_VIDEO_SECONDS
 } from '@/lib/uploadMedia';
 import { useToast } from '@/hooks/useToast';
 import { useAppSelector } from '@/store';
@@ -56,6 +60,8 @@ interface Event {
   paymentCompletedAt: string;
   invitationCardImage?: {
     resource_type?: string;
+    whatsapp_bytes?: number;
+    duration?: number;
     public_id: string;
     secure_url: string;
     url: string;
@@ -106,6 +112,7 @@ export default function AdminEventsPage() {
   const [editingEventImage, setEditingEventImage] = useState(false);
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [cardModalEvent, setCardModalEvent] = useState<Event | null>(null);
   const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
   const [uploadingEventImage, setUploadingEventImage] = useState(false);
   const { toast } = useToast();
@@ -186,9 +193,9 @@ export default function AdminEventsPage() {
     try {
       setUploadingEventImage(true);
 
-      const validation = validateMediaFile(eventImageFile);
+      const validation = await validateInvitationCard(eventImageFile);
       if (!validation.valid) {
-        toast({ title: "خطأ", description: validation.error, variant: "destructive" });
+        toast({ title: "لا يمكن استخدام هذا الملف", description: validation.error, variant: "destructive" });
         return;
       }
 
@@ -267,9 +274,9 @@ export default function AdminEventsPage() {
           return;
         }
 
-        const validation = validateMediaFile(invitationCardImage);
+        const validation = await validateInvitationCard(invitationCardImage);
         if (!validation.valid) {
-          toast({ title: "خطأ", description: validation.error, variant: "destructive" });
+          toast({ title: "لا يمكن استخدام هذا الملف", description: validation.error, variant: "destructive" });
           return;
         }
 
@@ -573,6 +580,26 @@ export default function AdminEventsPage() {
                             <Eye className="w-4 h-4" />
                           </button>
                           
+                          {/* Invitation card. It used to be settable only at
+                              approval, with no way back to it afterwards. */}
+                          {event.approvalStatus === 'approved' && (
+                            <button
+                              onClick={() => setCardModalEvent(event)}
+                              className={`p-2.5 text-white rounded-lg transition-colors duration-200 ${
+                                event.invitationCardImage
+                                  ? 'bg-blue-600 hover:bg-blue-700'
+                                  : 'bg-yellow-600 hover:bg-yellow-700'
+                              }`}
+                              title={
+                                event.invitationCardImage
+                                  ? `بطاقة الدعوة (${event.invitationCardImage.resource_type === 'video' ? 'فيديو' : 'صورة'})`
+                                  : 'بطاقة الدعوة (لم تُرفع بعد)'
+                              }
+                            >
+                              <ImageIcon className="w-4 h-4" />
+                            </button>
+                          )}
+
                           {/* Guest Management Button - All Packages.
                               Classic events have no guest list, so the button
                               tracks delivery of the cards to the customer. */}
@@ -657,8 +684,35 @@ export default function AdminEventsPage() {
         </div>
 
         {/* Event Details Modal */}
+        {cardModalEvent && (
+          <InvitationCardModal
+            eventId={cardModalEvent.id}
+            eventName={cardModalEvent.eventDetails.eventName || cardModalEvent.eventDetails.hostName}
+            card={cardModalEvent.invitationCardImage}
+            onClose={() => setCardModalEvent(null)}
+            onUpdated={async () => {
+              const refreshed = await adminAPI.getAllEvents({
+                page: currentPage,
+                limit: 10,
+                search: searchTerm,
+                approvalStatus: approvalStatusFilter,
+                status: statusFilter
+              });
+              setEvents(refreshed.data);
+              setTotalPages(refreshed.pagination.pages);
+              const updated = refreshed.data.find(e => e.id === cardModalEvent.id);
+              if (updated) {
+                setCardModalEvent(updated);
+                if (selectedEvent?.id === updated.id) {
+                  setSelectedEvent(updated);
+                }
+              }
+            }}
+          />
+        )}
+
         {showDetailsModal && selectedEvent && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-700 sticky top-0 bg-gray-900 z-10">
                 <div className="flex items-center justify-between">
@@ -1056,7 +1110,7 @@ export default function AdminEventsPage() {
                             className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-[#C09B52] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#C09B52] file:text-white hover:file:bg-[#A0884A] cursor-pointer"
                           />
                           <p className="text-xs text-gray-500 mt-1">
-                            الصور: JPEG, PNG, WebP (حتى {formatBytes(MAX_IMAGE_BYTES)}) — الفيديو: MP4, MOV, WebM (حتى {formatBytes(MAX_VIDEO_BYTES)})
+                            الصور: JPEG, PNG, WebP (حتى {formatBytes(MAX_IMAGE_BYTES)}) — الفيديو: MP4, MOV, WebM (حتى {formatBytes(MAX_VIDEO_BYTES)}، وبحد أقصى {formatDuration(MAX_VIDEO_SECONDS)})
                           </p>
                         </div>
                         {eventImagePreview && (
@@ -1313,7 +1367,7 @@ export default function AdminEventsPage() {
                         required
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        الصور: JPEG, PNG, WebP (حتى {formatBytes(MAX_IMAGE_BYTES)}) — الفيديو: MP4, MOV, WebM (حتى {formatBytes(MAX_VIDEO_BYTES)})
+                        الصور: JPEG, PNG, WebP (حتى {formatBytes(MAX_IMAGE_BYTES)}) — الفيديو: MP4, MOV, WebM (حتى {formatBytes(MAX_VIDEO_BYTES)}، وبحد أقصى {formatDuration(MAX_VIDEO_SECONDS)})
                       </p>
                       {invitationCardImagePreview && (
                         <div className="mt-3">

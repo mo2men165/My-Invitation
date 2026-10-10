@@ -34,6 +34,67 @@ export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 
 export const isVideoFile = (file: File) => file.type.startsWith('video/');
 
+// WhatsApp refuses video over 16MB. Invitation videos are transcoded to roughly
+// 1Mbps, so duration is what decides whether the result fits - about two and a
+// half minutes. Checking it here means an admin is told before spending minutes
+// uploading something that can never be sent.
+export const WHATSAPP_VIDEO_MAX_BYTES = 16 * 1024 * 1024;
+const TRANSCODE_BITS_PER_SECOND = 1_000_000;
+export const MAX_VIDEO_SECONDS = Math.floor(
+  (WHATSAPP_VIDEO_MAX_BYTES * 8) / TRANSCODE_BITS_PER_SECOND
+);
+
+export const formatDuration = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return mins > 0 ? `${mins}:${String(secs).padStart(2, '0')} دقيقة` : `${secs} ثانية`;
+};
+
+/** Reads a video's duration in the browser, without uploading it. */
+export function readVideoDuration(file: File): Promise<number> {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const probe = document.createElement('video');
+
+    const done = (duration: number) => {
+      URL.revokeObjectURL(url);
+      resolve(duration);
+    };
+
+    probe.preload = 'metadata';
+    // An unreadable duration should not block the upload; the server still
+    // checks the transcoded size before the card is saved.
+    probe.onloadedmetadata = () => done(Number.isFinite(probe.duration) ? probe.duration : 0);
+    probe.onerror = () => done(0);
+    probe.src = url;
+  });
+}
+
+/**
+ * Full pre-upload check for an invitation card: type, size, and for video the
+ * duration that decides whether the transcoded result fits WhatsApp's ceiling.
+ */
+export async function validateInvitationCard(file: File): Promise<{ valid: boolean; error?: string }> {
+  const basic = validateMediaFile(file);
+  if (!basic.valid) {
+    return basic;
+  }
+
+  if (!isVideoFile(file)) {
+    return { valid: true };
+  }
+
+  const duration = await readVideoDuration(file);
+  if (duration > MAX_VIDEO_SECONDS) {
+    return {
+      valid: false,
+      error: `الفيديو طويل جداً (${formatDuration(duration)}). الحد الأقصى ${formatDuration(MAX_VIDEO_SECONDS)} حتى يبقى داخل حد الواتساب (16 ميجابايت)`
+    };
+  }
+
+  return { valid: true };
+}
+
 export const formatBytes = (bytes: number) => {
   if (bytes >= 1024 * 1024) {
     return `${(bytes / 1024 / 1024).toFixed(1)} ميجابايت`;
