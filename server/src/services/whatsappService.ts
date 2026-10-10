@@ -591,6 +591,40 @@ export class WhatsappService {
   }
 
   /**
+   * Make sure a video card has a WhatsApp-safe rendition to send. Cards uploaded
+   * before renditions were generated at upload time carry only the original,
+   * which Meta refuses with 131053, so one is derived from the public id and
+   * pre-generated before Meta is pointed at it.
+   *
+   * The fallback runs from a webhook with its own freshly loaded event, so it
+   * needs this too - the initial send's derivation was never persisted.
+   */
+  private static async ensureWhatsappVideoRendition(event: any, eventId: string): Promise<void> {
+    if (event.invitationCardImage?.resource_type !== 'video') {
+      return;
+    }
+
+    if (event.invitationCardImage?.whatsapp_url) {
+      return;
+    }
+
+    const derived = CloudinaryService.buildWhatsappVideoUrl(
+      event.invitationCardImage?.secure_url || event.invitationCardImage?.url || ''
+    );
+
+    if (!derived) {
+      return;
+    }
+
+    logger.info('WHATSAPP: Deriving a WhatsApp rendition for a card uploaded before transcoding', {
+      eventId,
+      derived
+    });
+    await CloudinaryService.warmWhatsappVideo(derived);
+    event.invitationCardImage.whatsapp_url = derived;
+  }
+
+  /**
    * Google Maps link for an event, however its location was captured.
    */
   private static buildMapsLink(event: any): string {
@@ -1422,20 +1456,7 @@ export class WhatsappService {
       // Cards uploaded before renditions were generated at upload time have no
       // whatsapp_url, so derive one and give Cloudinary a moment to build it
       // rather than sending Meta a file it cannot decode.
-      if (isVideoCard && !event.invitationCardImage?.whatsapp_url) {
-        const derived = CloudinaryService.buildWhatsappVideoUrl(
-          event.invitationCardImage?.secure_url || event.invitationCardImage?.url || ''
-        );
-
-        if (derived) {
-          logger.info('WHATSAPP: Deriving a WhatsApp rendition for a card uploaded before transcoding', {
-            eventId,
-            derived
-          });
-          await CloudinaryService.warmWhatsappVideo(derived);
-          event.invitationCardImage.whatsapp_url = derived;
-        }
-      }
+      await this.ensureWhatsappVideoRendition(event, eventId);
 
       const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, templateName);
 
@@ -1644,6 +1665,8 @@ export class WhatsappService {
         });
         return { success: false, error: 'Event invitation card image URL is invalid or not accessible' };
       }
+
+      await this.ensureWhatsappVideoRendition(event, eventId);
 
       // Build message data using reusable method with fallback template name
       const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, fallbackTemplate);
