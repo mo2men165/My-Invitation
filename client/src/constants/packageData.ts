@@ -84,3 +84,29 @@ export const packageData: PackageData = {
     ]
   }
 };
+
+// ===========================================================================
+// CLASSIC PACKAGE TEMPORARILY DISABLED
+// ---------------------------------------------------------------------------
+// The classic package is not on sale for now. Its data above is deliberately
+// left in place: existing classic orders, bills and events still render their
+// package name, features and pricing from it.
+//
+// Only its purchasability is switched off, by leaving it out of the list below.
+// To bring the classic package back, uncomment the 'classic' line - no other
+// change is needed on the client.
+// ===========================================================================
+export const PURCHASABLE_PACKAGE_KEYS: Array<keyof PackageData> = [
+  // 'classic',
+  'premium',
+  'vip'
+];
+
+export const isPackagePurchasable = (packageType: string): boolean =>
+  PURCHASABLE_PACKAGE_KEYS.includes(packageType as keyof PackageData);
+
+/** packageData limited to what is currently on sale, for the packages page. */
+export const purchasablePackageData: PackageData = PURCHASABLE_PACKAGE_KEYS.reduce(
+  (acc, key) => ({ ...acc, [key]: packageData[key] }),
+  {} as PackageData
+);

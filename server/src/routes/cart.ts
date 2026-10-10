@@ -7,7 +7,9 @@ import { withDB } from '../utils/routeUtils';
 import {
   cartItemSchema, 
   updateCartItemSchema, 
-  mongoIdSchema 
+  mongoIdSchema,
+  isPackagePurchasable,
+  DISABLED_PACKAGE_MESSAGE
 } from '../utils/validation';
 import { Types } from 'mongoose';
 
@@ -76,6 +78,14 @@ router.post('/', withDB(async (req: Request, res: Response) => {
     }
 
     const cartItemData = validationResult.data;
+
+    // CLASSIC PACKAGE TEMPORARILY DISABLED - see DISABLED_PACKAGE_TYPES
+    if (!isPackagePurchasable(cartItemData.packageType)) {
+      return res.status(400).json({
+        success: false,
+        error: { message: DISABLED_PACKAGE_MESSAGE }
+      });
+    }
 
     // Find user and check cart limits
     const user = await User.findById(userId);
@@ -206,6 +216,13 @@ router.patch('/:id', withDB(async (req: Request, res: Response) => {
       cartItem.designId = new Types.ObjectId(updateData.designId);
     }
     if (updateData.packageType) {
+      // CLASSIC PACKAGE TEMPORARILY DISABLED - see DISABLED_PACKAGE_TYPES
+      if (!isPackagePurchasable(updateData.packageType)) {
+        return res.status(400).json({
+          success: false,
+          error: { message: DISABLED_PACKAGE_MESSAGE }
+        });
+      }
       cartItem.packageType = updateData.packageType;
     }
     if (updateData.details) {
@@ -416,6 +433,13 @@ router.patch('/:id/field', withDB(async (req: Request, res: Response) => {
     // Handle different field types
     switch (field) {
       case 'packageType':
+        // CLASSIC PACKAGE TEMPORARILY DISABLED - see DISABLED_PACKAGE_TYPES
+        if (!isPackagePurchasable(value)) {
+          return res.status(400).json({
+            success: false,
+            error: { message: DISABLED_PACKAGE_MESSAGE }
+          });
+        }
         if (!['classic', 'premium', 'vip'].includes(value)) {
           return res.status(400).json({
             success: false,

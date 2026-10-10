@@ -1,5 +1,10 @@
 // Re-export from split files
-export { packageData } from './packageData';
+export {
+  packageData,
+  purchasablePackageData,
+  PURCHASABLE_PACKAGE_KEYS,
+  isPackagePurchasable
+} from './packageData';
 export { additionalServices } from './additionalServices';
 export { customDesignSentinel } from './customDesign';
 

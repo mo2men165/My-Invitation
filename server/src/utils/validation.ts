@@ -257,3 +257,21 @@ export type BulkCompareInput = z.infer<typeof bulkCompareSchema>;
 export type RegisterData = z.infer<typeof registerSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
 export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
+// ===========================================================================
+// CLASSIC PACKAGE TEMPORARILY DISABLED
+// ---------------------------------------------------------------------------
+// The classic package is not on sale for now. The package type stays valid
+// everywhere else - existing classic events, orders and bills must keep working
+// - so only new purchases are refused: adding one to a cart, switching a cart
+// item to it, and paying for one that is already in a cart.
+//
+// To bring the classic package back, empty this array. Nothing else on the
+// server needs to change.
+// ===========================================================================
+export const DISABLED_PACKAGE_TYPES: string[] = ['classic'];
+
+export const isPackagePurchasable = (packageType: string): boolean =>
+  !DISABLED_PACKAGE_TYPES.includes(packageType);
+
+export const DISABLED_PACKAGE_MESSAGE =
+  'الباقة الكلاسيكية غير متاحة للشراء حالياً. يرجى اختيار باقة بريميوم أو VIP';

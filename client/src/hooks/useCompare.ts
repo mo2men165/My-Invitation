@@ -26,7 +26,9 @@ export const useCompare = () => {
   );
 
   // Updated toggleCompare with packageType support
-  const toggleCompare = useCallback(async (designId: string, packageType: 'classic' | 'premium' | 'vip' = 'classic') => {
+  // CLASSIC PACKAGE TEMPORARILY DISABLED: the default was 'classic', which is
+  // no longer on sale. The type itself stays, for comparisons saved earlier.
+  const toggleCompare = useCallback(async (designId: string, packageType: 'classic' | 'premium' | 'vip' = 'premium') => {
     const design = designs.find(d => d.id === designId);
     
     try {

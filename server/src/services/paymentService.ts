@@ -4,6 +4,7 @@ import { Event } from '../models/Event';
 import { logger } from '../config/logger';
 import { Types } from 'mongoose';
 import { NotificationService } from './notificationService';
+import { isPackagePurchasable, DISABLED_PACKAGE_MESSAGE } from '../utils/validation';
 import { emailService, BillEmailData, EventDetailsEmailData } from './emailService';
 
 export class PaymentService {
@@ -346,6 +347,17 @@ export class PaymentService {
             message: 'العناصر المحددة غير موجودة في السلة'
           };
         }
+      }
+
+      // CLASSIC PACKAGE TEMPORARILY DISABLED - see DISABLED_PACKAGE_TYPES.
+      // Every payment provider reaches checkout through here, so this also
+      // covers items that were added to a cart before it was withdrawn.
+      const disabledItems = cartItems.filter(item => !isPackagePurchasable(item.packageType));
+      if (disabledItems.length > 0) {
+        return {
+          success: false,
+          message: DISABLED_PACKAGE_MESSAGE
+        };
       }
 
       const summary = {
