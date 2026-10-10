@@ -18,13 +18,15 @@ import {
   UserCheck,
   AlertCircle,
   ExternalLink,
-  UserPlus
+  UserPlus,
+  Image as ImageIcon
 } from 'lucide-react';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
 import ConfirmationModal from '@/components/cart/CartModal/components/ConfirmationModal';
 import { GuestInviteCards } from './GuestInviteCards';
 import { AddGuestModal } from './AddGuestModal';
+import { InvitationCardModal } from './InvitationCardModal';
 import { getMissingCardCount, hasAllCards } from '@/utils/guestCards';
 
 interface Guest {
@@ -91,6 +93,14 @@ interface EventDetails {
   };
   inviteCount?: number;
   invitationCardUrl?: string;
+  invitationCardImage?: {
+    secure_url?: string;
+    url?: string;
+    resource_type?: string;
+    bytes?: number;
+    whatsapp_bytes?: number;
+    duration?: number;
+  };
   // Classic packages only: the cards are handed to the customer as a whole,
   // so delivery is tracked once per event instead of per guest.
   classicInvitationsDelivered?: {
@@ -155,6 +165,7 @@ export function AdminEventGuests({ eventId, onBack }: AdminEventGuestsProps) {
   const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
   const [showSendInvitationsConfirmation, setShowSendInvitationsConfirmation] = useState(false);
   const [showAddGuestModal, setShowAddGuestModal] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -523,6 +534,62 @@ ${event.invitationText}
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* The event's own invitation card, managed from the same screen as the
+          per-guest cards below rather than from the events list. */}
+      <div className="bg-gray-900/60 border border-gray-700 rounded-xl p-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex items-start gap-4">
+            <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-800 border border-gray-600 flex items-center justify-center shrink-0">
+              {event.invitationCardImage?.secure_url || event.invitationCardImage?.url ? (
+                event.invitationCardImage?.resource_type === 'video' ? (
+                  <video
+                    src={event.invitationCardImage.secure_url || event.invitationCardImage.url}
+                    className="w-full h-full object-cover"
+                    muted
+                  />
+                ) : (
+                  <img
+                    src={event.invitationCardImage.secure_url || event.invitationCardImage.url}
+                    alt="بطاقة الدعوة"
+                    className="w-full h-full object-cover"
+                  />
+                )
+              ) : (
+                <ImageIcon className="w-8 h-8 text-gray-600" />
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold text-white">بطاقة الدعوة الرئيسية</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                {event.invitationCardImage
+                  ? event.invitationCardImage.resource_type === 'video'
+                    ? 'فيديو — تُرسل مع الدعوة الأولى لكل ضيف'
+                    : 'صورة — تُرسل مع الدعوة الأولى لكل ضيف'
+                  : 'لم يتم رفع بطاقة دعوة بعد'}
+              </p>
+              {event.invitationCardImage?.resource_type === 'video' && event.invitationCardImage?.whatsapp_bytes ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  النسخة المرسلة عبر الواتساب: {(event.invitationCardImage.whatsapp_bytes / 1024 / 1024).toFixed(1)} ميجابايت
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowCardModal(true)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm transition-colors ${
+              event.invitationCardImage
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-yellow-600 hover:bg-yellow-700'
+            }`}
+          >
+            <ImageIcon className="h-4 w-4" />
+            {event.invitationCardImage ? 'عرض أو تغيير البطاقة' : 'رفع بطاقة الدعوة'}
+          </button>
         </div>
       </div>
 
@@ -1102,6 +1169,16 @@ ${event.invitationText}
         cancelText="إلغاء"
         variant="warning"
       />
+
+      {showCardModal && (
+        <InvitationCardModal
+          eventId={eventId}
+          eventName={event.eventName || event.hostName}
+          card={event.invitationCardImage}
+          onClose={() => setShowCardModal(false)}
+          onUpdated={loadEventGuests}
+        />
+      )}
 
       {showAddGuestModal && (
         <AddGuestModal

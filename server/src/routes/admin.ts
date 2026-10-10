@@ -1009,6 +1009,7 @@ router.get('/events/:eventId/guests', withDB(async (req: Request, res: Response)
           endTime: event.details.endTime,
           inviteCount: event.details.inviteCount,
           invitationCardUrl: event.invitationCardImage?.secure_url || event.invitationCardImage?.url,
+          invitationCardImage: event.invitationCardImage,
           user: {
             name: `${(event.userId as any).firstName} ${(event.userId as any).lastName}`,
             email: (event.userId as any).email,
