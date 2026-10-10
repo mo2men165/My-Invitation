@@ -45,6 +45,17 @@ export class WhatsappService {
   private static get VIDEO_INVITATION_TEMPLATE(): string {
     return process.env.WHATSAPP_VIDEO_INVITATION_TEMPLATE || 'initial_invitation_arabic';
   }
+
+  // Utility-category templates are not subject to Meta's per-user marketing
+  // frequency cap, so they are what rescues a send dropped with error 131049.
+  // There is no default for the video one: until such a template is approved, a
+  // video card simply has no fallback.
+  private static get IMAGE_INVITATION_UTILITY_TEMPLATE(): string {
+    return process.env.WHATSAPP_INVITATION_UTILITY_TEMPLATE || 'initial_invitation_utility';
+  }
+  private static get VIDEO_INVITATION_UTILITY_TEMPLATE(): string {
+    return process.env.WHATSAPP_VIDEO_INVITATION_UTILITY_TEMPLATE || '';
+  }
   
   // Lazy getters for environment variables - ensures they're read at runtime, not module load
   private static get PHONE_NUMBER_ID(): string | undefined {
@@ -1201,7 +1212,11 @@ export class WhatsappService {
       : eventImageUrl.replace(/^http:\/\//, 'https://');
 
     // Build body parameters - utility template excludes invitation_text
-    const isUtilityTemplate = templateName === 'initial_invitation_utility';
+    // Utility templates carry 7 parameters - they leave out invitation_text.
+    const isUtilityTemplate =
+      templateName === this.IMAGE_INVITATION_UTILITY_TEMPLATE ||
+      (!!this.VIDEO_INVITATION_UTILITY_TEMPLATE &&
+        templateName === this.VIDEO_INVITATION_UTILITY_TEMPLATE);
     const bodyParameters: any[] = [
       {
         type: 'text',
@@ -1428,7 +1443,7 @@ export class WhatsappService {
       const buttonComponents = messageData.template.components.filter((c: any) => c.type === 'button');
 
       logger.info('WHATSAPP: Message data prepared', {
-        template: 'initial_invitation',
+        template: templateName,
         to: phoneNumber,
         bodyParametersCount: bodyComponent?.parameters?.length || 0,
         bodyParameters: bodyComponent?.parameters?.map((p: any, i: number) => ({
@@ -1513,15 +1528,15 @@ export class WhatsappService {
   }
 
   /**
-   * Send fallback invitation message using initial_invitation_utility template
-   * This is triggered when the initial_invitation template fails to deliver
+   * Send the fallback invitation through the utility-category template, which
+   * Meta's per-user marketing frequency cap does not apply to. Triggered when
+   * the initial (marketing) template fails to deliver, typically with 131049.
    */
   static async sendInvitationFallback(eventId: string, guestId: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       logger.info('=== FALLBACK: Starting sendInvitationFallback ===', {
         eventId,
         guestId,
-        templateName: 'initial_invitation_utility',
         timestamp: new Date().toISOString()
       });
 
@@ -1568,14 +1583,20 @@ export class WhatsappService {
         return { success: false, error: 'Event invitation card image not set' };
       }
 
-      // The utility fallback template carries an IMAGE header, so a video card
-      // cannot go through it. The initial send already had its own video
-      // template, so there is simply no fallback for video.
-      if (event.invitationCardImage?.resource_type === 'video') {
-        logger.warn('FALLBACK: Invitation card is a video; the utility template cannot carry it', {
+      // A template's header type is fixed at approval, so a video card needs a
+      // video utility template. Without one approved there is no fallback, and
+      // a send dropped by the marketing frequency cap cannot be rescued.
+      const isVideoCard = event.invitationCardImage?.resource_type === 'video';
+      const fallbackTemplate = isVideoCard
+        ? this.VIDEO_INVITATION_UTILITY_TEMPLATE
+        : this.IMAGE_INVITATION_UTILITY_TEMPLATE;
+
+      if (!fallbackTemplate) {
+        logger.warn('FALLBACK: No utility template configured for a video invitation card', {
           eventId,
           guestId,
-          packageType: event.packageType
+          packageType: event.packageType,
+          hint: 'Set WHATSAPP_VIDEO_INVITATION_UTILITY_TEMPLATE once a video utility template is approved'
         });
         return {
           success: false,
@@ -1601,7 +1622,7 @@ export class WhatsappService {
       }
 
       // Build message data using reusable method with fallback template name
-      const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, 'initial_invitation_utility');
+      const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, fallbackTemplate);
 
       // Format dates for logging
       const eventDate = new Date(event.details.eventDate);
@@ -1649,7 +1670,7 @@ export class WhatsappService {
       logger.info('FALLBACK: Sending message to WhatsApp API...', {
         endpoint: `${this.WHATSAPP_API_URL}/${this.PHONE_NUMBER_ID}/messages`,
         phoneNumberId: this.PHONE_NUMBER_ID,
-        templateName: 'initial_invitation_utility'
+        templateName: fallbackTemplate
       });
 
       const response = await this.sendMessage(messageData);
@@ -1657,7 +1678,7 @@ export class WhatsappService {
 
       logger.info('FALLBACK: Message sent successfully', {
         messageId: sentMessageId,
-        templateName: 'initial_invitation_utility',
+        templateName: fallbackTemplate,
         response: JSON.stringify(response)
       });
 
@@ -1694,7 +1715,7 @@ export class WhatsappService {
         guestPhone: guest.phone,
         messageId: response.messages?.[0]?.id,
         packageType: event.packageType,
-        templateName: 'initial_invitation_utility'
+        templateName: fallbackTemplate
       });
 
       return { 
@@ -1713,8 +1734,7 @@ export class WhatsappService {
         error: error.message,
         stack: error.stack,
         response: error.response?.data,
-        statusCode: error.response?.status,
-        templateName: 'initial_invitation_utility'
+        statusCode: error.response?.status
       });
       return { success: false, error: error.message };
     }
