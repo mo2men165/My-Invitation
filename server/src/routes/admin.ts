@@ -11,7 +11,7 @@ import { NotificationService } from '../services/notificationService';
 import { AdminNotification } from '../models/AdminNotification';
 import { emailService } from '../services/emailService';
 import { uploadSingleImage } from '../config/multer';
-import { CloudinaryService } from '../services/cloudinaryService';
+import { CloudinaryService, WHATSAPP_VIDEO_MAX_BYTES } from '../services/cloudinaryService';
 import { registerTabbyWebhook, updateTabbyWebhook } from '../services/tabbyWebhookRegistration';
 import { PackageImage } from '../models/PackageImage';
 // Imported statically, not via await import(): tsc emits CommonJS locally while
@@ -39,8 +39,42 @@ const uploadedMediaSchema = z.object({
   bytes: z.number().optional().default(0),
   created_at: z.string().optional().default(() => new Date().toISOString()),
   resource_type: z.enum(['image', 'video']).optional().default('image'),
-  duration: z.number().optional()
+  duration: z.number().optional(),
+  whatsapp_url: z.string().url().optional(),
+  whatsapp_bytes: z.number().optional()
 });
+
+/**
+ * A video card is only usable if Cloudinary produced a WhatsApp-safe rendition
+ * and that rendition fits inside Meta's 16MB ceiling. Without this check the
+ * card saves fine and every invitation later fails with error 131053.
+ */
+function rejectUnsendableVideo(media: z.infer<typeof uploadedMediaSchema>, res: Response): boolean {
+  if (media.resource_type !== 'video') {
+    return false;
+  }
+
+  if (!media.whatsapp_url) {
+    res.status(400).json({
+      success: false,
+      error: { message: 'تعذر تجهيز نسخة الفيديو المتوافقة مع الواتساب. يرجى المحاولة مرة أخرى' }
+    });
+    return true;
+  }
+
+  if (media.whatsapp_bytes && media.whatsapp_bytes > WHATSAPP_VIDEO_MAX_BYTES) {
+    const sizeMb = (media.whatsapp_bytes / 1024 / 1024).toFixed(1);
+    res.status(400).json({
+      success: false,
+      error: {
+        message: `الفيديو كبير جداً بعد المعالجة (${sizeMb} ميجابايت). الحد الأقصى للواتساب 16 ميجابايت، يرجى استخدام مقطع أقصر`
+      }
+    });
+    return true;
+  }
+
+  return false;
+}
 
 // Same shape the customer-facing add-guest endpoint accepts.
 const adminGuestSchema = z.object({
@@ -544,6 +578,10 @@ router.post('/events/:eventId/approve', uploadSingleImage, withDB(async (req: Re
         });
       }
 
+      if (rejectUnsendableVideo(parsed.data, res)) {
+        return;
+      }
+
       invitationCardImage = parsed.data;
 
       if (event.invitationCardImage?.public_id) {
@@ -729,6 +767,10 @@ router.put('/events/:eventId/image', uploadSingleImage, withDB(async (req: Reque
           success: false,
           error: { message: 'بيانات الملف المرفوع غير صالحة' }
         });
+      }
+
+      if (rejectUnsendableVideo(parsed.data, res)) {
+        return;
       }
 
       const previousPublicId = event.invitationCardImage?.public_id;

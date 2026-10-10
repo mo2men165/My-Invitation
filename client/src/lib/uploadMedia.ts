@@ -17,6 +17,10 @@ export interface UploadedMedia {
   created_at: string;
   resource_type: 'image' | 'video';
   duration?: number;
+  // Video only: the H.264/AAC rendition Cloudinary transcodes at upload, which
+  // is what WhatsApp is given. The original stays for the website and download.
+  whatsapp_url?: string;
+  whatsapp_bytes?: number;
 }
 
 export const IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -24,7 +28,9 @@ export const VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video
 
 // Cloudinary's own ceilings on most plans; the API never sees these bytes.
 export const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
-export const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+// Transcoding shrinks this a lot, so the original can be larger than the 16MB
+// WhatsApp itself accepts; the ceiling is about keeping transcode time sane.
+export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 
 export const isVideoFile = (file: File) => file.type.startsWith('video/');
 
@@ -80,6 +86,8 @@ interface UploadSignature {
   folder: string;
   resourceType: 'image' | 'video';
   uploadUrl: string;
+  eager?: string;
+  eagerAsync?: boolean;
 }
 
 async function getUploadSignature(folder: string, resourceType: 'image' | 'video'): Promise<UploadSignature> {
@@ -117,6 +125,13 @@ export async function uploadMedia(
   form.append('signature', signature.signature);
   form.append('folder', signature.folder);
 
+  // Videos are transcoded to a WhatsApp-safe rendition during the upload. These
+  // have to match what the server signed, exactly.
+  if (signature.eager) {
+    form.append('eager', signature.eager);
+    form.append('eager_async', String(signature.eagerAsync ?? false));
+  }
+
   // XMLHttpRequest rather than fetch: it reports upload progress, which a
   // 100MB video needs.
   return new Promise<UploadedMedia>((resolve, reject) => {
@@ -143,6 +158,8 @@ export async function uploadMedia(
         return;
       }
 
+      const rendition = payload.eager?.[0];
+
       resolve({
         public_id: payload.public_id,
         secure_url: payload.secure_url,
@@ -153,7 +170,10 @@ export async function uploadMedia(
         bytes: payload.bytes || 0,
         created_at: payload.created_at || new Date().toISOString(),
         resource_type: payload.resource_type === 'video' ? 'video' : 'image',
-        ...(payload.duration ? { duration: payload.duration } : {})
+        ...(payload.duration ? { duration: payload.duration } : {}),
+        ...(rendition?.secure_url
+          ? { whatsapp_url: rendition.secure_url, whatsapp_bytes: rendition.bytes || 0 }
+          : {})
       });
     };
 

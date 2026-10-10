@@ -16,6 +16,10 @@ export interface ICloudinaryImage {
   created_at: string;
   resource_type?: string;
   duration?: number;
+  // Video only: the H.264/AAC rendition sent to WhatsApp, which refuses the
+  // codecs phones usually produce. The original is kept for the site.
+  whatsapp_url?: string;
+  whatsapp_bytes?: number;
 }
 
 export interface IGuest {
@@ -474,7 +478,9 @@ const eventSchema: Schema<IEvent> = new Schema({
     created_at: { type: String, required: false },
     // 'image' or 'video'; absent on cards uploaded before video support
     resource_type: { type: String, required: false },
-    duration: { type: Number, required: false }
+    duration: { type: Number, required: false },
+    whatsapp_url: { type: String, required: false },
+    whatsapp_bytes: { type: Number, required: false }
   },
   qrCodeReaderUrl: {
     type: String,

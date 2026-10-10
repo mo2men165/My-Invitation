@@ -4,6 +4,7 @@ import { logger } from '../config/logger';
 import { Event } from '../models/Event';
 import { Types } from 'mongoose';
 import { getCardUrl, getCardsToSend, getGuestCards, getInvitationSize } from '../utils/guestCards';
+import { CloudinaryService } from './cloudinaryService';
 
 // Type for bulk job message types
 export type BulkMessageType = 'invitation' | 'reminder' | 'thank-you';
@@ -1266,9 +1267,14 @@ export class WhatsappService {
 
     // The header carries whichever media the card is. A template's header type
     // is fixed at approval, so the caller picks the template to match.
+    //
+    // A video goes out as the transcoded rendition rather than the original:
+    // WhatsApp only accepts H.264/AAC MP4 and rejects anything else with
+    // error 131053, and phones routinely produce HEVC .mov files.
     const isVideoCard = event.invitationCardImage?.resource_type === 'video';
+    const videoLink = event.invitationCardImage?.whatsapp_url || validImageUrl;
     const headerParameter = isVideoCard
-      ? { type: 'video', video: { link: validImageUrl } }
+      ? { type: 'video', video: { link: videoLink } }
       : { type: 'image', image: { link: validImageUrl } };
 
     const messageData = {
@@ -1412,6 +1418,24 @@ export class WhatsappService {
       const templateName = isVideoCard
         ? this.VIDEO_INVITATION_TEMPLATE
         : this.IMAGE_INVITATION_TEMPLATE;
+
+      // Cards uploaded before renditions were generated at upload time have no
+      // whatsapp_url, so derive one and give Cloudinary a moment to build it
+      // rather than sending Meta a file it cannot decode.
+      if (isVideoCard && !event.invitationCardImage?.whatsapp_url) {
+        const derived = CloudinaryService.buildWhatsappVideoUrl(
+          event.invitationCardImage?.secure_url || event.invitationCardImage?.url || ''
+        );
+
+        if (derived) {
+          logger.info('WHATSAPP: Deriving a WhatsApp rendition for a card uploaded before transcoding', {
+            eventId,
+            derived
+          });
+          await CloudinaryService.warmWhatsappVideo(derived);
+          event.invitationCardImage.whatsapp_url = derived;
+        }
+      }
 
       const { messageData, phoneNumber, validImageUrl } = this.buildInvitationMessageData(event, guest, templateName);
 

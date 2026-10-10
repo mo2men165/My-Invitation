@@ -66,7 +66,27 @@ export interface UploadSignature {
   folder: string;
   resourceType: 'image' | 'video';
   uploadUrl: string;
+  // Video only: the rendition Cloudinary produces alongside the original, which
+  // is what gets sent to WhatsApp.
+  eager?: string;
+  eagerAsync?: boolean;
 }
+
+// What WhatsApp requires of a video, and what each part of this transformation
+// is for. Phones hand us HEVC .mov files all the time, so the original is never
+// what we send: Cloudinary transcodes this rendition at upload and Meta fetches
+// that instead. Anything it dislikes comes back as error 131053.
+//
+//   vc_h264:baseline:3.1  H.264 only, and the Baseline profile has no B-frames,
+//                         which Android WhatsApp clients cannot decode
+//   ac_aac                AAC audio, a single stream
+//   f_mp4                 .mp4 extension and a video/mp4 MIME type that matches
+//                         it - a mismatch is the documented cause of 131053
+//   w_1280,c_limit        within Baseline level 3.1, and never upscaled
+//   q_auto:good,br_1m     about two minutes inside the 16MB ceiling
+export const WHATSAPP_VIDEO_TRANSFORMATION =
+  'vc_h264:baseline:3.1,ac_aac,f_mp4,w_1280,c_limit,q_auto:good,br_1m';
+export const WHATSAPP_VIDEO_MAX_BYTES = 16 * 1024 * 1024;
 
 export interface UploadOptions {
   folder?: string;
@@ -309,8 +329,20 @@ export class CloudinaryService {
     ensureCloudinaryConfigured();
 
     const timestamp = Math.round(Date.now() / 1000);
+    const isVideo = resourceType === 'video';
+
+    // Every parameter the browser sends has to be signed, so the transcoding
+    // request is part of the signature rather than something the browser picks.
+    const paramsToSign: Record<string, string | number | boolean> = { folder, timestamp };
+    if (isVideo) {
+      paramsToSign.eager = WHATSAPP_VIDEO_TRANSFORMATION;
+      // Synchronous, so the rendition exists by the time the upload returns and
+      // Meta never fetches a URL that is still being generated.
+      paramsToSign.eager_async = false;
+    }
+
     const signature = cloudinary.utils.api_sign_request(
-      { folder, timestamp },
+      paramsToSign,
       process.env.CLOUDINARY_API_SECRET as string
     );
 
@@ -321,8 +353,46 @@ export class CloudinaryService {
       signature,
       folder,
       resourceType,
-      uploadUrl: `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`
+      uploadUrl: `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`,
+      ...(isVideo ? { eager: WHATSAPP_VIDEO_TRANSFORMATION, eagerAsync: false } : {})
     };
+  }
+
+  /**
+   * The WhatsApp-safe URL for a video that was uploaded before renditions were
+   * generated at upload time. Cloudinary builds the rendition when the URL is
+   * first requested, so warmWhatsappVideo should be called before handing it to
+   * Meta. Returns '' if the URL is not a Cloudinary video URL.
+   */
+  static buildWhatsappVideoUrl(secureUrl: string): string {
+    const marker = '/video/upload/';
+
+    if (!secureUrl.includes(marker)) {
+      return '';
+    }
+
+    const [prefix, rest] = secureUrl.split(marker);
+    return `${prefix}${marker}${WHATSAPP_VIDEO_TRANSFORMATION}/${rest}`;
+  }
+
+  /**
+   * Ask Cloudinary for a rendition so it exists before Meta fetches it. Failures
+   * are not fatal: the worst case is Meta fetching while it is still generating,
+   * which shows up as a delivery error the admin can retry.
+   */
+  static async warmWhatsappVideo(url: string, timeoutMs = 8000): Promise<void> {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-1' }, signal: controller.signal });
+      clearTimeout(timer);
+    } catch (error: any) {
+      logger.warn('Could not pre-generate the WhatsApp video rendition', {
+        url,
+        error: error.message
+      });
+    }
   }
 
   static validateImageFile(file: MulterFile): { valid: boolean; error?: string } {
