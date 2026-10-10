@@ -4,10 +4,13 @@ import { useState } from 'react';
 import { X, Loader2, UserPlus } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
+// Same dark styling the customer-facing guest form uses - without it the
+// country dropdown renders white text on a white background.
+import '@/styles/phone-input.css';
 import { adminAPI } from '@/lib/api/admin';
 import { useToast } from '@/hooks/useToast';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
-import { validatePhoneNumber, getDisallowedCountryError } from '@/utils/phoneValidation';
+import { validatePhoneNumber, getDisallowedCountryError, ALLOWED_COUNTRY_CODES } from '@/utils/phoneValidation';
 
 interface AddGuestModalProps {
   eventId: string;
@@ -120,13 +123,16 @@ export function AddGuestModal({ eventId, remainingInvites, onClose, onAdded }: A
 
         <div>
           <label className="text-sm text-gray-400 block mb-2">رقم الهاتف</label>
-          <div dir="ltr" className="phone-input-wrapper">
+          <div dir="ltr">
             <PhoneInput
-              international
-              defaultCountry="SA"
               value={phone}
               onChange={setPhone}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus-within:border-[#C09B52]"
+              placeholder="رقم الهاتف"
+              defaultCountry="SA"
+              international
+              countryCallingCodeEditable={false}
+              countries={ALLOWED_COUNTRY_CODES}
+              className="phone-input-custom"
             />
           </div>
         </div>

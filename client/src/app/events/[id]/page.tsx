@@ -27,7 +27,7 @@ import { CollaborationManagement } from '@/components/collaboration/Collaboratio
 
 // Import CSS
 import 'react-phone-number-input/style.css';
-import './phone-input.css';
+import '@/styles/phone-input.css';
 
 const EventDetailPage: React.FC = () => {
   const router = useRouter();
