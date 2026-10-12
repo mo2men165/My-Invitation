@@ -1664,9 +1664,14 @@ router.post('/events/:eventId/send-invitations', withDB(async (req: Request, res
       });
     }
 
+    // A guest whose delivery failed is marked as sent, so without this they
+    // would be skipped by every later send-all and never retried.
+    const needsSending = (g: any) =>
+      !g.whatsappMessageSent || g.whatsappDeliveryStatus === 'failed';
+
     const recipientIds: string[] = Array.isArray(guestIds) && guestIds.length > 0
       ? guestIds
-      : event.guests.filter(g => !g.whatsappMessageSent).map(g => g._id!.toString());
+      : event.guests.filter(needsSending).map(g => g._id!.toString());
 
     // Every person on an invitation needs a card before it can go out.
     const guestsMissingCards = event.guests.filter(

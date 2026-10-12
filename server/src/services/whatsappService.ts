@@ -134,6 +134,46 @@ export class WhatsappService {
   /**
    * Handle message status updates
    */
+  /**
+   * Record on the guest what Meta reported for their message, so a failed
+   * delivery is visible to admins instead of only in Meta's own dashboard.
+   * Matches by message id, which is the id of the last message sent to them.
+   */
+  private static async recordDeliveryStatus(status: any): Promise<void> {
+    try {
+      const error = status.errors?.[0];
+      const update: Record<string, any> = {
+        'guests.$.whatsappDeliveryStatus': status.status,
+        'guests.$.whatsappDeliveryUpdatedAt': new Date()
+      };
+
+      if (status.status === 'failed' && error) {
+        update['guests.$.whatsappDeliveryError'] = {
+          code: error.code,
+          title: error.title,
+          details: error.error_data?.details || error.message
+        };
+      } else {
+        // A later success clears an earlier failure on the same guest.
+        update['guests.$.whatsappDeliveryError'] = undefined;
+      }
+
+      const result = await Event.updateOne(
+        { 'guests.whatsappMessageId': status.id },
+        { $set: update }
+      );
+
+      if (result.matchedCount === 0) {
+        logger.info('WHATSAPP STATUS: No guest matches this message id', { messageId: status.id });
+      }
+    } catch (error: any) {
+      logger.error('WHATSAPP STATUS: Could not record delivery status', {
+        messageId: status.id,
+        error: error.message
+      });
+    }
+  }
+
   private static async handleMessageStatus(status: any): Promise<void> {
     try {
       logger.info('=== WHATSAPP STATUS: Message status update received ===', {
@@ -143,6 +183,10 @@ export class WhatsappService {
         recipientId: status.recipient_id,
         errors: status.errors ? JSON.stringify(status.errors) : null
       });
+
+      // Every status is recorded on the guest, not just failures: a delivered
+      // or read status is what clears an earlier failure.
+      await this.recordDeliveryStatus(status);
 
       // If message failed, trigger fallback mechanism (only if not already attempted)
       if (status.status === 'failed') {
@@ -1537,7 +1581,12 @@ export class WhatsappService {
             'guests.$.whatsappSentAt': new Date(),
             'guests.$.whatsappMessageId': sentMessageId,
             'guests.$.rsvpStatus': 'pending',
-            'guests.$.conversationStage': 'awaiting_rsvp'
+            'guests.$.conversationStage': 'awaiting_rsvp',
+            // A new attempt starts clean: Meta's status webhooks fill this in,
+            // and any failure recorded against the previous message is stale.
+            'guests.$.whatsappDeliveryStatus': 'sent',
+            'guests.$.whatsappDeliveryUpdatedAt': new Date(),
+            'guests.$.whatsappDeliveryError': undefined
           }
         }
       );
@@ -1750,7 +1799,12 @@ export class WhatsappService {
             'guests.$.whatsappSentAt': new Date(),
             'guests.$.whatsappMessageId': sentMessageId,
             'guests.$.rsvpStatus': 'pending',
-            'guests.$.conversationStage': 'awaiting_rsvp'
+            'guests.$.conversationStage': 'awaiting_rsvp',
+            // A new attempt starts clean: Meta's status webhooks fill this in,
+            // and any failure recorded against the previous message is stale.
+            'guests.$.whatsappDeliveryStatus': 'sent',
+            'guests.$.whatsappDeliveryUpdatedAt': new Date(),
+            'guests.$.whatsappDeliveryError': undefined
           }
         }
       );

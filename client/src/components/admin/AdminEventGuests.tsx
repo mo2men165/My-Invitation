@@ -65,6 +65,10 @@ interface Guest {
   actuallyAttended?: boolean;
   attendanceMarkedAt?: string;
   attendanceMarkedBy?: string;
+  // What Meta last reported for this guest's message
+  whatsappDeliveryStatus?: 'sent' | 'delivered' | 'read' | 'failed';
+  whatsappDeliveryUpdatedAt?: string;
+  whatsappDeliveryError?: { code?: number; title?: string; details?: string };
 }
 
 interface EventDetails {
@@ -120,6 +124,55 @@ interface GuestStats {
 interface AdminEventGuestsProps {
   eventId: string;
   onBack: () => void;
+}
+
+/**
+ * What Meta reported for this guest's message. A guest used to read as 'sent'
+ * even when delivery failed, which was only visible in Meta's own dashboard.
+ */
+function DeliveryStatusBadge({ guest }: { guest: Guest }) {
+  if (!guest.whatsappMessageSent) {
+    return null;
+  }
+
+  if (guest.whatsappDeliveryStatus === 'failed') {
+    const error = guest.whatsappDeliveryError;
+    return (
+      <span
+        className="flex items-center gap-1 px-2 py-1 bg-red-900/30 text-red-300 rounded text-xs border border-red-700/40"
+        title={[error?.title, error?.details].filter(Boolean).join(' — ') || undefined}
+      >
+        <XCircle className="h-3 w-3" />
+        <span>فشل التسليم{error?.code ? ` (${error.code})` : ''}</span>
+      </span>
+    );
+  }
+
+  if (guest.whatsappDeliveryStatus === 'read') {
+    return (
+      <span className="flex items-center gap-1 px-2 py-1 bg-blue-900/20 text-blue-300 rounded text-xs">
+        <CheckCircle className="h-3 w-3" />
+        <span>تمت القراءة</span>
+      </span>
+    );
+  }
+
+  if (guest.whatsappDeliveryStatus === 'delivered') {
+    return (
+      <span className="flex items-center gap-1 px-2 py-1 bg-green-900/20 text-green-300 rounded text-xs">
+        <CheckCircle className="h-3 w-3" />
+        <span>تم التسليم</span>
+      </span>
+    );
+  }
+
+  // Sent, with nothing back from Meta yet
+  return (
+    <span className="flex items-center gap-1 px-2 py-1 bg-gray-700/40 text-gray-300 rounded text-xs">
+      <Send className="h-3 w-3" />
+      <span>بانتظار التسليم</span>
+    </span>
+  );
 }
 
 function AccompanyingCountBadge({ guest }: { guest: Guest }) {
@@ -774,13 +827,53 @@ ${event.invitationText}
         </>
       )}
 
+      {/* Delivery failures, surfaced here because they are otherwise only
+          visible in Meta's own dashboard. */}
+      {(() => {
+        const failedGuests = guests.filter(g => g.whatsappDeliveryStatus === 'failed');
+
+        if (failedGuests.length === 0) {
+          return null;
+        }
+
+        const firstError = failedGuests[0].whatsappDeliveryError;
+
+        return (
+          <div className="bg-red-900/20 border border-red-700/40 rounded-xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-red-400 font-medium">
+                  {failedGuests.length} {failedGuests.length === 1 ? 'ضيف لم تصله الدعوة' : 'ضيوف لم تصلهم الدعوة'}
+                </h4>
+                <p className="text-red-100 text-sm mt-1">
+                  {firstError?.title || 'رفض واتساب تسليم الرسالة'}
+                  {firstError?.code ? ` (رمز ${firstError.code})` : ''}
+                </p>
+                <p className="text-red-100/70 text-xs mt-1">
+                  {failedGuests.slice(0, 5).map(g => g.name).join('، ')}
+                  {failedGuests.length > 5 ? ` و${failedGuests.length - 5} آخرين` : ''}
+                </p>
+                <p className="text-red-100/70 text-xs mt-2">
+                  إعادة الإرسال من زر إرسال جميع الدعوات ستشمل هؤلاء الضيوف
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Premium/VIP Bulk Actions */}
       {(event.packageType === 'premium' || event.packageType === 'vip') && event.guestListConfirmed?.isConfirmed && (
         <div className="space-y-4 mb-6">
           {/* Send All Invitations. Guests already sent are skipped, so this can
               be run again safely to pick up whoever is left. */}
           {(() => {
-            const unsentGuests = guests.filter(g => !g.whatsappMessageSent);
+            // A failed delivery still needs sending, even though the guest is
+            // marked as sent.
+            const unsentGuests = guests.filter(
+              g => !g.whatsappMessageSent || g.whatsappDeliveryStatus === 'failed'
+            );
             const guestsWithoutLinks = unsentGuests.filter(g => !hasAllCards(g));
             const missingCards = guestsWithoutLinks.reduce((sum, g) => sum + getMissingCardCount(g), 0);
             const sendingInvitations = bulkSending === 'invitations';
@@ -968,12 +1061,7 @@ ${event.invitationText}
                       <span className="text-xs text-gray-500">
                         أضيف في: {new Date(guest.addedAt).toLocaleDateString('ar-SA', { calendar: 'gregory', year: 'numeric', month: 'numeric', day: 'numeric' })}
                       </span>
-                      {guest.whatsappMessageSent && (
-                        <span className="flex items-center space-x-1  text-xs text-green-400">
-                          <CheckCircle className="h-3 w-3" />
-                          <span>تم الإرسال</span>
-                        </span>
-                      )}
+                      <DeliveryStatusBadge guest={guest} />
                     </div>
                   </div>
 
@@ -1021,12 +1109,7 @@ ${event.invitationText}
 
                       <AccompanyingCountBadge guest={guest} />
 
-                      {guest.whatsappMessageSent && (
-                        <span className="flex items-center space-x-1  px-2 py-1 bg-green-900/20 text-green-300 rounded text-xs">
-                          <CheckCircle className="h-3 w-3" />
-                          <span>تم الإرسال بواسطة المستخدم</span>
-                        </span>
-                      )}
+                      <DeliveryStatusBadge guest={guest} />
                     </div>
                   )}
                   
@@ -1061,12 +1144,7 @@ ${event.invitationText}
                         </span>
                       )}
                       
-                      {guest.whatsappMessageSent && (
-                        <span className="flex items-center space-x-1  px-2 py-1 bg-green-900/20 text-green-300 rounded text-xs">
-                          <CheckCircle className="h-3 w-3" />
-                          <span>تم الإرسال</span>
-                        </span>
-                      )}
+                      <DeliveryStatusBadge guest={guest} />
                       
                       {/* RSVP Status Display */}
                       {guest.rsvpStatus && guest.rsvpStatus !== 'pending' && (

@@ -68,6 +68,15 @@ export interface IGuest {
   refundedOnDecline?: boolean;
   // Track if fallback invitation was already attempted (prevents infinite loops)
   fallbackAttempted?: boolean;
+  // What Meta last reported for this guest's message. Without it a guest reads
+  // as sent even when delivery failed, which is only visible in Meta's console.
+  whatsappDeliveryStatus?: 'sent' | 'delivered' | 'read' | 'failed';
+  whatsappDeliveryUpdatedAt?: Date;
+  whatsappDeliveryError?: {
+    code?: number;
+    title?: string;
+    details?: string;
+  };
 }
 
 export interface IEvent extends Document {
@@ -291,6 +300,19 @@ const guestSchema = new Schema<IGuest>({
   fallbackAttempted: {
     type: Boolean,
     default: false
+  },
+  // Delivery status Meta last reported for this guest's message
+  whatsappDeliveryStatus: {
+    type: String,
+    enum: ['sent', 'delivered', 'read', 'failed']
+  },
+  whatsappDeliveryUpdatedAt: {
+    type: Date
+  },
+  whatsappDeliveryError: {
+    code: { type: Number, required: false },
+    title: { type: String, required: false },
+    details: { type: String, required: false }
   }
 }, { _id: true });
 
