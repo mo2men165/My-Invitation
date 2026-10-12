@@ -144,10 +144,30 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
         <div className="mb-6">
           {/* Every person on an invitation needs an entry card before sending */}
           {(() => {
+            const unsentGuests = guests.filter(g => !g.whatsappMessageSent);
             const guestsWithoutLinks = guests.filter(g => !hasAllCards(g));
             const missingCards = guestsWithoutLinks.reduce((sum, g) => sum + getMissingCardCount(g), 0);
             const canSendBulk = guestsWithoutLinks.length === 0;
-            
+
+            // Guests who already have their invitation - whether the customer
+            // sent it or our team did - are not sent to again, so with none
+            // left there is nothing to offer.
+            if (unsentGuests.length === 0) {
+              return (
+                <div className="bg-green-900/20 border border-green-700/30 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <CheckSquare className="w-5 h-5 text-green-400" />
+                    <div className="flex-1">
+                      <h4 className="text-green-400 font-medium text-sm">تم إرسال جميع الدعوات</h4>
+                      <p className="text-green-100 text-xs mt-1">
+                        استلم جميع الضيوف دعواتهم عبر الواتساب
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
             return canSendBulk ? (
               <>
                 <button
@@ -165,7 +185,7 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
                   ) : (
                     <>
                       <Send className="w-5 h-5" />
-                      إرسال جميع الدعوات عبر الواتساب ({guests.filter(g => !g.whatsappMessageSent).length} دعوة)
+                      إرسال جميع الدعوات عبر الواتساب ({unsentGuests.length} دعوة)
                     </>
                   )}
                 </button>

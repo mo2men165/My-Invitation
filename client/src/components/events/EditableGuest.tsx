@@ -316,31 +316,34 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
 
                 {guest.individualInviteImage ? (
                   <>
-                    {onSendWhatsappAPI && (
-                      <button
-                        onClick={() => onSendWhatsappAPI(guest)}
-                        disabled={sendingWhatsapp === guest._id}
-                        className={`flex items-center gap-1 px-2 py-1 text-white text-xs rounded transition-colors ${
-                          sendingWhatsapp === guest._id
-                            ? 'bg-gray-600 cursor-not-allowed'
-                            : 'bg-green-600 hover:bg-green-700'
-                        }`}
-                        title="إرسال دعوة تفاعلية عبر الواتساب"
-                      >
-                        {sendingWhatsapp === guest._id ? (
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Send className="w-3 h-3" />
-                        )}
-                        إرسال
-                      </button>
-                    )}
-                    
-                    {guest.whatsappMessageSent && (
+                    {/* Once a guest has their invitation - sent by the customer
+                        or by our team - there is nothing to send again, so the
+                        button gives way to the sent badge. */}
+                    {guest.whatsappMessageSent ? (
                       <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
                         <Check className="w-3 h-3" />
                         تم الإرسال
                       </span>
+                    ) : (
+                      onSendWhatsappAPI && (
+                        <button
+                          onClick={() => onSendWhatsappAPI(guest)}
+                          disabled={sendingWhatsapp === guest._id}
+                          className={`flex items-center gap-1 px-2 py-1 text-white text-xs rounded transition-colors ${
+                            sendingWhatsapp === guest._id
+                              ? 'bg-gray-600 cursor-not-allowed'
+                              : 'bg-green-600 hover:bg-green-700'
+                          }`}
+                          title="إرسال دعوة تفاعلية عبر الواتساب"
+                        >
+                          {sendingWhatsapp === guest._id ? (
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Send className="w-3 h-3" />
+                          )}
+                          إرسال
+                        </button>
+                      )
                     )}
                   </>
                 ) : (
