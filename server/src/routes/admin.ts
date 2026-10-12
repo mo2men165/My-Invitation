@@ -1159,6 +1159,47 @@ router.post('/events/:eventId/guests', withDB(async (req: Request, res: Response
 }));
 
 /**
+ * POST /api/admin/events/:eventId/guests/:guestId/test-fallback
+ * Send the fallback invitation to one guest on demand.
+ *
+ * The fallback normally only runs when Meta reports a delivery failure, which
+ * cannot be provoked reliably, so this fires that exact path - same template
+ * selection, same parameter count, same media header - to prove it is wired up.
+ */
+router.post('/events/:eventId/guests/:guestId/test-fallback', withDB(async (req: Request, res: Response) => {
+  try {
+    const { eventId, guestId } = req.params;
+    const eventIdString = Array.isArray(eventId) ? eventId[0] : eventId;
+    const guestIdString = Array.isArray(guestId) ? guestId[0] : guestId;
+    const adminId = req.user!.id;
+
+    logger.info(`Admin ${adminId} is testing the fallback invitation`, { eventId, guestId });
+
+    const result = await WhatsappService.sendInvitationFallback(eventIdString, guestIdString);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: { message: result.error || 'فشل إرسال الدعوة الاحتياطية' }
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'تم إرسال الدعوة الاحتياطية',
+      data: result.data
+    });
+
+  } catch (error) {
+    logger.error('Error testing fallback invitation:', error);
+    return res.status(500).json({
+      success: false,
+      error: { message: 'خطأ في إرسال الدعوة الاحتياطية' }
+    });
+  }
+}));
+
+/**
  * POST /api/admin/events/:eventId/guests/:guestId/whatsapp
  * Mark WhatsApp message as sent for a guest (admin only)
  */

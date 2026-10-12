@@ -1505,7 +1505,12 @@ export class WhatsappService {
 
       logger.info('WHATSAPP: Sending message to WhatsApp API...', {
         endpoint: `${this.WHATSAPP_API_URL}/${this.PHONE_NUMBER_ID}/messages`,
-        phoneNumberId: this.PHONE_NUMBER_ID
+        phoneNumberId: this.PHONE_NUMBER_ID,
+        // So a missing env var is visible on a successful send, rather than
+        // only when a failure needs the fallback and cannot find it.
+        templateUsed: templateName,
+        videoUtilityTemplate: this.VIDEO_INVITATION_UTILITY_TEMPLATE || 'NOT CONFIGURED',
+        imageUtilityTemplate: this.IMAGE_INVITATION_UTILITY_TEMPLATE
       });
 
       const response = await this.sendMessage(messageData);
