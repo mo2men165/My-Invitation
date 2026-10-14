@@ -10,26 +10,23 @@ import { Types } from 'mongoose';
 const router = Router();
 
 /**
- * These send endpoints take an eventId from the request body, so they have to
- * check that the caller is entitled to that event: its owner, one of its
- * collaborators, or an admin.
+ * Sending invitations is ours to do, not the customer's: our team sends every
+ * invitation, reminder and thank-you from the admin panel. Customers own their
+ * guest list, but no send control is offered to them and none is accepted here.
+ *
+ * The eventId arrives in the request body, so an admin is still checked against
+ * a real event before anything is sent.
  */
 async function canSendForEvent(eventId: string, user: { id: string; role: string }): Promise<boolean> {
-  if (user.role === 'admin') {
-    return true;
+  if (user.role !== 'admin') {
+    return false;
   }
 
   if (!Types.ObjectId.isValid(eventId)) {
     return false;
   }
 
-  const event = await Event.findOne({
-    _id: new Types.ObjectId(eventId),
-    $or: [
-      { userId: new Types.ObjectId(user.id) },
-      { 'collaborators.userId': new Types.ObjectId(user.id) }
-    ]
-  }).select('_id');
+  const event = await Event.findById(new Types.ObjectId(eventId)).select('_id');
 
   return !!event;
 }
@@ -177,7 +174,7 @@ router.post('/send-invitation', withDB(async (req: Request, res: Response) => {
       logger.warn('ROUTE: Caller not entitled to this event', { eventId, userId: req.user!.id });
       return res.status(403).json({
         success: false,
-        error: { message: 'ليس لديك صلاحية لإرسال الدعوات لهذه المناسبة' }
+        error: { message: 'إرسال الدعوات يتم من قبل فريقنا' }
       });
     }
 
@@ -238,7 +235,7 @@ router.post('/send-bulk-invitations', withDB(async (req: Request, res: Response)
     if (!(await canSendForEvent(eventId, req.user!))) {
       return res.status(403).json({
         success: false,
-        error: { message: 'ليس لديك صلاحية لإرسال الدعوات لهذه المناسبة' }
+        error: { message: 'إرسال الدعوات يتم من قبل فريقنا' }
       });
     }
 

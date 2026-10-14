@@ -29,16 +29,13 @@ interface GuestManagementProps {
   addingGuest: boolean;
   confirmingGuestList: boolean;
   onAddGuest: () => Promise<void>;
-  onSendWhatsapp: (guest: Guest) => Promise<void>;
-  onSendWhatsappAPI?: (guest: Guest) => Promise<void>;
-  onSendBulkWhatsapp?: () => Promise<void>;
+
   onRemoveGuest: (guestId: string) => Promise<void>;
   onUpdateGuest: (guestId: string, updates: Partial<Guest>) => Promise<void>;
   onConfirmGuestList: () => Promise<void>;
   onReopenGuestList?: () => Promise<void>;
-  sendingWhatsapp?: string | null;
-  sendingBulkWhatsapp?: boolean;
-  bulkProgress?: { sent: number; total: number } | null;
+
+
   getCountryFromPhone: (phone: string) => string;
   onCountryChange?: (country: string) => void;
   remainingInvites: number;
@@ -55,16 +52,13 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
   addingGuest,
   confirmingGuestList,
   onAddGuest,
-  onSendWhatsapp,
-  onSendWhatsappAPI,
-  onSendBulkWhatsapp,
+
   onRemoveGuest,
   onUpdateGuest,
   onConfirmGuestList,
   onReopenGuestList,
-  sendingWhatsapp,
-  sendingBulkWhatsapp,
-  bulkProgress,
+
+
   getCountryFromPhone,
   onCountryChange,
   remainingInvites
@@ -137,21 +131,30 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
         </div>
       </div>
 
-      {/* WhatsApp Bulk Send Button - Premium only. VIP customers do not send
-          their own invitations: our team sends them from the admin panel. */}
-      {event.packageType === 'premium' && guests.length > 0 && (
-        event.guestListConfirmed.isConfirmed ? (
+      {/* Customers never send invitations themselves - our team does, for both
+          premium and VIP - so this says where the sending stands instead of
+          offering a button. */}
+      {(event.packageType === 'premium' || event.packageType === 'vip') && guests.length > 0 && (
         <div className="mb-6">
-          {/* Every person on an invitation needs an entry card before sending */}
           {(() => {
-            const unsentGuests = guests.filter(g => !g.whatsappMessageSent);
-            const guestsWithoutLinks = guests.filter(g => !hasAllCards(g));
-            const missingCards = guestsWithoutLinks.reduce((sum, g) => sum + getMissingCardCount(g), 0);
-            const canSendBulk = guestsWithoutLinks.length === 0;
+            if (!event.guestListConfirmed.isConfirmed) {
+              return (
+                <div className="bg-orange-900/20 border border-orange-700/30 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-orange-400" />
+                    <div className="flex-1">
+                      <h4 className="text-orange-400 font-medium text-sm">قم بتأكيد قائمة الضيوف أولاً</h4>
+                      <p className="text-orange-100 text-xs mt-1">
+                        بعد تأكيد القائمة، سيقوم فريقنا بتجهيز بطاقات الدخول وإرسال الدعوات لضيوفك
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
 
-            // Guests who already have their invitation - whether the customer
-            // sent it or our team did - are not sent to again, so with none
-            // left there is nothing to offer.
+            const unsentGuests = guests.filter(g => !g.whatsappMessageSent);
+
             if (unsentGuests.length === 0) {
               return (
                 <div className="bg-green-900/20 border border-green-700/30 rounded-lg p-4">
@@ -168,39 +171,16 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
               );
             }
 
-            return canSendBulk ? (
-              <>
-                <button
-                  onClick={onSendBulkWhatsapp}
-                  disabled={sendingBulkWhatsapp || !onSendBulkWhatsapp}
-                  className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                >
-                  {sendingBulkWhatsapp ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      {bulkProgress
-                        ? `جاري الإرسال... ${bulkProgress.sent} من ${bulkProgress.total}`
-                        : 'جاري الإرسال...'}
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5" />
-                      إرسال جميع الدعوات عبر الواتساب ({unsentGuests.length} دعوة)
-                    </>
-                  )}
-                </button>
-                <p className="text-sm text-gray-400 mt-2 text-center">
-                  سيتم إرسال دعوات تفاعلية مع أزرار القبول/الاعتذار
-                </p>
-              </>
-            ) : (
-              <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-4">
+            return (
+              <div className="bg-blue-900/20 border border-blue-700/30 rounded-lg p-4">
                 <div className="flex items-center gap-3">
-                  <AlertCircle className="w-5 h-5 text-yellow-400" />
+                  <Send className="w-5 h-5 text-blue-400" />
                   <div className="flex-1">
-                    <h4 className="text-yellow-400 font-medium text-sm">في انتظار بطاقات الدخول</h4>
-                    <p className="text-yellow-100 text-xs mt-1">
-                      يجب إضافة بطاقة دخول لكل شخص ({guestsWithoutLinks.length} ضيف — {missingCards} بطاقة ناقصة) قبل إرسال الدعوات
+                    <h4 className="text-blue-400 font-medium text-sm">فريقنا يتولى إرسال الدعوات</h4>
+                    <p className="text-blue-100 text-xs mt-1">
+                      {guests.length - unsentGuests.length > 0
+                        ? `تم إرسال ${guests.length - unsentGuests.length} من ${guests.length} دعوة، وجارٍ إرسال الباقي`
+                        : `سيتم إرسال ${unsentGuests.length} دعوة لضيوفك قريباً`}
                     </p>
                   </div>
                 </div>
@@ -208,21 +188,6 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
             );
           })()}
         </div>
-        ) : (
-          <div className="mb-6">
-            <div className="bg-orange-900/20 border border-orange-700/30 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-orange-400" />
-                <div className="flex-1">
-                  <h4 className="text-orange-400 font-medium text-sm">قم بتأكيد قائمة الضيوف أولاً</h4>
-                  <p className="text-orange-100 text-xs mt-1">
-                    بعد تأكيد القائمة، سيتم إضافة الروابط الفردية ويمكنك إرسال الدعوات
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
       )}
 
       {/* Package-specific Notice */}
@@ -233,8 +198,8 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
             <div>
               <h4 className="font-medium text-green-400">تم تأكيد قائمة الضيوف</h4>
               <p className="text-sm text-green-100">
-                {event.packageType === 'premium' && 'بعد إضافة الروابط الفردية يمكنك إرسال الدعوات'}
-                {event.packageType === 'vip' && 'فريقنا سيتولى إرسال الدعوات للضيوف قريباً'}
+                {(event.packageType === 'premium' || event.packageType === 'vip') &&
+                  'فريقنا سيتولى إرسال الدعوات للضيوف قريباً'}
                 {event.guestListConfirmed.confirmedAt && 
                   ` (${new Date(event.guestListConfirmed.confirmedAt).toLocaleDateString('ar-SA', { calendar: 'gregory' })})`
                 }
@@ -278,8 +243,8 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
                 {event.packageType === 'vip' && 'باقة VIP'}
               </h4>
               <p className="text-sm text-yellow-100">
-                {event.packageType === 'premium' && 'أضف جميع ضيوفك وقم بتأكيد القائمة. بعدها سيتم إضافة الروابط الفردية لكل ضيف ويمكنك إرسال الدعوات'}
-                {event.packageType === 'vip' && 'أضف جميع ضيوفك ثم قم بتأكيد القائمة. فريقنا سيتولى إرسال الدعوات للضيوف نيابة عنك'}
+                {(event.packageType === 'premium' || event.packageType === 'vip') &&
+                  'أضف جميع ضيوفك ثم قم بتأكيد القائمة. فريقنا سيتولى إرسال الدعوات للضيوف نيابة عنك'}
               </p>
             </div>
           </div>
@@ -304,13 +269,12 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
         packageType={event.packageType}
         invitationCardUrl={event.invitationCardUrl}
         isVipConfirmed={isVipConfirmed}
-        onSendWhatsapp={onSendWhatsapp}
-        onSendWhatsappAPI={onSendWhatsappAPI}
+
         onRemoveGuest={onRemoveGuest}
         onUpdateGuest={onUpdateGuest}
         getCountryFromPhone={getCountryFromPhone}
         onCountryChange={onCountryChange}
-        sendingWhatsapp={sendingWhatsapp}
+
       />
 
       {/* Confirm Final Guest List Button - For all packages - Only for owners */}
@@ -321,8 +285,8 @@ export const GuestManagement: React.FC<GuestManagementProps> = ({
               <div className="flex-1">
                 <h4 className="text-yellow-400 font-medium mb-1">تأكيد القائمة النهائية</h4>
                 <p className="text-yellow-100 text-sm mb-2">
-                  {event.packageType === 'premium' && 'بعد التأكيد، سيتم إضافة الروابط الفردية لكل ضيف'}
-                  {event.packageType === 'vip' && 'بعد التأكيد، سيقوم فريقنا بإرسال الدعوات لجميع الضيوف'}
+                  {(event.packageType === 'premium' || event.packageType === 'vip') &&
+                    'بعد التأكيد، سيقوم فريقنا بإرسال الدعوات لجميع الضيوف'}
                 </p>
                 <div className="bg-orange-900/20 border border-orange-700/30 rounded-lg p-3 mt-2">
                   <p className="text-orange-300 text-xs font-medium">

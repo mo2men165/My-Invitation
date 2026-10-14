@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { eventsAPI, EventItem, GuestStats } from '@/lib/api/events';
-import { whatsappAPI } from '@/lib/api/whatsapp';
 import { useToast } from '@/hooks/useToast';
 import { Guest } from '@/types/event';
 import { 
@@ -45,9 +44,6 @@ const EventDetailPage: React.FC = () => {
   const [addingGuest, setAddingGuest] = useState(false);
   const [confirmingGuestList, setConfirmingGuestList] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
-  const [sendingWhatsapp, setSendingWhatsapp] = useState<string | null>(null);
-  const [sendingBulkWhatsapp, setSendingBulkWhatsapp] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
   
   // New guest form
   const [newGuest, setNewGuest] = useState<Guest>({
@@ -174,246 +170,6 @@ const EventDetailPage: React.FC = () => {
       });
     } finally {
       setAddingGuest(false);
-    }
-  };
-
-  const handleSendWhatsapp = async (guest: Guest) => {
-    if (!guest._id || !event) return;
-
-    let message = `بسم الله الرحمن الرحيم
-
-دعوة كريمة
-
-السلام عليكم ورحمة الله وبركاته الأستاذ الفاضل/ ${guest.name}
-
-${event.details.invitationText}
-
-تفاصيل المناسبة:
-- المضيف: ${event.details.hostName}
-- التاريخ: ${formatEventDate(event.details.eventDate)}
-- الوقت: من ${event.details.startTime} إلى ${event.details.endTime}
-- المكان: ${event.details.eventLocation}
-- عدد الأشخاص المدعوين: ${guest.numberOfAccompanyingGuests}`;
-
-    // Add invitation URL for all packages
-    if (event.invitationCardUrl) {
-      message += `\n\nرابط الدعوة: ${event.invitationCardUrl}`;
-    } else {
-      message += `\n\nرابط الدعوة سيتم إرساله قريباً بعد موافقة الإدارة`;
-    }
-
-    message += `\n\nنتشرف بحضوركم الكريم وننتظركم معنا في هذه المناسبة المباركة`;
-
-    const whatsappUrl = `https://wa.me/${guest.phone.replace(/^\+/, '')}?text=${encodeURIComponent(message)}`;
-    
-    try {
-      // Mark as sent in backend
-      await eventsAPI.markWhatsappSent(eventId, guest._id!);
-      
-      // Open WhatsApp
-      window.open(whatsappUrl, '_blank');
-      
-      // Reload to update UI
-      await loadEventDetails();
-      
-      toast({
-        title: "تم إرسال الرسالة",
-        description: "تم تحديث حالة الرسالة بنجاح",
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "خطأ في تحديث حالة الرسالة",
-        description: error.message || "حدث خطأ غير متوقع",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // New WhatsApp API integration for Premium/VIP packages
-  const handleSendWhatsappAPI = async (guest: Guest) => {
-    if (!guest._id || !event) return;
-
-    console.log('=== USER FRONTEND: Starting handleSendWhatsappAPI ===', {
-      eventId,
-      guestId: guest._id,
-      guestName: guest.name,
-      guestPhone: guest.phone,
-      packageType: event.packageType,
-      hasIndividualLink: !!guest.individualInviteImage
-    });
-
-    // Check if package supports WhatsApp integration
-    if (event.packageType === 'classic') {
-      console.warn('USER FRONTEND: Classic package not supported');
-      toast({
-        title: "غير متاح",
-        description: "إرسال الدعوات عبر الواتساب متاح فقط لحزم Premium و VIP",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Check if individual invite image is set
-    if (!guest.individualInviteImage) {
-      console.error('USER FRONTEND: Individual invite link missing', {
-        guestId: guest._id,
-        guestName: guest.name
-      });
-      toast({
-        title: "خطأ",
-        description: "لم يتم إضافة رابط الدعوة الفردي لهذا الضيف بعد",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setSendingWhatsapp(guest._id);
-      
-      console.log('USER FRONTEND: Calling whatsappAPI.sendInvitation...');
-      const result = await whatsappAPI.sendInvitation(eventId, guest._id);
-      console.log('USER FRONTEND: API response received', result);
-      
-      if (result.success) {
-        console.log('USER FRONTEND: Invitation sent successfully', {
-          messageId: result.data?.messageId
-        });
-
-        toast({
-          title: "تم إرسال الدعوة",
-          description: "تم إرسال الدعوة عبر الواتساب بنجاح",
-          variant: "default"
-        });
-        
-        // Reload to update UI
-        console.log('USER FRONTEND: Reloading event details...');
-        await loadEventDetails();
-        console.log('=== USER FRONTEND: handleSendWhatsappAPI complete ===');
-      }
-    } catch (error: any) {
-      console.error('=== USER FRONTEND: ERROR in handleSendWhatsappAPI ===', {
-        error: error.message,
-        stack: error.stack,
-        guestId: guest._id
-      });
-      toast({
-        title: "خطأ في إرسال الدعوة",
-        description: error.message || "فشل في إرسال الدعوة",
-        variant: "destructive"
-      });
-    } finally {
-      setSendingWhatsapp(null);
-    }
-  };
-
-  // Send bulk invitations via WhatsApp API
-  const handleSendBulkWhatsapp = async () => {
-    if (!event) return;
-
-    console.log('=== USER FRONTEND BULK: Starting handleSendBulkWhatsapp ===', {
-      eventId,
-      packageType: event.packageType,
-      totalGuests: guests.length,
-      guestListConfirmed: event.guestListConfirmed?.isConfirmed
-    });
-
-    // Check if package supports WhatsApp integration
-    if (event.packageType === 'classic') {
-      console.warn('USER FRONTEND BULK: Classic package not supported');
-      toast({
-        title: "غير متاح",
-        description: "إرسال الدعوات عبر الواتساب متاح فقط لحزم Premium و VIP",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Get guests who haven't received WhatsApp messages yet
-    const unsentGuests = guests.filter(guest => !guest.whatsappMessageSent);
-    
-    console.log('USER FRONTEND BULK: Unsent guests count', {
-      total: guests.length,
-      unsent: unsentGuests.length,
-      unsentGuestIds: unsentGuests.map(g => g._id)
-    });
-
-    // Every person on an invitation needs an entry card before sending
-    const guestsWithoutLinks = unsentGuests.filter(g => !hasAllCards(g));
-    if (guestsWithoutLinks.length > 0) {
-      const missingCards = guestsWithoutLinks.reduce((sum, g) => sum + getMissingCardCount(g), 0);
-      console.error('USER FRONTEND BULK: Some guests missing entry cards', {
-        count: guestsWithoutLinks.length,
-        missingCards,
-        guestNames: guestsWithoutLinks.map(g => g.name)
-      });
-      toast({
-        title: "خطأ",
-        description: `${guestsWithoutLinks.length} ضيف بحاجة إلى بطاقات دخول (${missingCards} بطاقة ناقصة)`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (unsentGuests.length === 0) {
-      console.log('USER FRONTEND BULK: No unsent guests');
-      toast({
-        title: "لا توجد دعوات للإرسال",
-        description: "جميع الضيوف تم إرسال الدعوات لهم",
-        variant: "default"
-      });
-      return;
-    }
-
-    try {
-      setSendingBulkWhatsapp(true);
-      setBulkProgress({ sent: 0, total: unsentGuests.length });
-
-      const guestIds = unsentGuests.map(guest => guest._id!);
-      console.log('USER FRONTEND BULK: Sending bulk invitations...', {
-        guestIds,
-        count: guestIds.length
-      });
-
-      // Sending happens a chunk per request; progress comes back as it goes.
-      const summary = await whatsappAPI.sendBulkInvitations(eventId, guestIds, progress => {
-        setBulkProgress({ sent: progress.sent, total: progress.total });
-      });
-      console.log('USER FRONTEND BULK: Bulk send summary', summary);
-
-      if (summary.failed === 0) {
-        toast({
-          title: "تم إرسال الدعوات",
-          description: `تم إرسال ${summary.sent} دعوة عبر الواتساب`,
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: summary.sent > 0 ? "تم إرسال بعض الدعوات" : "فشل إرسال الدعوات",
-          description: `تم إرسال ${summary.sent} من ${summary.total} دعوة. فشل ${summary.failed}: ${
-            summary.failures[0]?.error || 'خطأ غير معروف'
-          }`,
-          variant: summary.sent > 0 ? "default" : "destructive"
-        });
-      }
-
-      // Reload to update UI
-      console.log('USER FRONTEND BULK: Reloading event details...');
-      await loadEventDetails();
-      console.log('=== USER FRONTEND BULK: handleSendBulkWhatsapp complete ===');
-    } catch (error: any) {
-      console.error('=== USER FRONTEND BULK: ERROR in handleSendBulkWhatsapp ===', {
-        error: error.message,
-        stack: error.stack
-      });
-      toast({
-        title: "خطأ في إرسال الدعوات",
-        description: error.message || "فشل في إرسال الدعوات",
-        variant: "destructive"
-      });
-    } finally {
-      setSendingBulkWhatsapp(false);
-      setBulkProgress(null);
     }
   };
 
@@ -610,16 +366,10 @@ ${event.details.invitationText}
               addingGuest={addingGuest}
               confirmingGuestList={confirmingGuestList}
               onAddGuest={handleAddGuest}
-              onSendWhatsapp={handleSendWhatsapp}
-              onSendWhatsappAPI={handleSendWhatsappAPI}
-              onSendBulkWhatsapp={handleSendBulkWhatsapp}
               onRemoveGuest={handleRemoveGuest}
               onUpdateGuest={handleUpdateGuest}
               onConfirmGuestList={handleConfirmGuestList}
               onReopenGuestList={handleReopenGuestList}
-              sendingWhatsapp={sendingWhatsapp}
-              sendingBulkWhatsapp={sendingBulkWhatsapp}
-              bulkProgress={bulkProgress}
               getCountryFromPhone={getCountryFromPhone}
               onCountryChange={handleCountryChange}
               remainingInvites={guestStats?.remainingInvites || 0}

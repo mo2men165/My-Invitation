@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Check, Trash2, Users2, Edit2, X, Save } from 'lucide-react';
+import { Check, Trash2, Users2, Edit2, X, Save } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { Guest } from '@/types/event';
@@ -11,11 +11,10 @@ interface EditableGuestProps {
   packageType: string;
   invitationCardUrl?: string;
   isVipConfirmed: boolean;
-  onSendWhatsapp: (guest: Guest) => Promise<void>;
-  onSendWhatsappAPI?: (guest: Guest) => Promise<void>;
+
   onRemoveGuest: (guestId: string) => Promise<void>;
   onUpdateGuest: (guestId: string, updates: Partial<Guest>) => Promise<void>;
-  sendingWhatsapp?: string | null;
+
   getCountryFromPhone: (phone: string) => string;
   onCountryChange?: (country: string) => void;
 }
@@ -55,11 +54,10 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
   packageType,
   invitationCardUrl,
   isVipConfirmed,
-  onSendWhatsapp,
-  onSendWhatsappAPI,
+
   onRemoveGuest,
   onUpdateGuest,
-  sendingWhatsapp,
+
   getCountryFromPhone,
   onCountryChange
 }) => {
@@ -314,41 +312,17 @@ export const EditableGuest: React.FC<EditableGuestProps> = ({
 
                 <AccompanyingCountBadge guest={guest} />
 
-                {guest.individualInviteImage ? (
-                  <>
-                    {/* Once a guest has their invitation - sent by the customer
-                        or by our team - there is nothing to send again, so the
-                        button gives way to the sent badge. */}
-                    {guest.whatsappMessageSent ? (
-                      <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
-                        <Check className="w-3 h-3" />
-                        تم الإرسال
-                      </span>
-                    ) : (
-                      onSendWhatsappAPI && (
-                        <button
-                          onClick={() => onSendWhatsappAPI(guest)}
-                          disabled={sendingWhatsapp === guest._id}
-                          className={`flex items-center gap-1 px-2 py-1 text-white text-xs rounded transition-colors ${
-                            sendingWhatsapp === guest._id
-                              ? 'bg-gray-600 cursor-not-allowed'
-                              : 'bg-green-600 hover:bg-green-700'
-                          }`}
-                          title="إرسال دعوة تفاعلية عبر الواتساب"
-                        >
-                          {sendingWhatsapp === guest._id ? (
-                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Send className="w-3 h-3" />
-                          )}
-                          إرسال
-                        </button>
-                      )
-                    )}
-                  </>
+                {/* Customers never send invitations - our team does - so this
+                    reports where the guest stands and offers no control. */}
+                {guest.whatsappMessageSent ? (
+                  <span className="flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
+                    <Check className="w-3 h-3" />
+                    تم الإرسال
+                  </span>
                 ) : (
                   <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded">
-                    في انتظار الرابط
+                    <Users2 className="w-4 h-4" />
+                    في انتظار الإرسال
                   </span>
                 )}
               </>

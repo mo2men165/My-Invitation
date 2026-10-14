@@ -33,7 +33,10 @@ const getPackageFeatures = (packageType: keyof PackageData) => {
   features['تذكير 5 أيام'] = packageFeatures.some(f => f.includes('تذكير') && f.includes('5 أيام')) ? 'متاح' : 'غير متاح';
   features['مشرف مجاني'] = packageFeatures.some(f => f.includes('مشرف لقراءة') && !f.includes('برسوم')) ? 'متاح' : 'غير متاح';
   features['مشرف برسوم إضافية'] = packageFeatures.some(f => f.includes('مشرف') && f.includes('برسوم أضافيه')) ? 'متاح' : 'غير متاح';
+  // Our team sends every premium and VIP invitation; only the classic package
+  // hands the cards to the customer to distribute.
   features['توزيع العميل'] = packageFeatures.some(f => f.includes('من قبل العميل')) ? 'متاح' : 'غير متاح';
+  features['الإرسال من قبلنا'] = packageFeatures.some(f => f.includes('من قبلنا')) ? 'متاح' : 'غير متاح';
   features['موقع المناسبة'] = packageFeatures.some(f => f.includes('موقع المناسبة')) ? 'متاح' : 'غير متاح';
   
   return features;
