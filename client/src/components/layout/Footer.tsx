@@ -193,13 +193,15 @@ export function Footer() {
                 {services.map((service, index) => (
                   <motion.li 
                     key={index}
-                    className="group cursor-pointer"
+                    className="group"
                     whileHover={{ x: 5 }}
                     initial={{ opacity: 0, x: -20 }}
                     animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -20 }}
                     transition={{ duration: 0.3, delay: index * 0.1 }}
                   >
-                    <div className="flex items-center space-x-2 ">
+                    {/* These looked clickable but went nowhere; every service is
+                        offered through the packages page. */}
+                    <Link href="/packages" className="flex items-center space-x-2 ">
                       <motion.div 
                         className="w-1.5 ml-3 h-1.5 rounded-full group-hover:w-3 transition-all duration-300"
                         style={{ backgroundColor: '#C09B52' }}
@@ -207,7 +209,7 @@ export function Footer() {
                       <span className="text-gray-300 mr-3 group-hover:text-white transition-colors">
                         {service}
                       </span>
-                    </div>
+                    </Link>
                   </motion.li>
                 ))}
               </ul>
